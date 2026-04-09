@@ -23,6 +23,25 @@ export const IPC_CHANNELS = {
   // Settings
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
+
+  // Document operations (Phase 3)
+  DOC_CREATE: 'doc:create',
+  DOC_OPEN: 'doc:open',
+  DOC_SAVE: 'doc:save',
+  DOC_SAVE_AS: 'doc:saveAs',
+  DOC_RENAME: 'doc:rename',
+  DOC_DUPLICATE: 'doc:duplicate',
+  DOC_ARCHIVE: 'doc:archive',
+  DOC_RESTORE: 'doc:restore',
+  DOC_DELETE: 'doc:delete',
+  DOC_LIST: 'doc:list',
+  DOC_IMPORT: 'doc:import',
+  DOC_EXPORT: 'doc:export',
+  DOC_GET_LAST_OPENED: 'doc:getLastOpened',
+  DOC_SET_LAST_OPENED: 'doc:setLastOpened',
+  DOC_SCHEDULE_AUTOSAVE: 'doc:scheduleAutosave',
+  DOC_GET_RECOVERY_SNAPSHOTS: 'doc:getRecoverySnapshots',
+  DOC_CLEAR_RECOVERY_SNAPSHOT: 'doc:clearRecoverySnapshot',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -190,4 +209,149 @@ export function isSettingsGetRequest(payload: any): payload is SettingsGetReques
 
 export function isSettingsSetRequest(payload: any): payload is SettingsSetRequest {
   return typeof payload === 'object' && typeof payload.key === 'string' && payload.value !== undefined
+}
+
+// Document operation types (Phase 3)
+export interface DocCreateRequest {
+  title?: string
+}
+
+export interface DocOpenRequest {
+  id: string
+}
+
+export interface DocSaveRequest {
+  document: any // LaconDocument
+}
+
+export interface DocSaveAsRequest {
+  document: any // LaconDocument
+  newTitle: string
+}
+
+export interface DocRenameRequest {
+  id: string
+  newTitle: string
+}
+
+export interface DocDuplicateRequest {
+  id: string
+}
+
+export interface DocArchiveRequest {
+  id: string
+}
+
+export interface DocRestoreRequest {
+  id: string
+}
+
+export interface DocDeleteRequest {
+  id: string
+}
+
+export interface DocListRequest {
+  includeArchived?: boolean
+}
+
+export interface DocImportRequest {
+  data: string
+  format: 'json' | 'html' | 'markdown'
+  title?: string
+}
+
+export interface DocExportRequest {
+  document: any // LaconDocument
+  format: 'json' | 'html' | 'markdown'
+}
+
+export interface DocSetLastOpenedRequest {
+  id: string
+}
+
+export interface DocScheduleAutosaveRequest {
+  document: any // LaconDocument
+}
+
+export interface DocClearRecoverySnapshotRequest {
+  documentId: string
+}
+
+export type DocCreateResponse = IpcResponse<any> // LaconDocument
+export type DocOpenResponse = IpcResponse<any | null> // LaconDocument | null
+export type DocSaveResponse = IpcResponse<void>
+export type DocSaveAsResponse = IpcResponse<any> // LaconDocument
+export type DocRenameResponse = IpcResponse<void>
+export type DocDuplicateResponse = IpcResponse<any> // LaconDocument
+export type DocArchiveResponse = IpcResponse<void>
+export type DocRestoreResponse = IpcResponse<void>
+export type DocDeleteResponse = IpcResponse<void>
+export type DocListResponse = IpcResponse<any[]> // DocumentListItem[]
+export type DocImportResponse = IpcResponse<any> // ImportResult
+export type DocExportResponse = IpcResponse<any> // ExportResult
+export type DocGetLastOpenedResponse = IpcResponse<any | null> // LaconDocument | null
+export type DocSetLastOpenedResponse = IpcResponse<void>
+export type DocScheduleAutosaveResponse = IpcResponse<void>
+export type DocGetRecoverySnapshotsResponse = IpcResponse<any[]> // RecoverySnapshot[]
+export type DocClearRecoverySnapshotResponse = IpcResponse<void>
+
+// Type guards for document operations
+export function isDocCreateRequest(payload: any): payload is DocCreateRequest {
+  return typeof payload === 'object'
+}
+
+export function isDocOpenRequest(payload: any): payload is DocOpenRequest {
+  return typeof payload === 'object' && typeof payload.id === 'string'
+}
+
+export function isDocSaveRequest(payload: any): payload is DocSaveRequest {
+  return typeof payload === 'object' && payload.document !== undefined
+}
+
+export function isDocSaveAsRequest(payload: any): payload is DocSaveAsRequest {
+  return typeof payload === 'object' && payload.document !== undefined && typeof payload.newTitle === 'string'
+}
+
+export function isDocRenameRequest(payload: any): payload is DocRenameRequest {
+  return typeof payload === 'object' && typeof payload.id === 'string' && typeof payload.newTitle === 'string'
+}
+
+export function isDocDuplicateRequest(payload: any): payload is DocDuplicateRequest {
+  return typeof payload === 'object' && typeof payload.id === 'string'
+}
+
+export function isDocArchiveRequest(payload: any): payload is DocArchiveRequest {
+  return typeof payload === 'object' && typeof payload.id === 'string'
+}
+
+export function isDocRestoreRequest(payload: any): payload is DocRestoreRequest {
+  return typeof payload === 'object' && typeof payload.id === 'string'
+}
+
+export function isDocDeleteRequest(payload: any): payload is DocDeleteRequest {
+  return typeof payload === 'object' && typeof payload.id === 'string'
+}
+
+export function isDocListRequest(payload: any): payload is DocListRequest {
+  return typeof payload === 'object'
+}
+
+export function isDocImportRequest(payload: any): payload is DocImportRequest {
+  return typeof payload === 'object' && typeof payload.data === 'string' && typeof payload.format === 'string'
+}
+
+export function isDocExportRequest(payload: any): payload is DocExportRequest {
+  return typeof payload === 'object' && payload.document !== undefined && typeof payload.format === 'string'
+}
+
+export function isDocSetLastOpenedRequest(payload: any): payload is DocSetLastOpenedRequest {
+  return typeof payload === 'object' && typeof payload.id === 'string'
+}
+
+export function isDocScheduleAutosaveRequest(payload: any): payload is DocScheduleAutosaveRequest {
+  return typeof payload === 'object' && payload.document !== undefined
+}
+
+export function isDocClearRecoverySnapshotRequest(payload: any): payload is DocClearRecoverySnapshotRequest {
+  return typeof payload === 'object' && typeof payload.documentId === 'string'
 }

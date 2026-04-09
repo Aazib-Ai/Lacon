@@ -24,15 +24,30 @@
     "dist": "electron-builder"
   },
   "dependencies": {
-    "electron-updater": "^6.3.9"
+    "@tiptap/core": "workspace:*",
+    "@tiptap/extension-document": "workspace:*",
+    "@tiptap/extension-link": "workspace:*",
+    "@tiptap/extension-paragraph": "workspace:*",
+    "@tiptap/extension-text": "workspace:*",
+    "@tiptap/html": "workspace:*",
+    "@tiptap/markdown": "workspace:*",
+    "@tiptap/react": "workspace:*",
+    "@tiptap/starter-kit": "workspace:*",
+    "dompurify": "^3.2.2",
+    "electron-updater": "^6.3.9",
+    "turndown": "^7.2.0"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.2.0",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/turndown": "^5.0.5",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
+    "jsdom": "^29.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.3",

@@ -7,6 +7,7 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
+import type { DocumentListItem, LaconDocument, RecoverySnapshot } from '../../shared/document-types'
 import {
   type CollectionName,
   COLLECTIONS,
@@ -238,6 +239,91 @@ export class DataStore {
   private ensureInitialized(): void {
     if (!this.initialized) {
       throw new Error('DataStore not initialized. Call initialize() first.')
+    }
+  }
+
+  // Document-specific methods for Phase 3
+
+  async saveDocument(document: LaconDocument): Promise<void> {
+    await this.save(COLLECTIONS.DOCUMENTS, document.metadata.id, document)
+  }
+
+  async getDocument(id: string): Promise<LaconDocument | null> {
+    return this.load(COLLECTIONS.DOCUMENTS, id)
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    await this.delete(COLLECTIONS.DOCUMENTS, id)
+  }
+
+  async listDocuments(includeArchived: boolean = false): Promise<DocumentListItem[]> {
+    const ids = await this.list(COLLECTIONS.DOCUMENTS)
+    const documents: DocumentListItem[] = []
+
+    for (const id of ids) {
+      const doc = await this.getDocument(id)
+      if (doc && (includeArchived || !doc.metadata.isArchived)) {
+        documents.push({
+          id: doc.metadata.id,
+          title: doc.metadata.title,
+          createdAt: doc.metadata.createdAt,
+          updatedAt: doc.metadata.updatedAt,
+          isArchived: doc.metadata.isArchived,
+        })
+      }
+    }
+
+    return documents.sort((a, b) => b.updatedAt - a.updatedAt)
+  }
+
+  async saveRecoverySnapshot(snapshot: RecoverySnapshot): Promise<void> {
+    const recoveryPath = join(this.dataPath, 'recovery')
+    if (!existsSync(recoveryPath)) {
+      mkdirSync(recoveryPath, { recursive: true })
+    }
+
+    const filePath = join(recoveryPath, `${snapshot.documentId}.json`)
+    writeFileSync(filePath, JSON.stringify(snapshot, null, 2), 'utf-8')
+  }
+
+  async getRecoverySnapshots(): Promise<RecoverySnapshot[]> {
+    const recoveryPath = join(this.dataPath, 'recovery')
+    if (!existsSync(recoveryPath)) {
+      return []
+    }
+
+    const files = readdirSync(recoveryPath).filter(f => f.endsWith('.json'))
+    const snapshots: RecoverySnapshot[] = []
+
+    for (const file of files) {
+      try {
+        const json = readFileSync(join(recoveryPath, file), 'utf-8')
+        snapshots.push(JSON.parse(json))
+      } catch (error) {
+        console.error(`Failed to read recovery snapshot ${file}:`, error)
+      }
+    }
+
+    return snapshots.sort((a, b) => b.timestamp - a.timestamp)
+  }
+
+  async clearRecoverySnapshot(documentId: string): Promise<void> {
+    const recoveryPath = join(this.dataPath, 'recovery', `${documentId}.json`)
+    if (existsSync(recoveryPath)) {
+      unlinkSync(recoveryPath)
+    }
+  }
+
+  async getLastOpenedDocumentId(): Promise<string | null> {
+    const settings = await this.load(COLLECTIONS.SETTINGS, 'default')
+    return settings?.lastOpenedDocumentId || null
+  }
+
+  async setLastOpenedDocumentId(id: string): Promise<void> {
+    const settings = await this.load(COLLECTIONS.SETTINGS, 'default')
+    if (settings) {
+      settings.lastOpenedDocumentId = id
+      await this.save(COLLECTIONS.SETTINGS, 'default', settings)
     }
   }
 }

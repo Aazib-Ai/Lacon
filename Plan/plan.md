@@ -100,34 +100,34 @@ Amplify: [amplifies/phase-02-amplify.md](amplifies/phase-02-amplify.md)
 ## Phase 3: Core Editor and Document Lifecycle
 Amplify: [amplifies/phase-03-amplify.md](amplifies/phase-03-amplify.md)
 
-- [ ] P3-T1 Integrate core editor runtime
-  - [ ] P3-T1.1 Editor boots in renderer
-  - [ ] P3-T1.2 Starter extension stack works
-  - [ ] P3-T1.3 Keyboard baseline complete
-- [ ] P3-T2 Implement document lifecycle
-  - [ ] P3-T2.1 New, open, save, save-as
-  - [ ] P3-T2.2 Autosave and crash-recovery draft
-  - [ ] P3-T2.3 Rename, duplicate, archive, restore
-- [ ] P3-T3 Implement import and export pipeline
-  - [ ] P3-T3.1 JSON canonical format
-  - [ ] P3-T3.2 HTML import/export
-  - [ ] P3-T3.3 Markdown import/export
+- [x] P3-T1 Integrate core editor runtime
+  - [x] P3-T1.1 Editor boots in renderer
+  - [x] P3-T1.2 Starter extension stack works
+  - [x] P3-T1.3 Keyboard baseline complete
+- [x] P3-T2 Implement document lifecycle
+  - [x] P3-T2.1 New, open, save, save-as
+  - [x] P3-T2.2 Autosave and crash-recovery draft
+  - [x] P3-T2.3 Rename, duplicate, archive, restore
+- [x] P3-T3 Implement import and export pipeline
+  - [x] P3-T3.1 JSON canonical format
+  - [x] P3-T3.2 HTML import/export
+  - [x] P3-T3.3 Markdown import/export
 
 ## Phase 4: UI and UX Product Shell
 Amplify: [amplifies/phase-04-amplify.md](amplifies/phase-04-amplify.md)
 
-- [ ] P4-T1 Build design system primitives
-  - [ ] P4-T1.1 Typography, spacing, color tokens
-  - [ ] P4-T1.2 Component state spec
-  - [ ] P4-T1.3 Theming foundation
-- [ ] P4-T2 Build desktop app shell
-  - [ ] P4-T2.1 Sidebar and workspace navigation
-  - [ ] P4-T2.2 Central editor canvas
-  - [ ] P4-T2.3 Right assistant panel and status bar
-- [ ] P4-T3 Build interaction and accessibility layer
-  - [ ] P4-T3.1 Keyboard-first navigation
-  - [ ] P4-T3.2 Focus management and semantics
-  - [ ] P4-T3.3 Reduced motion and high contrast support
+- [x] P4-T1 Build design system primitives
+  - [x] P4-T1.1 Typography, spacing, color tokens
+  - [x] P4-T1.2 Component state spec
+  - [x] P4-T1.3 Theming foundation
+- [x] P4-T2 Build desktop app shell
+  - [x] P4-T2.1 Sidebar and workspace navigation
+  - [x] P4-T2.2 Central editor canvas
+  - [x] P4-T2.3 Right assistant panel and status bar
+- [x] P4-T3 Build interaction and accessibility layer
+  - [x] P4-T3.1 Keyboard-first navigation
+  - [x] P4-T3.2 Focus management and semantics
+  - [x] P4-T3.3 Reduced motion and high contrast support
 
 ## Phase 5: Advanced Editing Features
 Amplify: [amplifies/phase-05-amplify.md](amplifies/phase-05-amplify.md)
