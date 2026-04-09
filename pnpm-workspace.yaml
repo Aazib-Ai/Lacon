@@ -2,3 +2,4 @@ packages:
   - 'packages/*'
   - 'packages-deprecated/*'
   - 'demos'
+  - 'apps/*'

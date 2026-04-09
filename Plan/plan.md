@@ -68,18 +68,18 @@ Amplify: [amplifies/phase-00-amplify.md](amplifies/phase-00-amplify.md)
 ## Phase 1: Monorepo App Setup and Build System
 Amplify: [amplifies/phase-01-amplify.md](amplifies/phase-01-amplify.md)
 
-- [ ] P1-T1 Create Electron app workspace structure
-  - [ ] P1-T1.1 App directories created
-  - [ ] P1-T1.2 Main, preload, renderer entry points created
-  - [ ] P1-T1.3 Workspace registration done
-- [ ] P1-T2 Establish local dev and CI build flow
-  - [ ] P1-T2.1 Dev scripts added
-  - [ ] P1-T2.2 Build scripts added
-  - [ ] P1-T2.3 Lint and test scripts added
-- [ ] P1-T3 Configure packaging baseline
-  - [ ] P1-T3.1 Windows installer config
-  - [ ] P1-T3.2 macOS installer config
-  - [ ] P1-T3.3 Stable and beta channel wiring
+- [x] P1-T1 Create Electron app workspace structure
+  - [x] P1-T1.1 App directories created
+  - [x] P1-T1.2 Main, preload, renderer entry points created
+  - [x] P1-T1.3 Workspace registration done
+- [x] P1-T2 Establish local dev and CI build flow
+  - [x] P1-T2.1 Dev scripts added
+  - [x] P1-T2.2 Build scripts added
+  - [x] P1-T2.3 Lint and test scripts added
+- [x] P1-T3 Configure packaging baseline
+  - [x] P1-T3.1 Windows installer config
+  - [x] P1-T3.2 macOS installer config
+  - [x] P1-T3.3 Stable and beta channel wiring
 
 ## Phase 2: Security Foundation and Local Data Architecture
 Amplify: [amplifies/phase-02-amplify.md](amplifies/phase-02-amplify.md)
