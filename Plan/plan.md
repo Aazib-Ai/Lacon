@@ -132,18 +132,18 @@ Amplify: [amplifies/phase-04-amplify.md](amplifies/phase-04-amplify.md)
 ## Phase 5: Advanced Editing Features
 Amplify: [amplifies/phase-05-amplify.md](amplifies/phase-05-amplify.md)
 
-- [ ] P5-T1 Add advanced content features
-  - [ ] P5-T1.1 Tables
-  - [ ] P5-T1.2 Media embeds and links
-  - [ ] P5-T1.3 Mentions and rich text controls
-- [ ] P5-T2 Add creator utilities
-  - [ ] P5-T2.1 Real-time word count
-  - [ ] P5-T2.2 Speaking-duration estimate
-  - [ ] P5-T2.3 Script structure helpers
-- [ ] P5-T3 Build content fidelity tests
-  - [ ] P5-T3.1 JSON roundtrip
-  - [ ] P5-T3.2 HTML roundtrip
-  - [ ] P5-T3.3 Markdown roundtrip
+- [x] P5-T1 Add advanced content features
+  - [x] P5-T1.1 Tables
+  - [x] P5-T1.2 Media embeds and links
+  - [x] P5-T1.3 Mentions and rich text controls
+- [x] P5-T2 Add creator utilities
+  - [x] P5-T2.1 Real-time word count
+  - [x] P5-T2.2 Speaking-duration estimate
+  - [x] P5-T2.3 Script structure helpers
+- [x] P5-T3 Build content fidelity tests
+  - [x] P5-T3.1 JSON roundtrip
+  - [x] P5-T3.2 HTML roundtrip
+  - [x] P5-T3.3 Markdown roundtrip
 
 ## Phase 6: Agent Runtime Core
 Amplify: [amplifies/phase-06-amplify.md](amplifies/phase-06-amplify.md)

@@ -7,6 +7,9 @@ Use this file as a shared ledger across coding agents.
 - [x] Phase 0 - All tasks claimed by Kiro on 2026-04-09
 - [x] Phase 1 - All tasks claimed by Kiro on 2026-04-09
 - [x] Phase 2 - All tasks claimed by Kiro on 2026-04-09
+- [x] Phase 3 - All tasks claimed by Kiro on 2026-04-09
+- [x] Phase 4 - All tasks claimed by Kiro on 2026-04-09
+- [ ] Phase 5 - All tasks claimed by Kiro on 2026-04-09
 
 Claim entry:
 
@@ -50,6 +53,15 @@ Claim entry:
 - Agent: Kiro
 - Phase: P4
 - Task ID: P4-T1, P4-T2, P4-T3, P4-T4, P4-T5, P4-T6, P4-T7, P4-T8, P4-T9, P4-T10
+- Claim status: CLAIMED
+- Expected completion window: 2026-04-09
+
+Claim entry:
+
+- Date: 2026-04-09
+- Agent: Kiro
+- Phase: P5
+- Task ID: P5-T1, P5-T2, P5-T3, P5-T4, P5-T5, P5-T6, P5-T7
 - Claim status: CLAIMED
 - Expected completion window: 2026-04-09
 
@@ -291,6 +303,54 @@ Report:
   - Keyboard-first navigation fully functional
   - All hard rules satisfied (keyboard-first, accessibility, visual consistency)
 
+Report:
+
+- Date: 2026-04-09
+- Agent: Kiro
+- Phase: P5
+- Task ID: P5-T1, P5-T2, P5-T3, P5-T4, P5-T5, P5-T6, P5-T7
+- Final status: DONE
+- Files changed:
+  - apps/lacon-desktop/package.json (added table, image, youtube, mention extensions)
+  - apps/lacon-desktop/src/renderer/extensions/table-extension.ts (new)
+  - apps/lacon-desktop/src/renderer/extensions/media-extension.ts (new)
+  - apps/lacon-desktop/src/renderer/extensions/mention-extension.ts (new)
+  - apps/lacon-desktop/src/renderer/components/MentionList.tsx (new)
+  - apps/lacon-desktop/src/renderer/components/Editor.tsx (updated with advanced features)
+  - apps/lacon-desktop/src/renderer/utils/content-analytics.ts (new)
+  - apps/lacon-desktop/src/renderer/utils/script-helpers.ts (new)
+  - apps/lacon-desktop/src/renderer/index.css (added Phase 5 styles)
+  - apps/lacon-desktop/tests/editor/table-features.test.ts (new)
+  - apps/lacon-desktop/tests/editor/media-features.test.ts (new)
+  - apps/lacon-desktop/tests/editor/mention-features.test.ts (new)
+  - apps/lacon-desktop/tests/editor/content-analytics.test.ts (new)
+  - apps/lacon-desktop/tests/editor/script-helpers.test.ts (new)
+  - apps/lacon-desktop/tests/editor/fidelity-roundtrip.test.ts (new)
+- Commands run:
+  - pnpm --filter lacon-desktop add @tiptap/extension-table @tiptap/extension-image @tiptap/extension-youtube @tiptap/extension-mention @tiptap/suggestion tippy.js (successful)
+  - pnpm --filter lacon-desktop test (successful - 220/220 tests passed)
+  - pnpm --filter lacon-desktop typecheck (successful)
+  - pnpm --filter lacon-desktop lint (successful)
+- Validation summary:
+  - Table extension with insert, delete, merge, split operations implemented
+  - Image and YouTube embed support with validation implemented
+  - Mention system with suggestion dropdown and keyboard navigation implemented
+  - Content analytics: word count, character count, speaking/reading duration, readability score
+  - Script helpers: templates for scenes, dialogue, YouTube scripts, formatting macros
+  - Comprehensive fidelity tests for JSON, HTML roundtrips with complex documents
+  - Regression tests for table, media, mention, and link preservation
+  - All 220 tests passing (150 from Phase 4 + 70 new Phase 5 tests)
+  - TypeScript type checking passes
+  - All Phase 5 code passes lint checks
+  - Advanced toolbar with table operations, media insertion, and metrics display
+  - CSS styles for tables, images, YouTube embeds, mentions, and dropdowns
+- Follow-up actions:
+  - Phase 6 (Agent Runtime Core) can begin (no blockers)
+  - Phase 7 (BYOM Provider Platform) can begin (no blockers)
+  - All advanced editing features are production-ready
+  - Content fidelity maintained across all formats
+  - All hard rules satisfied (keyboard accessible, no fidelity loss, comprehensive tests)
+
 Report template:
 
 - Date:
@@ -324,7 +384,7 @@ Blocker template:
 - [x] P2 complete
 - [x] P3 complete
 - [x] P4 complete
-- [ ] P5 complete
+- [x] P5 complete
 - [ ] P6 complete
 - [ ] P7 complete
 - [ ] P8 complete

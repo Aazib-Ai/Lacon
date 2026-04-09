@@ -176,15 +176,36 @@ importers:
       '@tiptap/extension-document':
         specifier: workspace:*
         version: link:../../packages/extension-document
+      '@tiptap/extension-image':
+        specifier: workspace:^
+        version: link:../../packages/extension-image
       '@tiptap/extension-link':
         specifier: workspace:*
         version: link:../../packages/extension-link
+      '@tiptap/extension-mention':
+        specifier: workspace:^
+        version: link:../../packages/extension-mention
       '@tiptap/extension-paragraph':
         specifier: workspace:*
         version: link:../../packages/extension-paragraph
+      '@tiptap/extension-table':
+        specifier: workspace:^
+        version: link:../../packages/extension-table
+      '@tiptap/extension-table-cell':
+        specifier: workspace:^
+        version: link:../../packages-deprecated/extension-table-cell
+      '@tiptap/extension-table-header':
+        specifier: workspace:^
+        version: link:../../packages-deprecated/extension-table-header
+      '@tiptap/extension-table-row':
+        specifier: workspace:^
+        version: link:../../packages-deprecated/extension-table-row
       '@tiptap/extension-text':
         specifier: workspace:*
         version: link:../../packages/extension-text
+      '@tiptap/extension-youtube':
+        specifier: workspace:^
+        version: link:../../packages/extension-youtube
       '@tiptap/html':
         specifier: workspace:*
         version: link:../../packages/html
@@ -197,12 +218,18 @@ importers:
       '@tiptap/starter-kit':
         specifier: workspace:*
         version: link:../../packages/starter-kit
+      '@tiptap/suggestion':
+        specifier: workspace:^
+        version: link:../../packages/suggestion
       dompurify:
         specifier: ^3.2.2
         version: 3.3.3
       electron-updater:
         specifier: ^6.3.9
         version: 6.8.3
+      tippy.js:
+        specifier: ^6.3.7
+        version: 6.3.7
       turndown:
         specifier: ^7.2.0
         version: 7.2.4
@@ -214,7 +241,7 @@ importers:
         specifier: ^28.0.1
         version: 28.0.1
       '@types/node':
-        specifier: ^22.10.2
+        specifier: ^22.10.3
         version: 22.10.3
       '@types/react':
         specifier: ^19.0.0
@@ -3103,6 +3130,9 @@ packages:
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
+
+  '@popperjs/core@2.11.8':
+    resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
 
   '@preact/signals-core@1.12.1':
     resolution: {integrity: sha512-BwbTXpj+9QutoZLQvbttRg5x3l5468qaV2kufh+51yha1c53ep5dY4kTuZR35+3pAZxpfQerGJiQqg34ZNZ6uA==}
@@ -7717,6 +7747,9 @@ packages:
     resolution: {integrity: sha512-Bf+ILmBgretUrdJxzXM0SgXLZ3XfiaUuOj/IKQHuTXip+05Xn+uyEYdVg0kYDipTBcLrCVyUzAPz7QmArb0mmw==}
     engines: {node: '>=14.0.0'}
 
+  tippy.js@6.3.7:
+    resolution: {integrity: sha512-E1d3oP2emgJ9dRQZdf3Kkn0qJgI6ZLpyS5z6ZkY1DF3kaQaBsGZsndEpHwx+eC+tYM41HaSNvNtLx8tU57FzTQ==}
+
   tldts-core@6.1.73:
     resolution: {integrity: sha512-k1g5eX87vxu3g//6XMn62y4qjayu4cYby/PF7Ksnh4F4uUK1Z1ze/mJ4a+y5OjdJ+cXRp+YTInZhH+FGdUWy1w==}
 
@@ -10631,6 +10664,8 @@ snapshots:
     optional: true
 
   '@polka/url@1.0.0-next.29': {}
+
+  '@popperjs/core@2.11.8': {}
 
   '@preact/signals-core@1.12.1': {}
 
@@ -15867,6 +15902,10 @@ snapshots:
       picomatch: 4.0.4
 
   tinyrainbow@3.1.0: {}
+
+  tippy.js@6.3.7:
+    dependencies:
+      '@popperjs/core': 2.11.8
 
   tldts-core@6.1.73: {}
 

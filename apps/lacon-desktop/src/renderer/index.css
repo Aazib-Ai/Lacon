@@ -247,3 +247,246 @@ body {
   font-style: italic;
   color: #666;
 }
+
+/* Phase 5: Advanced Editor Features */
+
+/* Table styles */
+.editor-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1rem 0;
+  overflow: hidden;
+}
+
+.editor-table-cell,
+.editor-table-header {
+  border: 2px solid var(--color-borderPrimary, #ddd);
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+  min-width: 100px;
+}
+
+.editor-table-header {
+  background-color: var(--color-bgSecondary, #f5f5f5);
+  font-weight: 600;
+  text-align: left;
+}
+
+.editor-table-cell:focus,
+.editor-table-header:focus {
+  outline: 2px solid var(--color-borderFocus, #0066cc);
+  outline-offset: -2px;
+}
+
+.selectedCell {
+  background-color: var(--color-bgHover, #e8f4ff);
+}
+
+/* Image styles */
+.editor-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1rem 0;
+  border-radius: 4px;
+}
+
+.editor-image.ProseMirror-selectednode {
+  outline: 2px solid var(--color-borderFocus, #0066cc);
+}
+
+/* YouTube embed styles */
+.editor-youtube {
+  margin: 1rem 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.editor-youtube iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: none;
+}
+
+/* Mention styles */
+.editor-mention {
+  background-color: var(--color-bgSecondary, #f0f0f0);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--color-textPrimary, #333);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.editor-mention:hover {
+  background-color: var(--color-bgHover, #e0e0e0);
+}
+
+/* Mention list dropdown */
+.mention-list {
+  background: var(--color-bgPrimary, #fff);
+  border: 1px solid var(--color-borderPrimary, #ddd);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  min-width: 200px;
+}
+
+.mention-list-empty {
+  padding: 8px 12px;
+  color: var(--color-textTertiary, #999);
+  font-size: 14px;
+}
+
+.mention-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  color: var(--color-textPrimary, #333);
+}
+
+.mention-list-item:hover,
+.mention-list-item.is-selected {
+  background-color: var(--color-bgHover, #f0f0f0);
+}
+
+.mention-list-item-label {
+  font-weight: 500;
+}
+
+.mention-list-item-type {
+  font-size: 12px;
+  color: var(--color-textTertiary, #999);
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+
+/* Toolbar dropdown menus */
+.toolbar-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.toolbar-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-bgPrimary, #fff);
+  border: 1px solid var(--color-borderPrimary, #ddd);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  min-width: 180px;
+  z-index: 1000;
+}
+
+.toolbar-dropdown-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--color-textPrimary, #333);
+}
+
+.toolbar-dropdown-menu button:hover {
+  background-color: var(--color-bgHover, #f0f0f0);
+}
+
+.toolbar-dropdown-menu button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Toolbar metrics display */
+.toolbar-metrics {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--color-bgPrimary, #fff);
+  border: 1px solid var(--color-borderPrimary, #ddd);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  min-width: 200px;
+  z-index: 1000;
+}
+
+.metric {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.metric-label {
+  color: var(--color-textSecondary, #666);
+  font-weight: 500;
+}
+
+.metric-value {
+  color: var(--color-textPrimary, #333);
+  font-weight: 600;
+}
+
+/* Link preview styles */
+.editor-link {
+  color: var(--color-linkPrimary, #0066cc);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.editor-link:hover {
+  color: var(--color-linkHover, #0052a3);
+}
+
+/* Horizontal rule for scene breaks */
+hr {
+  border: none;
+  border-top: 2px solid var(--color-borderPrimary, #ddd);
+  margin: 2rem 0;
+}
+
+/* Script formatting helpers */
+.script-scene-heading {
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 2rem;
+}
+
+.script-character {
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 1rem;
+}
+
+.script-parenthetical {
+  font-style: italic;
+  margin-left: 2rem;
+}
+
+.script-transition {
+  font-weight: 600;
+  text-align: right;
+  margin-top: 1rem;
+}

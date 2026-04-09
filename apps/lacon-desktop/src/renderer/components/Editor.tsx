@@ -1,14 +1,18 @@
 /**
- * TipTap Editor Component - Phase 3
- * Core editor with baseline commands and keyboard shortcuts
+ * TipTap Editor Component - Phase 5
+ * Advanced editor with tables, media, mentions, and creator utilities
  */
 
 import { Editor as TiptapEditor } from '@tiptap/core'
 import Link from '@tiptap/extension-link'
 import StarterKit from '@tiptap/starter-kit'
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 import type { DocumentContent } from '../../shared/document-types'
+import { MediaExtensions } from '../extensions/media-extension'
+import { MentionExtension } from '../extensions/mention-extension'
+import { TableExtensions } from '../extensions/table-extension'
+import { calculateContentMetrics, formatDuration } from '../utils/content-analytics'
 
 interface EditorProps {
   content: DocumentContent
@@ -40,6 +44,9 @@ export function Editor({ content, onChange, onDirty, editable = true }: EditorPr
             class: 'editor-link',
           },
         }),
+        ...TableExtensions,
+        ...MediaExtensions,
+        MentionExtension(),
       ],
       content,
       editable,
@@ -60,6 +67,7 @@ export function Editor({ content, onChange, onDirty, editable = true }: EditorPr
     return () => {
       editor.destroy()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update editor content when prop changes
@@ -95,6 +103,9 @@ interface EditorToolbarProps {
 
 function EditorToolbar({ editor }: EditorToolbarProps) {
   const [, forceUpdate] = React.useReducer(x => x + 1, 0)
+  const [showTableMenu, setShowTableMenu] = useState(false)
+  const [showMediaMenu, setShowMediaMenu] = useState(false)
+  const [showMetrics, setShowMetrics] = useState(false)
 
   // Force re-render when editor updates
   useEffect(() => {
@@ -116,8 +127,32 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
     return null
   }
 
+  const metrics = calculateContentMetrics(editor)
+
+  const insertTable = () => {
+    ;(editor.chain().focus() as any).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+    setShowTableMenu(false)
+  }
+
+  const insertImage = () => {
+    const url = window.prompt('Enter image URL:')
+    if (url) {
+      editor.chain().focus().setImage({ src: url }).run()
+    }
+    setShowMediaMenu(false)
+  }
+
+  const insertYouTube = () => {
+    const url = window.prompt('Enter YouTube URL:')
+    if (url) {
+      editor.chain().focus().setYoutubeVideo({ src: url }).run()
+    }
+    setShowMediaMenu(false)
+  }
+
   return (
     <div className="editor-toolbar">
+      {/* Basic formatting */}
       <button
         onClick={() => (editor.chain().focus() as any).toggleBold().run()}
         className={editor.isActive('bold') ? 'is-active' : ''}
@@ -140,6 +175,8 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         S
       </button>
       <div className="toolbar-separator" />
+
+      {/* Headings */}
       <button
         onClick={() => (editor.chain().focus() as any).toggleHeading({ level: 1 }).run()}
         className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
@@ -162,6 +199,8 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         H3
       </button>
       <div className="toolbar-separator" />
+
+      {/* Lists */}
       <button
         onClick={() => (editor.chain().focus() as any).toggleBulletList().run()}
         className={editor.isActive('bulletList') ? 'is-active' : ''}
@@ -177,6 +216,8 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         1.
       </button>
       <div className="toolbar-separator" />
+
+      {/* Links */}
       <button
         onClick={() => {
           const url = window.prompt('Enter URL:')
@@ -197,6 +238,56 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         Unlink
       </button>
       <div className="toolbar-separator" />
+
+      {/* Tables */}
+      <div className="toolbar-dropdown">
+        <button
+          onClick={() => setShowTableMenu(!showTableMenu)}
+          className={editor.isActive('table') ? 'is-active' : ''}
+          title="Table"
+        >
+          Table
+        </button>
+        {showTableMenu && (
+          <div className="toolbar-dropdown-menu">
+            <button onClick={insertTable}>Insert Table (3x3)</button>
+            {editor.isActive('table') && (
+              <>
+                <button onClick={() => (editor.chain().focus() as any).addColumnBefore().run()}>
+                  Add Column Before
+                </button>
+                <button onClick={() => (editor.chain().focus() as any).addColumnAfter().run()}>Add Column After</button>
+                <button onClick={() => (editor.chain().focus() as any).deleteColumn().run()}>Delete Column</button>
+                <button onClick={() => (editor.chain().focus() as any).addRowBefore().run()}>Add Row Before</button>
+                <button onClick={() => (editor.chain().focus() as any).addRowAfter().run()}>Add Row After</button>
+                <button onClick={() => (editor.chain().focus() as any).deleteRow().run()}>Delete Row</button>
+                <button onClick={() => (editor.chain().focus() as any).mergeCells().run()}>Merge Cells</button>
+                <button onClick={() => (editor.chain().focus() as any).splitCell().run()}>Split Cell</button>
+                <button onClick={() => (editor.chain().focus() as any).toggleHeaderRow().run()}>
+                  Toggle Header Row
+                </button>
+                <button onClick={() => (editor.chain().focus() as any).deleteTable().run()}>Delete Table</button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Media */}
+      <div className="toolbar-dropdown">
+        <button onClick={() => setShowMediaMenu(!showMediaMenu)} title="Insert Media">
+          Media
+        </button>
+        {showMediaMenu && (
+          <div className="toolbar-dropdown-menu">
+            <button onClick={insertImage}>Insert Image</button>
+            <button onClick={insertYouTube}>Insert YouTube Video</button>
+          </div>
+        )}
+      </div>
+      <div className="toolbar-separator" />
+
+      {/* Undo/Redo */}
       <button
         onClick={() => (editor.chain().focus() as any).undo().run()}
         disabled={!(editor.can() as any).undo()}
@@ -211,6 +302,32 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
       >
         ↷
       </button>
+      <div className="toolbar-separator" />
+
+      {/* Metrics */}
+      <button onClick={() => setShowMetrics(!showMetrics)} title="Content Metrics">
+        📊 Stats
+      </button>
+      {showMetrics && (
+        <div className="toolbar-metrics">
+          <div className="metric">
+            <span className="metric-label">Words:</span>
+            <span className="metric-value">{metrics.wordCount}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Characters:</span>
+            <span className="metric-value">{metrics.characterCount}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Speaking:</span>
+            <span className="metric-value">{formatDuration(metrics.speakingDuration)}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Reading:</span>
+            <span className="metric-value">{formatDuration(metrics.readingDuration)}</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
