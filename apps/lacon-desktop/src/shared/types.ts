@@ -3,7 +3,7 @@
  */
 
 export interface IpcAPI {
-  invoke: (channel: string, ...args: any[]) => Promise<any>
+  invoke: (channel: string, payload?: any) => Promise<any>
   on: (channel: string, listener: (...args: any[]) => void) => void
   removeListener: (channel: string, listener: (...args: any[]) => void) => void
 }

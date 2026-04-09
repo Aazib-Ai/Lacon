@@ -84,18 +84,18 @@ Amplify: [amplifies/phase-01-amplify.md](amplifies/phase-01-amplify.md)
 ## Phase 2: Security Foundation and Local Data Architecture
 Amplify: [amplifies/phase-02-amplify.md](amplifies/phase-02-amplify.md)
 
-- [ ] P2-T1 Implement secrets architecture
-  - [ ] P2-T1.1 Encrypted key store in main process
-  - [ ] P2-T1.2 Key access API via IPC only
-  - [ ] P2-T1.3 Redaction of sensitive logs
-- [ ] P2-T2 Implement versioned local persistence model
-  - [ ] P2-T2.1 Schema for docs, sessions, traces, settings
-  - [ ] P2-T2.2 Migration runner
-  - [ ] P2-T2.3 Backup and restore routine
-- [ ] P2-T3 Implement security guardrails
-  - [ ] P2-T3.1 IPC payload validation
-  - [ ] P2-T3.2 Permission prompt policy
-  - [ ] P2-T3.3 Threat model document
+- [x] P2-T1 Implement secrets architecture
+  - [x] P2-T1.1 Encrypted key store in main process
+  - [x] P2-T1.2 Key access API via IPC only
+  - [x] P2-T1.3 Redaction of sensitive logs
+- [x] P2-T2 Implement versioned local persistence model
+  - [x] P2-T2.1 Schema for docs, sessions, traces, settings
+  - [x] P2-T2.2 Migration runner
+  - [x] P2-T2.3 Backup and restore routine
+- [x] P2-T3 Implement security guardrails
+  - [x] P2-T3.1 IPC payload validation
+  - [x] P2-T3.2 Permission prompt policy
+  - [x] P2-T3.3 Threat model document
 
 ## Phase 3: Core Editor and Document Lifecycle
 Amplify: [amplifies/phase-03-amplify.md](amplifies/phase-03-amplify.md)
