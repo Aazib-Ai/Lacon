@@ -3,7 +3,8 @@ import { join } from 'path'
 
 import { getMigrationRunner } from './data/migrations'
 import { getDataStore } from './data/store'
-import { registerIpcHandlers } from './ipc/handlers'
+import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
+import { registerProviderHandlers } from './ipc/provider-handlers'
 import { getKeyStore } from './security/keystore'
 import { createSafeLogger } from './security/log-redaction'
 
@@ -32,6 +33,8 @@ async function initializeApp() {
 
     // Register IPC handlers
     registerIpcHandlers()
+    registerAgentIpcHandlers()
+    registerProviderHandlers()
     logger.info('IPC handlers registered')
 
     logger.info('Application initialized successfully')

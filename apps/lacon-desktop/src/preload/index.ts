@@ -32,4 +32,51 @@ const api: IpcAPI = {
   },
 }
 
+// Agent runtime API (Phase 6)
+const agentAPI = {
+  startRun: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_START_RUN, payload),
+  cancelRun: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_CANCEL_RUN, payload),
+  getRunStatus: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_GET_RUN_STATUS, payload),
+  approveRequest: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVE_REQUEST, payload),
+  rejectRequest: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_REJECT_REQUEST, payload),
+  getPendingApprovals: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_GET_PENDING_APPROVALS),
+  registerTool: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_REGISTER_TOOL, payload),
+}
+
+// Provider API (Phase 7)
+const providerAPI = {
+  register: (config: any) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_REGISTER, config),
+  unregister: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_UNREGISTER, providerId),
+  list: () => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_LIST),
+  getModels: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_GET_MODELS, providerId),
+  checkHealth: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_CHECK_HEALTH, providerId),
+  checkAllHealth: () => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_CHECK_ALL_HEALTH),
+  setFallback: (primary: string, fallbacks: string[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_SET_FALLBACK, primary, fallbacks),
+  getUsage: (filter?: any) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_GET_USAGE, filter),
+  getUsageSummary: (providerId?: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_GET_USAGE_SUMMARY, providerId),
+  chatCompletion: (providerId: string, request: any, feature: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_CHAT_COMPLETION, providerId, request, feature),
+  streamStart: (providerId: string, request: any, feature: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_STREAM_START, providerId, request, feature),
+  createKey: (providerId: string, providerType: string, label: string, apiKey: string) =>
+    ipcRenderer.invoke('provider:createKey', providerId, providerType, label, apiKey),
+  onStreamChunk: (callback: (streamId: string, chunk: any) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.PROVIDER_STREAM_CHUNK, (event, streamId, chunk) => callback(streamId, chunk))
+  },
+  onStreamComplete: (callback: (streamId: string, usage: any) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.PROVIDER_STREAM_COMPLETE, (event, streamId, usage) => callback(streamId, usage))
+  },
+  onStreamError: (callback: (streamId: string, error: string) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.PROVIDER_STREAM_ERROR, (event, streamId, error) => callback(streamId, error))
+  },
+}
+
 contextBridge.exposeInMainWorld('api', api)
+contextBridge.exposeInMainWorld('electron', {
+  agent: agentAPI,
+  provider: providerAPI,
+  onAgentStream: (callback: (chunk: any) => void) => {
+    ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))
+  },
+})

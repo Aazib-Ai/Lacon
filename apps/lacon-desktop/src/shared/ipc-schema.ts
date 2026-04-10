@@ -42,6 +42,31 @@ export const IPC_CHANNELS = {
   DOC_SCHEDULE_AUTOSAVE: 'doc:scheduleAutosave',
   DOC_GET_RECOVERY_SNAPSHOTS: 'doc:getRecoverySnapshots',
   DOC_CLEAR_RECOVERY_SNAPSHOT: 'doc:clearRecoverySnapshot',
+
+  // Agent runtime operations (Phase 6)
+  AGENT_START_RUN: 'agent:startRun',
+  AGENT_CANCEL_RUN: 'agent:cancelRun',
+  AGENT_GET_RUN_STATUS: 'agent:getRunStatus',
+  AGENT_APPROVE_REQUEST: 'agent:approveRequest',
+
+  // Provider operations (Phase 7)
+  PROVIDER_REGISTER: 'provider:register',
+  PROVIDER_UNREGISTER: 'provider:unregister',
+  PROVIDER_LIST: 'provider:list',
+  PROVIDER_GET_MODELS: 'provider:getModels',
+  PROVIDER_CHECK_HEALTH: 'provider:checkHealth',
+  PROVIDER_CHECK_ALL_HEALTH: 'provider:checkAllHealth',
+  PROVIDER_SET_FALLBACK: 'provider:setFallback',
+  PROVIDER_GET_USAGE: 'provider:getUsage',
+  PROVIDER_GET_USAGE_SUMMARY: 'provider:getUsageSummary',
+  PROVIDER_CHAT_COMPLETION: 'provider:chatCompletion',
+  PROVIDER_STREAM_START: 'provider:streamStart',
+  PROVIDER_STREAM_CHUNK: 'provider:streamChunk',
+  PROVIDER_STREAM_COMPLETE: 'provider:streamComplete',
+  PROVIDER_STREAM_ERROR: 'provider:streamError',
+  AGENT_REJECT_REQUEST: 'agent:rejectRequest',
+  AGENT_GET_PENDING_APPROVALS: 'agent:getPendingApprovals',
+  AGENT_REGISTER_TOOL: 'agent:registerTool',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -354,4 +379,69 @@ export function isDocScheduleAutosaveRequest(payload: any): payload is DocSchedu
 
 export function isDocClearRecoverySnapshotRequest(payload: any): payload is DocClearRecoverySnapshotRequest {
   return typeof payload === 'object' && typeof payload.documentId === 'string'
+}
+
+// Agent runtime operation types (Phase 6)
+export interface AgentStartRunRequest {
+  instruction: string
+  documentContext?: {
+    documentId: string
+    content: any
+    selection?: { from: number; to: number }
+  }
+}
+
+export interface AgentCancelRunRequest {
+  runId: string
+  reason?: string
+}
+
+export interface AgentGetRunStatusRequest {
+  runId: string
+}
+
+export interface AgentApproveRequestRequest {
+  requestId: string
+}
+
+export interface AgentRejectRequestRequest {
+  requestId: string
+  reason?: string
+}
+
+export interface AgentRegisterToolRequest {
+  tool: any // ToolContract
+}
+
+export type AgentStartRunResponse = IpcResponse<string> // runId
+export type AgentCancelRunResponse = IpcResponse<void>
+export type AgentGetRunStatusResponse = IpcResponse<any> // AgentRunContext
+export type AgentApproveRequestResponse = IpcResponse<void>
+export type AgentRejectRequestResponse = IpcResponse<void>
+export type AgentGetPendingApprovalsResponse = IpcResponse<any[]> // ApprovalRequest[]
+export type AgentRegisterToolResponse = IpcResponse<void>
+
+// Type guards for agent operations
+export function isAgentStartRunRequest(payload: any): payload is AgentStartRunRequest {
+  return typeof payload === 'object' && typeof payload.instruction === 'string'
+}
+
+export function isAgentCancelRunRequest(payload: any): payload is AgentCancelRunRequest {
+  return typeof payload === 'object' && typeof payload.runId === 'string'
+}
+
+export function isAgentGetRunStatusRequest(payload: any): payload is AgentGetRunStatusRequest {
+  return typeof payload === 'object' && typeof payload.runId === 'string'
+}
+
+export function isAgentApproveRequestRequest(payload: any): payload is AgentApproveRequestRequest {
+  return typeof payload === 'object' && typeof payload.requestId === 'string'
+}
+
+export function isAgentRejectRequestRequest(payload: any): payload is AgentRejectRequestRequest {
+  return typeof payload === 'object' && typeof payload.requestId === 'string'
+}
+
+export function isAgentRegisterToolRequest(payload: any): payload is AgentRegisterToolRequest {
+  return typeof payload === 'object' && payload.tool !== undefined
 }

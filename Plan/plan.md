@@ -148,37 +148,37 @@ Amplify: [amplifies/phase-05-amplify.md](amplifies/phase-05-amplify.md)
 ## Phase 6: Agent Runtime Core
 Amplify: [amplifies/phase-06-amplify.md](amplifies/phase-06-amplify.md)
 
-- [ ] P6-T1 Build orchestrator
-  - [ ] P6-T1.1 Planner and router
-  - [ ] P6-T1.2 Context assembly pipeline
-  - [ ] P6-T1.3 Cancellation and retry controls
-- [ ] P6-T2 Build tool execution framework
-  - [ ] P6-T2.1 Typed tool schema
-  - [ ] P6-T2.2 Timeouts and idempotency
-  - [ ] P6-T2.3 Manual approval flow for high-risk actions
-- [ ] P6-T3 Build streaming UX integration
-  - [ ] P6-T3.1 Token stream rendering
-  - [ ] P6-T3.2 Partial output handling
-  - [ ] P6-T3.3 Stop and resume behavior
+- [x] P6-T1 Build orchestrator
+  - [x] P6-T1.1 Planner and router
+  - [x] P6-T1.2 Context assembly pipeline
+  - [x] P6-T1.3 Cancellation and retry controls
+- [x] P6-T2 Build tool execution framework
+  - [x] P6-T2.1 Typed tool schema
+  - [x] P6-T2.2 Timeouts and idempotency
+  - [x] P6-T2.3 Manual approval flow for high-risk actions
+- [x] P6-T3 Build streaming UX integration
+  - [x] P6-T3.1 Token stream rendering
+  - [x] P6-T3.2 Partial output handling
+  - [x] P6-T3.3 Stop and resume behavior
 
 ## Phase 7: BYOM Provider Platform
 Amplify: [amplifies/phase-07-amplify.md](amplifies/phase-07-amplify.md)
 
-- [ ] P7-T1 Build provider abstraction and adapters
-  - [ ] P7-T1.1 OpenAI adapter
-  - [ ] P7-T1.2 Anthropic adapter
-  - [ ] P7-T1.3 Gemini adapter
-  - [ ] P7-T1.4 OpenRouter adapter
-  - [ ] P7-T1.5 Local model adapter
-  - [ ] P7-T1.6 Custom endpoint adapter
-- [ ] P7-T2 Build provider management UX
-  - [ ] P7-T2.1 Add, edit, remove key flows
-  - [ ] P7-T2.2 Model picker and defaults
-  - [ ] P7-T2.3 Provider health and latency checks
-- [ ] P7-T3 Build reliability layer
-  - [ ] P7-T3.1 Retry policy
-  - [ ] P7-T3.2 Fallback chain
-  - [ ] P7-T3.3 Usage accounting
+- [x] P7-T1 Build provider abstraction and adapters
+  - [x] P7-T1.1 OpenAI adapter
+  - [x] P7-T1.2 Anthropic adapter
+  - [x] P7-T1.3 Gemini adapter
+  - [x] P7-T1.4 OpenRouter adapter
+  - [x] P7-T1.5 Local model adapter
+  - [x] P7-T1.6 Custom endpoint adapter
+- [x] P7-T2 Build provider management UX
+  - [x] P7-T2.1 Add, edit, remove key flows
+  - [x] P7-T2.2 Model picker and defaults
+  - [x] P7-T2.3 Provider health and latency checks
+- [x] P7-T3 Build reliability layer
+  - [x] P7-T3.1 Retry policy
+  - [x] P7-T3.2 Fallback chain
+  - [x] P7-T3.3 Usage accounting
 
 ## Phase 8: Competitive Agent Tooling
 Amplify: [amplifies/phase-08-amplify.md](amplifies/phase-08-amplify.md)

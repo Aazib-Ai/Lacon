@@ -32,56 +32,56 @@ Provide a robust multi-provider model platform with secure key handling, health 
 
 ## Epic P7-E1: Provider Abstraction
 
-- [ ] P7-T1 Define provider interface contract
-  - [ ] P7-T1.1 Chat completion interface
-  - [ ] P7-T1.2 Streaming interface
-  - [ ] P7-T1.3 Tool call interface
-  - [ ] P7-T1.4 Usage reporting interface
+- [x] P7-T1 Define provider interface contract
+  - [x] P7-T1.1 Chat completion interface
+  - [x] P7-T1.2 Streaming interface
+  - [x] P7-T1.3 Tool call interface
+  - [x] P7-T1.4 Usage reporting interface
 
-- [ ] P7-T2 Implement adapters
-  - [ ] P7-T2.1 OpenAI adapter
-  - [ ] P7-T2.2 Anthropic adapter
-  - [ ] P7-T2.3 Gemini adapter
-  - [ ] P7-T2.4 OpenRouter adapter
-  - [ ] P7-T2.5 Local model adapter
-  - [ ] P7-T2.6 Custom OpenAI-compatible endpoint adapter
+- [x] P7-T2 Implement adapters
+  - [x] P7-T2.1 OpenAI adapter
+  - [x] P7-T2.2 Anthropic adapter
+  - [x] P7-T2.3 Gemini adapter
+  - [x] P7-T2.4 OpenRouter adapter
+  - [x] P7-T2.5 Local model adapter
+  - [x] P7-T2.6 Custom OpenAI-compatible endpoint adapter
 
 ## Epic P7-E2: Provider Management UX
 
-- [ ] P7-T3 Build provider settings surface
-  - [ ] P7-T3.1 Add provider and key flow
-  - [ ] P7-T3.2 Edit provider and model defaults
-  - [ ] P7-T3.3 Remove provider and revoke key
+- [x] P7-T3 Build provider settings surface
+  - [x] P7-T3.1 Add provider and key flow
+  - [x] P7-T3.2 Edit provider and model defaults
+  - [x] P7-T3.3 Remove provider and revoke key
 
-- [ ] P7-T4 Build health and diagnostics view
-  - [ ] P7-T4.1 Connectivity check
-  - [ ] P7-T4.2 Latency check
-  - [ ] P7-T4.3 Capability check by model
+- [x] P7-T4 Build health and diagnostics view
+  - [x] P7-T4.1 Connectivity check
+  - [x] P7-T4.2 Latency check
+  - [x] P7-T4.3 Capability check by model
 
 ## Epic P7-E3: Reliability and Accounting
 
-- [ ] P7-T5 Implement retry and fallback engine
-  - [ ] P7-T5.1 Retry policy per provider
-  - [ ] P7-T5.2 Fallback chain configuration
-  - [ ] P7-T5.3 Circuit breaker behavior
+- [x] P7-T5 Implement retry and fallback engine
+  - [x] P7-T5.1 Retry policy per provider
+  - [x] P7-T5.2 Fallback chain configuration
+  - [x] P7-T5.3 Circuit breaker behavior
 
-- [ ] P7-T6 Implement usage accounting
-  - [ ] P7-T6.1 Token and request tracking
-  - [ ] P7-T6.2 Cost estimation tracking
-  - [ ] P7-T6.3 Per-feature usage attribution
+- [x] P7-T6 Implement usage accounting
+  - [x] P7-T6.1 Token and request tracking
+  - [x] P7-T6.2 Cost estimation tracking
+  - [x] P7-T6.3 Per-feature usage attribution
 
 ## Validation
 
-- [ ] V7-1 All provider adapters pass contract tests
-- [ ] V7-2 Settings UX supports add, edit, remove flows
-- [ ] V7-3 Retry and fallback logic tested with fault injection
-- [ ] V7-4 Usage accounting data appears in diagnostics
+- [x] V7-1 All provider adapters pass contract tests
+- [x] V7-2 Settings UX supports add, edit, remove flows
+- [x] V7-3 Retry and fallback logic tested with fault injection
+- [x] V7-4 Usage accounting data appears in diagnostics
 
 ## Definition of Done
 
-- [ ] Phase 7 checklist complete
-- [ ] Multi-provider runtime is secure and reliable
-- [ ] Master plan checkboxes updated in Plan/plan.md
+- [x] Phase 7 checklist complete
+- [x] Multi-provider runtime is secure and reliable
+- [x] Master plan checkboxes updated in Plan/plan.md
 
 ## Agent Handoff Template
 

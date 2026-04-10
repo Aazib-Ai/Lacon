@@ -5,7 +5,14 @@
 
 import { ipcMain } from 'electron'
 
+import type { AgentRuntimeConfig } from '@/shared/agent-types'
 import {
+  type AgentApproveRequestRequest,
+  type AgentCancelRunRequest,
+  type AgentGetRunStatusRequest,
+  type AgentRegisterToolRequest,
+  type AgentRejectRequestRequest,
+  type AgentStartRunRequest,
   type DataDeleteRequest,
   type DataExportRequest,
   type DataImportRequest,
@@ -37,6 +44,7 @@ import {
   IPC_CHANNELS,
 } from '@/shared/ipc-schema'
 
+import { AgentOrchestrator } from '../agent/orchestrator'
 import { COLLECTIONS } from '../data/schema'
 import { getDataStore } from '../data/store'
 import { getKeyStore } from '../security/keystore'
@@ -48,6 +56,7 @@ import { IpcValidationError, validateIpcRequest } from './ipc-validator'
 // Service instances
 let documentService: DocumentService | null = null
 let importExportService: ImportExportService | null = null
+let agentOrchestrator: AgentOrchestrator | null = null
 
 function getDocumentService(): DocumentService {
   if (!documentService) {
@@ -362,4 +371,96 @@ async function handleIpc<T>(
       },
     }
   }
+}
+
+/**
+ * Get or create agent orchestrator instance
+ * Phase 6: Agent Runtime Core
+ */
+function getAgentOrchestrator(): AgentOrchestrator {
+  if (!agentOrchestrator) {
+    const config: AgentRuntimeConfig = {
+      maxConcurrentTools: 3,
+      defaultToolTimeout: 30000, // 30 seconds
+      maxRetries: 3,
+      retryBackoffMs: 1000,
+      approvalThreshold: 60, // Risk score threshold
+      enableStreaming: true,
+    }
+    agentOrchestrator = new AgentOrchestrator(config)
+  }
+  return agentOrchestrator
+}
+
+/**
+ * Register agent runtime IPC handlers
+ * Phase 6: Epic P6-E3, Task P6-T8
+ */
+export function registerAgentIpcHandlers(): void {
+  const orchestrator = getAgentOrchestrator()
+
+  // Start agent run
+  ipcMain.handle(IPC_CHANNELS.AGENT_START_RUN, async (event, payload: AgentStartRunRequest) => {
+    return handleIpc(IPC_CHANNELS.AGENT_START_RUN, payload, async () => {
+      const runId = await orchestrator.startRun(payload.instruction, payload.documentContext)
+      return { success: true, data: runId }
+    })
+  })
+
+  // Cancel agent run
+  ipcMain.handle(IPC_CHANNELS.AGENT_CANCEL_RUN, async (event, payload: AgentCancelRunRequest) => {
+    return handleIpc(IPC_CHANNELS.AGENT_CANCEL_RUN, payload, async () => {
+      orchestrator.cancelRun(payload.runId, payload.reason)
+      return { success: true }
+    })
+  })
+
+  // Get run status
+  ipcMain.handle(IPC_CHANNELS.AGENT_GET_RUN_STATUS, async (event, payload: AgentGetRunStatusRequest) => {
+    return handleIpc(IPC_CHANNELS.AGENT_GET_RUN_STATUS, payload, async () => {
+      const runContext = orchestrator.getRunContext(payload.runId)
+      if (!runContext) {
+        return {
+          success: false,
+          error: {
+            code: 'RUN_NOT_FOUND',
+            message: `Run not found: ${payload.runId}`,
+          },
+        }
+      }
+      return { success: true, data: runContext }
+    })
+  })
+
+  // Approve request
+  ipcMain.handle(IPC_CHANNELS.AGENT_APPROVE_REQUEST, async (event, payload: AgentApproveRequestRequest) => {
+    return handleIpc(IPC_CHANNELS.AGENT_APPROVE_REQUEST, payload, async () => {
+      orchestrator.getApprovalManager().approve(payload.requestId)
+      return { success: true }
+    })
+  })
+
+  // Reject request
+  ipcMain.handle(IPC_CHANNELS.AGENT_REJECT_REQUEST, async (event, payload: AgentRejectRequestRequest) => {
+    return handleIpc(IPC_CHANNELS.AGENT_REJECT_REQUEST, payload, async () => {
+      orchestrator.getApprovalManager().reject(payload.requestId, payload.reason)
+      return { success: true }
+    })
+  })
+
+  // Get pending approvals
+  ipcMain.handle(IPC_CHANNELS.AGENT_GET_PENDING_APPROVALS, async () => {
+    return handleIpc(IPC_CHANNELS.AGENT_GET_PENDING_APPROVALS, {}, async () => {
+      const approvals = orchestrator.getApprovalManager().getPendingApprovals()
+      return { success: true, data: approvals }
+    })
+  })
+
+  // Register tool
+  ipcMain.handle(IPC_CHANNELS.AGENT_REGISTER_TOOL, async (event, payload: AgentRegisterToolRequest) => {
+    return handleIpc(IPC_CHANNELS.AGENT_REGISTER_TOOL, payload, async () => {
+      orchestrator.registerTool(payload.tool)
+      return { success: true }
+    })
+  })
 }
