@@ -1,8 +1,10 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 
+import { AuditManager } from './audit/audit-manager'
 import { getMigrationRunner } from './data/migrations'
 import { getDataStore } from './data/store'
+import { registerAuditHandlers } from './ipc/audit-handlers'
 import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
 import { registerToolHandlers } from './ipc/tool-handlers'
@@ -12,6 +14,7 @@ import { createSafeLogger } from './security/log-redaction'
 const logger = createSafeLogger('Main')
 
 let mainWindow: BrowserWindow | null = null
+let auditManager: AuditManager | null = null
 
 async function initializeApp() {
   try {
@@ -32,15 +35,22 @@ async function initializeApp() {
     await dataStore.initialize()
     logger.info('Data store initialized')
 
+    // Initialize audit manager (Phase 9)
+    auditManager = new AuditManager()
+    logger.info('Audit manager initialized')
+
     // Register IPC handlers
     registerIpcHandlers()
     registerAgentIpcHandlers()
     registerProviderHandlers()
-    
+
     // Register tool handlers (Phase 8)
     const workspaceRoot = app.getPath('userData')
     registerToolHandlers(workspaceRoot)
-    
+
+    // Register audit handlers (Phase 9)
+    registerAuditHandlers(auditManager)
+
     logger.info('IPC handlers registered')
 
     logger.info('Application initialized successfully')
@@ -98,3 +108,11 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+// Export audit manager for use in other modules
+export function getAuditManager(): AuditManager {
+  if (!auditManager) {
+    throw new Error('Audit manager not initialized')
+  }
+  return auditManager
+}

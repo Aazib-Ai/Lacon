@@ -51,6 +51,32 @@ export interface ToolAPI {
   brollGenerator: (input: any) => Promise<any>
 }
 
+// Audit API (Phase 9)
+export interface AuditAPI {
+  query: (filter: any) => Promise<any>
+  getStatistics: () => Promise<any>
+  verifyIntegrity: (eventId: string) => Promise<any>
+}
+
+// Trace API (Phase 9)
+export interface TraceAPI {
+  listSessions: (filter: any) => Promise<any>
+  getTimeline: (sessionId: string) => Promise<any>
+  getMetrics: (sessionId: string) => Promise<any>
+  replay: (config: any) => Promise<any>
+}
+
+// Policy API (Phase 9)
+export interface PolicyAPI {
+  listRules: () => Promise<any>
+  getRule: (ruleId: string) => Promise<any>
+  registerRule: (rule: any) => Promise<any>
+  unregisterRule: (ruleId: string) => Promise<any>
+  evaluate: (context: any) => Promise<any>
+  getViolations: (limit?: number) => Promise<any>
+  getStatistics: () => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -59,6 +85,9 @@ declare global {
       agent: AgentAPI
       provider: ProviderAPI
       tool: ToolAPI
+      audit: AuditAPI
+      trace: TraceAPI
+      policy: PolicyAPI
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }

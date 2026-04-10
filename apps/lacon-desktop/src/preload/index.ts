@@ -85,11 +85,40 @@ const toolAPI = {
   brollGenerator: (input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_BROLL_GENERATOR, input),
 }
 
+// Audit API (Phase 9)
+const auditAPI = {
+  query: (filter: any) => ipcRenderer.invoke(IPC_CHANNELS.AUDIT_QUERY, { filter }),
+  getStatistics: () => ipcRenderer.invoke(IPC_CHANNELS.AUDIT_GET_STATISTICS),
+  verifyIntegrity: (eventId: string) => ipcRenderer.invoke(IPC_CHANNELS.AUDIT_VERIFY_INTEGRITY, { eventId }),
+}
+
+// Trace API (Phase 9)
+const traceAPI = {
+  listSessions: (filter: any) => ipcRenderer.invoke(IPC_CHANNELS.TRACE_LIST_SESSIONS, { filter }),
+  getTimeline: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.TRACE_GET_TIMELINE, { sessionId }),
+  getMetrics: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.TRACE_GET_METRICS, { sessionId }),
+  replay: (config: any) => ipcRenderer.invoke(IPC_CHANNELS.TRACE_REPLAY, { config }),
+}
+
+// Policy API (Phase 9)
+const policyAPI = {
+  listRules: () => ipcRenderer.invoke(IPC_CHANNELS.POLICY_LIST_RULES),
+  getRule: (ruleId: string) => ipcRenderer.invoke(IPC_CHANNELS.POLICY_GET_RULE, { ruleId }),
+  registerRule: (rule: any) => ipcRenderer.invoke(IPC_CHANNELS.POLICY_REGISTER_RULE, { rule }),
+  unregisterRule: (ruleId: string) => ipcRenderer.invoke(IPC_CHANNELS.POLICY_UNREGISTER_RULE, { ruleId }),
+  evaluate: (context: any) => ipcRenderer.invoke(IPC_CHANNELS.POLICY_EVALUATE, { context }),
+  getViolations: (limit?: number) => ipcRenderer.invoke(IPC_CHANNELS.POLICY_GET_VIOLATIONS, { limit }),
+  getStatistics: () => ipcRenderer.invoke(IPC_CHANNELS.POLICY_GET_STATISTICS),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
   provider: providerAPI,
   tool: toolAPI,
+  audit: auditAPI,
+  trace: traceAPI,
+  policy: policyAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))

@@ -199,18 +199,18 @@ Amplify: [amplifies/phase-08-amplify.md](amplifies/phase-08-amplify.md)
 ## Phase 9: Auditability and Governance
 Amplify: [amplifies/phase-09-amplify.md](amplifies/phase-09-amplify.md)
 
-- [ ] P9-T1 Build immutable audit log system
-  - [ ] P9-T1.1 Prompt and response events
-  - [ ] P9-T1.2 Tool invocation events
-  - [ ] P9-T1.3 Document-impact events
-- [ ] P9-T2 Build trace viewer
-  - [ ] P9-T2.1 Timeline and drill-down UI
-  - [ ] P9-T2.2 Token and latency metrics
-  - [ ] P9-T2.3 Replay diagnostics
-- [ ] P9-T3 Build policy enforcement layer
-  - [ ] P9-T3.1 Pre-execution risk checks
-  - [ ] P9-T3.2 Sensitive data checks
-  - [ ] P9-T3.3 Human approval checkpoints
+- [x] P9-T1 Build immutable audit log system
+  - [x] P9-T1.1 Prompt and response events
+  - [x] P9-T1.2 Tool invocation events
+  - [x] P9-T1.3 Document-impact events
+- [x] P9-T2 Build trace viewer
+  - [x] P9-T2.1 Timeline and drill-down UI
+  - [x] P9-T2.2 Token and latency metrics
+  - [x] P9-T2.3 Replay diagnostics
+- [x] P9-T3 Build policy enforcement layer
+  - [x] P9-T3.1 Pre-execution risk checks
+  - [x] P9-T3.2 Sensitive data checks
+  - [x] P9-T3.3 Human approval checkpoints
 
 ## Phase 10: Quality, Performance, Security Hardening
 Amplify: [amplifies/phase-10-amplify.md](amplifies/phase-10-amplify.md)

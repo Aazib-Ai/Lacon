@@ -78,6 +78,26 @@ export const IPC_CHANNELS = {
   TOOLS_YOUTUBE_TRANSCRIPT: 'tools:youtube-transcript',
   TOOLS_TONE_ANALYZER: 'tools:tone-analyzer',
   TOOLS_BROLL_GENERATOR: 'tools:broll-generator',
+
+  // Audit operations (Phase 9)
+  AUDIT_QUERY: 'audit:query',
+  AUDIT_GET_STATISTICS: 'audit:getStatistics',
+  AUDIT_VERIFY_INTEGRITY: 'audit:verifyIntegrity',
+
+  // Trace operations (Phase 9)
+  TRACE_LIST_SESSIONS: 'trace:listSessions',
+  TRACE_GET_TIMELINE: 'trace:getTimeline',
+  TRACE_GET_METRICS: 'trace:getMetrics',
+  TRACE_REPLAY: 'trace:replay',
+
+  // Policy operations (Phase 9)
+  POLICY_LIST_RULES: 'policy:listRules',
+  POLICY_GET_RULE: 'policy:getRule',
+  POLICY_REGISTER_RULE: 'policy:registerRule',
+  POLICY_UNREGISTER_RULE: 'policy:unregisterRule',
+  POLICY_EVALUATE: 'policy:evaluate',
+  POLICY_GET_VIOLATIONS: 'policy:getViolations',
+  POLICY_GET_STATISTICS: 'policy:getStatistics',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -455,4 +475,115 @@ export function isAgentRejectRequestRequest(payload: any): payload is AgentRejec
 
 export function isAgentRegisterToolRequest(payload: any): payload is AgentRegisterToolRequest {
   return typeof payload === 'object' && payload.tool !== undefined
+}
+
+// Audit operation types (Phase 9)
+export interface AuditQueryRequest {
+  filter: any // AuditQueryFilter
+}
+
+export interface AuditVerifyIntegrityRequest {
+  eventId: string
+}
+
+export type AuditQueryResponse = IpcResponse<any[]> // AuditEvent[]
+export type AuditGetStatisticsResponse = IpcResponse<any> // AuditStatistics
+export type AuditVerifyIntegrityResponse = IpcResponse<any> // IntegrityCheckResult
+
+// Trace operation types (Phase 9)
+export interface TraceListSessionsRequest {
+  filter: any // TraceFilterOptions
+}
+
+export interface TraceGetTimelineRequest {
+  sessionId: string
+}
+
+export interface TraceGetMetricsRequest {
+  sessionId: string
+}
+
+export interface TraceReplayRequest {
+  config: any // ReplayConfiguration
+}
+
+export type TraceListSessionsResponse = IpcResponse<any[]> // TraceSessionSummary[]
+export type TraceGetTimelineResponse = IpcResponse<any[]> // TraceTimelineEntry[]
+export type TraceGetMetricsResponse = IpcResponse<any> // TraceMetrics
+export type TraceReplayResponse = IpcResponse<any> // ReplayDiagnostics
+
+// Policy operation types (Phase 9)
+export interface PolicyGetRuleRequest {
+  ruleId: string
+}
+
+export interface PolicyRegisterRuleRequest {
+  rule: any // PolicyRule
+}
+
+export interface PolicyUnregisterRuleRequest {
+  ruleId: string
+}
+
+export interface PolicyEvaluateRequest {
+  context: any // PolicyEvaluationContext
+}
+
+export interface PolicyGetViolationsRequest {
+  limit?: number
+}
+
+export type PolicyListRulesResponse = IpcResponse<any[]> // PolicyRule[]
+export type PolicyGetRuleResponse = IpcResponse<any> // PolicyRule
+export type PolicyRegisterRuleResponse = IpcResponse<boolean>
+export type PolicyUnregisterRuleResponse = IpcResponse<boolean>
+export type PolicyEvaluateResponse = IpcResponse<any> // PolicyEvaluationResult
+export type PolicyGetViolationsResponse = IpcResponse<any[]> // PolicyViolation[]
+export type PolicyGetStatisticsResponse = IpcResponse<any> // PolicyStatistics
+
+// Type guards for audit operations
+export function isAuditQueryRequest(payload: any): payload is AuditQueryRequest {
+  return typeof payload === 'object'
+}
+
+export function isAuditVerifyIntegrityRequest(payload: any): payload is AuditVerifyIntegrityRequest {
+  return typeof payload === 'object' && typeof payload.eventId === 'string'
+}
+
+// Type guards for trace operations
+export function isTraceListSessionsRequest(payload: any): payload is TraceListSessionsRequest {
+  return typeof payload === 'object'
+}
+
+export function isTraceGetTimelineRequest(payload: any): payload is TraceGetTimelineRequest {
+  return typeof payload === 'object' && typeof payload.sessionId === 'string'
+}
+
+export function isTraceGetMetricsRequest(payload: any): payload is TraceGetMetricsRequest {
+  return typeof payload === 'object' && typeof payload.sessionId === 'string'
+}
+
+export function isTraceReplayRequest(payload: any): payload is TraceReplayRequest {
+  return typeof payload === 'object' && payload.config !== undefined
+}
+
+// Type guards for policy operations
+export function isPolicyGetRuleRequest(payload: any): payload is PolicyGetRuleRequest {
+  return typeof payload === 'object' && typeof payload.ruleId === 'string'
+}
+
+export function isPolicyRegisterRuleRequest(payload: any): payload is PolicyRegisterRuleRequest {
+  return typeof payload === 'object' && payload.rule !== undefined
+}
+
+export function isPolicyUnregisterRuleRequest(payload: any): payload is PolicyUnregisterRuleRequest {
+  return typeof payload === 'object' && typeof payload.ruleId === 'string'
+}
+
+export function isPolicyEvaluateRequest(payload: any): payload is PolicyEvaluateRequest {
+  return typeof payload === 'object' && payload.context !== undefined
+}
+
+export function isPolicyGetViolationsRequest(payload: any): payload is PolicyGetViolationsRequest {
+  return typeof payload === 'object'
 }

@@ -2,8 +2,15 @@
  * Tests for Authoring Tools (Phase 8)
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createRewriteTool, createShortenTool, createExpandTool, createPolishTool, createToneAdjustTool } from '../../src/main/tools/authoring-tools'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  createExpandTool,
+  createPolishTool,
+  createRewriteTool,
+  createShortenTool,
+  createToneAdjustTool,
+} from '../../src/main/tools/authoring-tools'
 import type { AuthoringToolInput } from '../../src/shared/tool-types'
 
 describe('Authoring Tools', () => {
@@ -31,7 +38,7 @@ describe('Authoring Tools', () => {
       expect(result.metadata.transformationType).toBe('rewrite')
       expect(mockExecuteTransform).toHaveBeenCalledWith(
         'Original text',
-        'Rewrite this text to improve clarity and readability'
+        'Rewrite this text to improve clarity and readability',
       )
     })
 
@@ -67,10 +74,7 @@ describe('Authoring Tools', () => {
 
       expect(result.transformedText).toBe('Short text')
       expect(result.metadata.transformationType).toBe('shorten')
-      expect(mockExecuteTransform).toHaveBeenCalledWith(
-        input.text,
-        expect.stringContaining('20 characters')
-      )
+      expect(mockExecuteTransform).toHaveBeenCalledWith(input.text, expect.stringContaining('20 characters'))
     })
 
     it('should use default target length (70% of original)', async () => {
@@ -84,10 +88,7 @@ describe('Authoring Tools', () => {
 
       await tool.execute(input)
 
-      expect(mockExecuteTransform).toHaveBeenCalledWith(
-        input.text,
-        expect.stringContaining('70 characters')
-      )
+      expect(mockExecuteTransform).toHaveBeenCalledWith(input.text, expect.stringContaining('70 characters'))
     })
   })
 
@@ -122,10 +123,7 @@ describe('Authoring Tools', () => {
       const result = await tool.execute(input)
 
       expect(result.transformedText).toBe('Polished professional text')
-      expect(mockExecuteTransform).toHaveBeenCalledWith(
-        'Rough text',
-        expect.stringContaining('professional tone')
-      )
+      expect(mockExecuteTransform).toHaveBeenCalledWith('Rough text', expect.stringContaining('professional tone'))
     })
 
     it('should polish text with custom tone', async () => {
@@ -138,12 +136,9 @@ describe('Authoring Tools', () => {
         insertionMode: 'replace',
       }
 
-      const result = await tool.execute(input)
+      await tool.execute(input)
 
-      expect(mockExecuteTransform).toHaveBeenCalledWith(
-        'Rough text',
-        expect.stringContaining('casual tone')
-      )
+      expect(mockExecuteTransform).toHaveBeenCalledWith('Rough text', expect.stringContaining('casual tone'))
     })
   })
 
@@ -162,10 +157,7 @@ describe('Authoring Tools', () => {
 
       expect(result.transformedText).toBe('Friendly toned text')
       expect(result.metadata.transformationType).toBe('tone-adjust')
-      expect(mockExecuteTransform).toHaveBeenCalledWith(
-        'Original text',
-        expect.stringContaining('friendly')
-      )
+      expect(mockExecuteTransform).toHaveBeenCalledWith('Original text', expect.stringContaining('friendly'))
     })
   })
 
@@ -179,10 +171,10 @@ describe('Authoring Tools', () => {
         insertionMode: 'replace',
       }
 
-      const _result = await tool.execute(input)
+      const result = await tool.execute(input)
 
-      expect(_result.metadata.originalLength).toBe(8)
-      expect(_result.metadata.transformedLength).toBe(11)
+      expect(result.metadata.originalLength).toBe(8)
+      expect(result.metadata.transformedLength).toBe(11)
     })
   })
 
