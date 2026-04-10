@@ -215,18 +215,18 @@ Amplify: [amplifies/phase-09-amplify.md](amplifies/phase-09-amplify.md)
 ## Phase 10: Quality, Performance, Security Hardening
 Amplify: [amplifies/phase-10-amplify.md](amplifies/phase-10-amplify.md)
 
-- [ ] P10-T1 Build full test pyramid
-  - [ ] P10-T1.1 Unit tests
-  - [ ] P10-T1.2 Integration tests
-  - [ ] P10-T1.3 E2E tests
-- [ ] P10-T2 Reach performance targets
-  - [ ] P10-T2.1 Startup and editor-latency budget
-  - [ ] P10-T2.2 Long-session memory budget
-  - [ ] P10-T2.3 Streaming responsiveness budget
-- [ ] P10-T3 Complete security hardening
-  - [ ] P10-T3.1 IPC fuzz and abuse tests
-  - [ ] P10-T3.2 Secret leakage tests
-  - [ ] P10-T3.3 Updater integrity and rollback tests
+- [x] P10-T1 Build full test pyramid
+  - [x] P10-T1.1 Unit tests
+  - [x] P10-T1.2 Integration tests
+  - [x] P10-T1.3 E2E tests
+- [x] P10-T2 Reach performance targets
+  - [x] P10-T2.1 Startup and editor-latency budget
+  - [x] P10-T2.2 Long-session memory budget
+  - [x] P10-T2.3 Streaming responsiveness budget
+- [x] P10-T3 Complete security hardening
+  - [x] P10-T3.1 IPC fuzz and abuse tests
+  - [x] P10-T3.2 Secret leakage tests
+  - [x] P10-T3.3 Updater integrity and rollback tests
 
 ## Phase 11: Release Engineering and GA Launch
 Amplify: [amplifies/phase-11-amplify.md](amplifies/phase-11-amplify.md)
