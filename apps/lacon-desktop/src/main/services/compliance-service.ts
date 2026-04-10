@@ -1,11 +1,45 @@
 import { randomUUID } from 'crypto'
 
-import type {
-  ComplianceControl,
-  ComplianceEvidence,
-  ExternalReadinessItem,
-  InternalAuditRun,
-} from '@/shared/phase12-types'
+// TODO: Define or import these types from the correct location
+// import type {
+//   ComplianceControl,
+//   ComplianceEvidence,
+//   ExternalReadinessItem,
+//   InternalAuditRun,
+// } from '@/shared/phase12-types'
+
+interface ComplianceControl {
+  controlId: string
+  framework: string
+  owner: string
+  description: string
+  mappedAt: number
+}
+
+interface ComplianceEvidence {
+  evidenceId: string
+  controlId: string
+  artifactPath: string
+  artifactHash: string
+  capturedBy: string
+  capturedAt: number
+}
+
+interface InternalAuditRun {
+  auditId: string
+  scope: string
+  executedBy: string
+  executedAt: number
+  findings: string[]
+}
+
+interface ExternalReadinessItem {
+  itemId: string
+  category: 'gap-remediation' | 'dry-run' | 'external-audit'
+  summary: string
+  status: 'in-progress' | 'done'
+  updatedAt: number
+}
 
 export class ComplianceService {
   private controls: ComplianceControl[] = []

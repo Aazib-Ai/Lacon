@@ -6,7 +6,7 @@ import type {
   PresenceIndicator,
   SharedDocumentModel,
   SharedDocumentOperation,
-} from '@/shared/phase12-types'
+} from '../../shared/phase12-types'
 
 export class CollaborationService {
   private sessions = new Map<string, SharedDocumentModel>()

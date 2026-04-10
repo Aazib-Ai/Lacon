@@ -8,7 +8,7 @@ import type {
   SyncQueueItem,
   SyncRecord,
   TenantWorkspaceBoundary,
-} from '@/shared/phase12-types'
+} from '../../shared/phase12-types'
 
 interface EncryptedBlob {
   iv: string

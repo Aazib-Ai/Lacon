@@ -24,8 +24,7 @@ import {
   type SyncResolveConflictRequest,
   type SyncRestoreToDeviceRequest,
   IPC_CHANNELS,
-} from '@/shared/ipc-schema'
-
+} from '../../shared/ipc-schema'
 import { getAccountSyncService } from '../services/account-sync-service'
 import { getCollaborationService } from '../services/collaboration-service'
 import { getComplianceService } from '../services/compliance-service'
