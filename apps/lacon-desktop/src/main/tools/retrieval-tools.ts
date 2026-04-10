@@ -5,8 +5,16 @@
 
 import { promises as fs } from 'fs'
 import * as path from 'path'
+
 import type { ToolContract } from '../../shared/agent-types'
-import type { Citation, WebResearchInput, WebResearchOutput, WebSource, WorkspaceQAInput, WorkspaceQAOutput } from '../../shared/tool-types'
+import type {
+  Citation,
+  WebResearchInput,
+  WebResearchOutput,
+  WebSource,
+  WorkspaceQAInput,
+  WorkspaceQAOutput,
+} from '../../shared/tool-types'
 
 /**
  * P8-T4: Workspace QA Tool
@@ -51,15 +59,15 @@ export function createWorkspaceQATool(
 
       // P8-T4.1: Index local workspace docs
       const files = await indexWorkspaceFiles(workspaceRoot, filePatterns)
-      
+
       // P8-T4.2: Search for relevant content
       const citations = await searchFiles(files, input.query, maxResults)
-      
+
       // Build context from citations
       const context = citations
         .map(c => `File: ${c.filePath}\nLines ${c.lineStart}-${c.lineEnd}:\n${c.content}`)
         .join('\n\n')
-      
+
       // Query with context
       const answer = await executeQuery(input.query, context)
 
@@ -143,14 +151,14 @@ export function createWebResearchTool(
 // Helper: Index workspace files
 async function indexWorkspaceFiles(workspaceRoot: string, patterns: string[]): Promise<string[]> {
   const files: string[] = []
-  
+
   async function walk(dir: string): Promise<void> {
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true })
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name)
-        
+
         // Skip node_modules, .git, dist, build
         if (entry.isDirectory()) {
           if (!['node_modules', '.git', 'dist', 'build', '.turbo'].includes(entry.name)) {
@@ -168,7 +176,7 @@ async function indexWorkspaceFiles(workspaceRoot: string, patterns: string[]): P
       // Skip directories we can't read
     }
   }
-  
+
   await walk(workspaceRoot)
   return files
 }
@@ -193,17 +201,17 @@ async function searchFiles(files: string[], query: string, maxResults: number): 
   const citations: Citation[] = []
   const queryLower = query.toLowerCase()
   const queryTerms = queryLower.split(/\s+/).filter(t => t.length > 2)
-  
+
   for (const filePath of files) {
     try {
       const content = await fs.readFile(filePath, 'utf-8')
       const lines = content.split('\n')
-      
+
       // Search for lines containing query terms
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
         const lineLower = line.toLowerCase()
-        
+
         // Calculate relevance score
         let score = 0
         for (const term of queryTerms) {
@@ -211,13 +219,13 @@ async function searchFiles(files: string[], query: string, maxResults: number): 
             score += 1
           }
         }
-        
+
         if (score > 0) {
           // Extract context (3 lines before and after)
           const start = Math.max(0, i - 3)
           const end = Math.min(lines.length - 1, i + 3)
           const contextLines = lines.slice(start, end + 1)
-          
+
           citations.push({
             id: `${filePath}:${i}`,
             filePath,
@@ -232,7 +240,7 @@ async function searchFiles(files: string[], query: string, maxResults: number): 
       // Skip files we can't read
     }
   }
-  
+
   // Sort by relevance and return top results
   citations.sort((a, b) => b.relevanceScore - a.relevanceScore)
   return citations.slice(0, maxResults)

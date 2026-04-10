@@ -4,6 +4,13 @@ import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 
+const alias = {
+  '@/main': resolve(__dirname, 'src/main'),
+  '@/preload': resolve(__dirname, 'src/preload'),
+  '@/renderer': resolve(__dirname, 'src/renderer'),
+  '@/shared': resolve(__dirname, 'src/shared'),
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -11,6 +18,9 @@ export default defineConfig({
       {
         entry: 'src/main/index.ts',
         vite: {
+          resolve: {
+            alias,
+          },
           build: {
             outDir: 'dist/main',
             rollupOptions: {
@@ -25,6 +35,9 @@ export default defineConfig({
           options.reload()
         },
         vite: {
+          resolve: {
+            alias,
+          },
           build: {
             outDir: 'dist/preload',
             rollupOptions: {
@@ -37,12 +50,7 @@ export default defineConfig({
     renderer(),
   ],
   resolve: {
-    alias: {
-      '@/main': resolve(__dirname, 'src/main'),
-      '@/preload': resolve(__dirname, 'src/preload'),
-      '@/renderer': resolve(__dirname, 'src/renderer'),
-      '@/shared': resolve(__dirname, 'src/shared'),
-    },
+    alias,
   },
   build: {
     outDir: 'dist/renderer',

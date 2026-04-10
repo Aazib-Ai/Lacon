@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useState } from 'react'
+
 import type {
   AuthoringToolInput,
   AuthoringToolOutput,
@@ -82,26 +83,28 @@ export function useAuthoringTools() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const executeTool = useCallback(async (toolName: string, input: AuthoringToolInput): Promise<AuthoringToolOutput | null> => {
-    setLoading(true)
-    setError(null)
+  const executeTool = useCallback(
+    async (toolName: string, input: AuthoringToolInput): Promise<AuthoringToolOutput | null> => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      const result = await window.electron.invoke('tools:authoring', toolName, input)
+      try {
+        const result = await window.electron.invoke('tools:authoring', toolName, input)
 
-      if (result.success) {
-        return result.output as AuthoringToolOutput
-      } else {
+        if (result.success) {
+          return result.output as AuthoringToolOutput
+        }
         setError(result.error || 'Tool execution failed')
         return null
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Tool execution failed')
+        return null
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Tool execution failed')
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    },
+    [],
+  )
 
   const rewrite = useCallback((input: AuthoringToolInput) => executeTool('rewrite-text', input), [executeTool])
   const shorten = useCallback((input: AuthoringToolInput) => executeTool('shorten-text', input), [executeTool])
@@ -136,10 +139,9 @@ export function useWorkspaceQA() {
 
       if (result.success) {
         return result.output as WorkspaceQAOutput
-      } else {
-        setError(result.error || 'Workspace QA failed')
-        return null
       }
+      setError(result.error || 'Workspace QA failed')
+      return null
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Workspace QA failed')
       return null
@@ -171,10 +173,9 @@ export function useWebResearch() {
 
       if (result.success) {
         return result.output as WebResearchOutput
-      } else {
-        setError(result.error || 'Web research failed')
-        return null
       }
+      setError(result.error || 'Web research failed')
+      return null
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Web research failed')
       return null
@@ -197,26 +198,28 @@ export function useYouTubeTranscript() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchTranscript = useCallback(async (input: YouTubeTranscriptInput): Promise<YouTubeTranscriptOutput | null> => {
-    setLoading(true)
-    setError(null)
+  const fetchTranscript = useCallback(
+    async (input: YouTubeTranscriptInput): Promise<YouTubeTranscriptOutput | null> => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      const result = await window.electron.invoke('tools:youtube-transcript', input)
+      try {
+        const result = await window.electron.invoke('tools:youtube-transcript', input)
 
-      if (result.success) {
-        return result.output as YouTubeTranscriptOutput
-      } else {
+        if (result.success) {
+          return result.output as YouTubeTranscriptOutput
+        }
         setError(result.error || 'YouTube transcript fetch failed')
         return null
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'YouTube transcript fetch failed')
+        return null
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'YouTube transcript fetch failed')
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    },
+    [],
+  )
 
   return {
     loading,
@@ -241,10 +244,9 @@ export function useToneAnalyzer() {
 
       if (result.success) {
         return result.output as ToneAnalyzerOutput
-      } else {
-        setError(result.error || 'Tone analysis failed')
-        return null
       }
+      setError(result.error || 'Tone analysis failed')
+      return null
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tone analysis failed')
       return null
@@ -276,10 +278,9 @@ export function useBRollGenerator() {
 
       if (result.success) {
         return result.output as BRollGeneratorOutput
-      } else {
-        setError(result.error || 'B-roll generation failed')
-        return null
       }
+      setError(result.error || 'B-roll generation failed')
+      return null
     } catch (err) {
       setError(err instanceof Error ? err.message : 'B-roll generation failed')
       return null

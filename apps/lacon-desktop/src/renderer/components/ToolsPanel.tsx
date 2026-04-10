@@ -4,7 +4,16 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { useAuthoringTools, useBRollGenerator, useToneAnalyzer, useToolsList, useWebResearch, useWorkspaceQA, useYouTubeTranscript } from '../hooks/useTools'
+
+import {
+  useAuthoringTools,
+  useBRollGenerator,
+  useToneAnalyzer,
+  useToolsList,
+  useWebResearch,
+  useWorkspaceQA,
+  useYouTubeTranscript,
+} from '../hooks/useTools'
 
 export const ToolsPanel: React.FC = () => {
   const { tools, loading, error, loadTools, getToolsByCategory } = useToolsList()
@@ -28,10 +37,7 @@ export const ToolsPanel: React.FC = () => {
       <div className="tools-header">
         <h2>Agent Tools</h2>
         <div className="category-filter">
-          <button
-            className={selectedCategory === 'all' ? 'active' : ''}
-            onClick={() => handleCategoryChange('all')}
-          >
+          <button className={selectedCategory === 'all' ? 'active' : ''} onClick={() => handleCategoryChange('all')}>
             All
           </button>
           <button
@@ -90,27 +96,37 @@ export const AuthoringToolsPanel: React.FC<{
 
   const handleRewrite = async () => {
     const result = await rewrite({ text: selectedText, insertionMode })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   const handleShorten = async () => {
     const result = await shorten({ text: selectedText, insertionMode })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   const handleExpand = async () => {
     const result = await expand({ text: selectedText, insertionMode })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   const handlePolish = async () => {
     const result = await polish({ text: selectedText, tone, insertionMode })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   const handleToneAdjust = async () => {
     const result = await toneAdjust({ text: selectedText, tone, insertionMode })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   return (
@@ -175,12 +191,16 @@ export const ResearchToolsPanel: React.FC<{
 
   const handleWorkspaceQA = async () => {
     const result = await workspaceQA.query({ query })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   const handleWebResearch = async () => {
     const result = await webResearch.research({ query })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   return (
@@ -188,12 +208,7 @@ export const ResearchToolsPanel: React.FC<{
       <h3>Research Tools</h3>
 
       <div className="query-input">
-        <input
-          type="text"
-          placeholder="Enter your query..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
+        <input type="text" placeholder="Enter your query..." value={query} onChange={e => setQuery(e.target.value)} />
       </div>
 
       <div className="tool-actions">
@@ -227,17 +242,23 @@ export const CreatorToolsPanel: React.FC<{
 
   const handleFetchTranscript = async () => {
     const result = await youtubeTranscript.fetchTranscript({ url: youtubeUrl, includeTimestamps: true })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   const handleAnalyzeTone = async () => {
     const result = await toneAnalyzer.analyze({ text: scriptText, analyzeHook: true, analyzeTone: true })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   const handleGenerateBRoll = async () => {
     const result = await brollGenerator.generate({ scriptText, includeOnScreenText: true, includeTimestamps: true })
-    if (result) onResult(result)
+    if (result) {
+      onResult(result)
+    }
   }
 
   return (

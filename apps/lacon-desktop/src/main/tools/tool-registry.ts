@@ -98,7 +98,14 @@ export class ToolRegistry {
    * Helper: Get tool category from name
    */
   private getToolCategory(name: string): string {
-    if (name.includes('text') || name.includes('rewrite') || name.includes('shorten') || name.includes('expand') || name.includes('polish') || name.includes('tone')) {
+    if (
+      name.includes('text') ||
+      name.includes('rewrite') ||
+      name.includes('shorten') ||
+      name.includes('expand') ||
+      name.includes('polish') ||
+      name.includes('tone')
+    ) {
       return 'authoring'
     }
     if (name.includes('workspace') || name.includes('web') || name.includes('research')) {
@@ -193,14 +200,14 @@ export class ToolRegistry {
         id: '1',
         url: 'https://example.com/article1',
         title: 'Example Article 1',
-        snippet: 'This is a relevant article about ' + query,
+        snippet: `This is a relevant article about ${query}`,
         relevanceScore: 0.9,
       },
       {
         id: '2',
         url: 'https://example.com/article2',
         title: 'Example Article 2',
-        snippet: 'Another relevant article discussing ' + query,
+        snippet: `Another relevant article discussing ${query}`,
         relevanceScore: 0.8,
       },
     ]
@@ -254,7 +261,7 @@ export class ToolRegistry {
       segments: [
         { text: 'Welcome to this video.', startTime: 0, endTime: 3 },
         { text: 'Today we will discuss important topics.', startTime: 3, endTime: 7 },
-        { text: 'Let\'s get started.', startTime: 7, endTime: 10 },
+        { text: "Let's get started.", startTime: 7, endTime: 10 },
       ],
     }
   }

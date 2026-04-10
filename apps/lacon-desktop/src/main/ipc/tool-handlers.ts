@@ -3,8 +3,9 @@
  * Exposes tool execution to renderer process
  */
 
-import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
+import { ipcMain } from 'electron'
+
 import { getToolRegistry } from '../tools/tool-registry'
 
 /**
