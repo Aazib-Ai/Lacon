@@ -125,6 +125,36 @@ export const IPC_CHANNELS = {
   RELEASE_RECORD_ROLLBACK_DRILL: 'release:recordRollbackDrill',
   RELEASE_LIST_ROLLBACK_DRILLS: 'release:listRollbackDrills',
   RELEASE_GET_DEFAULT_ROLLBACK_RUNBOOK_TEMPLATE: 'release:getDefaultRollbackRunbookTemplate',
+
+  // Phase 12: Collaboration
+  COLLAB_CREATE_SESSION: 'collab:createSession',
+  COLLAB_GET_SESSION: 'collab:getSession',
+  COLLAB_ADD_MEMBER: 'collab:addMember',
+  COLLAB_UPDATE_MEMBER_ROLE: 'collab:updateMemberRole',
+  COLLAB_UPDATE_PRESENCE: 'collab:updatePresence',
+  COLLAB_LIST_PRESENCE: 'collab:listPresence',
+  COLLAB_APPLY_OPERATION: 'collab:applyOperation',
+
+  // Phase 12: Optional account and sync
+  ACCOUNT_CREATE_TENANT: 'account:createTenant',
+  ACCOUNT_CREATE_IDENTITY: 'account:createIdentity',
+  ACCOUNT_CREATE_SESSION: 'account:createSession',
+  ACCOUNT_ADD_RECOVERY_METHOD: 'account:addRecoveryMethod',
+  SYNC_QUEUE_CHANGE: 'sync:queueChange',
+  SYNC_PROCESS_QUEUE: 'sync:processQueue',
+  SYNC_RESOLVE_CONFLICT: 'sync:resolveConflict',
+  SYNC_CREATE_RESTORE_SNAPSHOT: 'sync:createRestoreSnapshot',
+  SYNC_RESTORE_TO_DEVICE: 'sync:restoreToDevice',
+  SYNC_GET_STATUS: 'sync:getStatus',
+
+  // Phase 12: Compliance program
+  COMPLIANCE_MAP_CONTROL: 'compliance:mapControl',
+  COMPLIANCE_CAPTURE_EVIDENCE: 'compliance:captureEvidence',
+  COMPLIANCE_RECORD_INTERNAL_AUDIT: 'compliance:recordInternalAudit',
+  COMPLIANCE_BUILD_GAP_PLAN: 'compliance:buildGapPlan',
+  COMPLIANCE_RUN_DRY_ASSESSMENT: 'compliance:runDryAssessment',
+  COMPLIANCE_PREPARE_EXTERNAL_AUDIT: 'compliance:prepareExternalAudit',
+  COMPLIANCE_GET_DASHBOARD: 'compliance:getDashboard',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -869,4 +899,347 @@ export function isReleaseGetDefaultRollbackRunbookTemplateRequest(
   payload: any,
 ): payload is ReleaseGetDefaultRollbackRunbookTemplateRequest {
   return typeof payload === 'object' && (payload.channel === 'stable' || payload.channel === 'beta')
+}
+
+// Phase 12 operation types
+export interface CollaborationCreateSessionRequest {
+  documentId: string
+  owner: {
+    userId: string
+    displayName: string
+  }
+}
+
+export interface CollaborationGetSessionRequest {
+  documentId: string
+}
+
+export interface CollaborationAddMemberRequest {
+  documentId: string
+  member: {
+    userId: string
+    displayName: string
+    role: 'owner' | 'editor' | 'commenter' | 'viewer'
+  }
+}
+
+export interface CollaborationUpdateMemberRoleRequest {
+  documentId: string
+  userId: string
+  role: 'owner' | 'editor' | 'commenter' | 'viewer'
+}
+
+export interface CollaborationUpdatePresenceRequest {
+  presence: {
+    userId: string
+    documentId: string
+    status: 'active' | 'idle' | 'offline'
+    cursorPos: number
+    selection: {
+      from: number
+      to: number
+    }
+  }
+}
+
+export interface CollaborationListPresenceRequest {
+  documentId: string
+}
+
+export interface CollaborationApplyOperationRequest {
+  operation: {
+    opId: string
+    documentId: string
+    actorId: string
+    baseRevision: number
+    timestamp: number
+    patch: {
+      from: number
+      to: number
+      insertText: string
+    }
+  }
+}
+
+export interface AccountCreateTenantRequest {
+  tenantId: string
+  workspaceId: string
+  displayName: string
+  createdBy: string
+}
+
+export interface AccountCreateIdentityRequest {
+  email: string
+  displayName: string
+  tenantId: string
+  mfaEnabled: boolean
+}
+
+export interface AccountCreateSessionRequest {
+  accountId: string
+  deviceId: string
+  durationMs: number
+}
+
+export interface AccountAddRecoveryMethodRequest {
+  accountId: string
+  type: 'backup-code' | 'email-otp' | 'authenticator-app'
+}
+
+export interface SyncQueueChangeRequest {
+  tenantId: string
+  workspaceId: string
+  deviceId: string
+  documentId: string
+  baseRevision: number
+  plainPayload: string
+  encryptionKey: string
+}
+
+export interface SyncResolveConflictRequest {
+  strategy: 'last-writer-wins' | 'manual-merge'
+  localPayload: string
+  remotePayload: string
+  localTimestamp: number
+  remoteTimestamp: number
+}
+
+export interface SyncCreateRestoreSnapshotRequest {
+  accountId: string
+  tenantId: string
+  workspaceId: string
+  sourceDeviceId: string
+  plainState: string
+  encryptionKey: string
+}
+
+export interface SyncRestoreToDeviceRequest {
+  snapshotId: string
+  encryptionKey: string
+}
+
+export interface SyncGetStatusRequest {
+  workspaceId: string
+}
+
+export interface ComplianceMapControlRequest {
+  framework: 'SOC2' | 'ISO27001' | 'Internal'
+  controlId: string
+  owner: string
+  description: string
+}
+
+export interface ComplianceCaptureEvidenceRequest {
+  controlId: string
+  artifactPath: string
+  artifactHash: string
+  capturedBy: string
+}
+
+export interface ComplianceRecordInternalAuditRequest {
+  scope: string
+  executedBy: string
+  findings: string[]
+}
+
+export interface ComplianceBuildGapPlanRequest {
+  gaps: string[]
+}
+
+export interface ComplianceRunDryAssessmentRequest {
+  summary: string
+}
+
+export interface CompliancePrepareExternalAuditRequest {
+  summary: string
+}
+
+export function isCollaborationCreateSessionRequest(payload: any): payload is CollaborationCreateSessionRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.documentId === 'string' &&
+    typeof payload.owner === 'object' &&
+    typeof payload.owner.userId === 'string' &&
+    typeof payload.owner.displayName === 'string'
+  )
+}
+
+export function isCollaborationGetSessionRequest(payload: any): payload is CollaborationGetSessionRequest {
+  return typeof payload === 'object' && typeof payload.documentId === 'string'
+}
+
+export function isCollaborationAddMemberRequest(payload: any): payload is CollaborationAddMemberRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.documentId === 'string' &&
+    typeof payload.member === 'object' &&
+    typeof payload.member.userId === 'string' &&
+    typeof payload.member.displayName === 'string' &&
+    typeof payload.member.role === 'string'
+  )
+}
+
+export function isCollaborationUpdateMemberRoleRequest(payload: any): payload is CollaborationUpdateMemberRoleRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.documentId === 'string' &&
+    typeof payload.userId === 'string' &&
+    typeof payload.role === 'string'
+  )
+}
+
+export function isCollaborationUpdatePresenceRequest(payload: any): payload is CollaborationUpdatePresenceRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.presence === 'object' &&
+    typeof payload.presence.userId === 'string' &&
+    typeof payload.presence.documentId === 'string' &&
+    typeof payload.presence.status === 'string' &&
+    typeof payload.presence.cursorPos === 'number' &&
+    typeof payload.presence.selection === 'object' &&
+    typeof payload.presence.selection.from === 'number' &&
+    typeof payload.presence.selection.to === 'number'
+  )
+}
+
+export function isCollaborationListPresenceRequest(payload: any): payload is CollaborationListPresenceRequest {
+  return typeof payload === 'object' && typeof payload.documentId === 'string'
+}
+
+export function isCollaborationApplyOperationRequest(payload: any): payload is CollaborationApplyOperationRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.operation === 'object' &&
+    typeof payload.operation.opId === 'string' &&
+    typeof payload.operation.documentId === 'string' &&
+    typeof payload.operation.actorId === 'string' &&
+    typeof payload.operation.baseRevision === 'number' &&
+    typeof payload.operation.timestamp === 'number' &&
+    typeof payload.operation.patch === 'object' &&
+    typeof payload.operation.patch.from === 'number' &&
+    typeof payload.operation.patch.to === 'number' &&
+    typeof payload.operation.patch.insertText === 'string'
+  )
+}
+
+export function isAccountCreateTenantRequest(payload: any): payload is AccountCreateTenantRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.tenantId === 'string' &&
+    typeof payload.workspaceId === 'string' &&
+    typeof payload.displayName === 'string' &&
+    typeof payload.createdBy === 'string'
+  )
+}
+
+export function isAccountCreateIdentityRequest(payload: any): payload is AccountCreateIdentityRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.email === 'string' &&
+    typeof payload.displayName === 'string' &&
+    typeof payload.tenantId === 'string' &&
+    typeof payload.mfaEnabled === 'boolean'
+  )
+}
+
+export function isAccountCreateSessionRequest(payload: any): payload is AccountCreateSessionRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.accountId === 'string' &&
+    typeof payload.deviceId === 'string' &&
+    typeof payload.durationMs === 'number'
+  )
+}
+
+export function isAccountAddRecoveryMethodRequest(payload: any): payload is AccountAddRecoveryMethodRequest {
+  return typeof payload === 'object' && typeof payload.accountId === 'string' && typeof payload.type === 'string'
+}
+
+export function isSyncQueueChangeRequest(payload: any): payload is SyncQueueChangeRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.tenantId === 'string' &&
+    typeof payload.workspaceId === 'string' &&
+    typeof payload.deviceId === 'string' &&
+    typeof payload.documentId === 'string' &&
+    typeof payload.baseRevision === 'number' &&
+    typeof payload.plainPayload === 'string' &&
+    typeof payload.encryptionKey === 'string'
+  )
+}
+
+export function isSyncResolveConflictRequest(payload: any): payload is SyncResolveConflictRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.strategy === 'string' &&
+    typeof payload.localPayload === 'string' &&
+    typeof payload.remotePayload === 'string' &&
+    typeof payload.localTimestamp === 'number' &&
+    typeof payload.remoteTimestamp === 'number'
+  )
+}
+
+export function isSyncCreateRestoreSnapshotRequest(payload: any): payload is SyncCreateRestoreSnapshotRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.accountId === 'string' &&
+    typeof payload.tenantId === 'string' &&
+    typeof payload.workspaceId === 'string' &&
+    typeof payload.sourceDeviceId === 'string' &&
+    typeof payload.plainState === 'string' &&
+    typeof payload.encryptionKey === 'string'
+  )
+}
+
+export function isSyncRestoreToDeviceRequest(payload: any): payload is SyncRestoreToDeviceRequest {
+  return (
+    typeof payload === 'object' && typeof payload.snapshotId === 'string' && typeof payload.encryptionKey === 'string'
+  )
+}
+
+export function isSyncGetStatusRequest(payload: any): payload is SyncGetStatusRequest {
+  return typeof payload === 'object' && typeof payload.workspaceId === 'string'
+}
+
+export function isComplianceMapControlRequest(payload: any): payload is ComplianceMapControlRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.framework === 'string' &&
+    typeof payload.controlId === 'string' &&
+    typeof payload.owner === 'string' &&
+    typeof payload.description === 'string'
+  )
+}
+
+export function isComplianceCaptureEvidenceRequest(payload: any): payload is ComplianceCaptureEvidenceRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.controlId === 'string' &&
+    typeof payload.artifactPath === 'string' &&
+    typeof payload.artifactHash === 'string' &&
+    typeof payload.capturedBy === 'string'
+  )
+}
+
+export function isComplianceRecordInternalAuditRequest(payload: any): payload is ComplianceRecordInternalAuditRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.scope === 'string' &&
+    typeof payload.executedBy === 'string' &&
+    Array.isArray(payload.findings)
+  )
+}
+
+export function isComplianceBuildGapPlanRequest(payload: any): payload is ComplianceBuildGapPlanRequest {
+  return typeof payload === 'object' && Array.isArray(payload.gaps)
+}
+
+export function isComplianceRunDryAssessmentRequest(payload: any): payload is ComplianceRunDryAssessmentRequest {
+  return typeof payload === 'object' && typeof payload.summary === 'string'
+}
+
+export function isCompliancePrepareExternalAuditRequest(
+  payload: any,
+): payload is CompliancePrepareExternalAuditRequest {
+  return typeof payload === 'object' && typeof payload.summary === 'string'
 }

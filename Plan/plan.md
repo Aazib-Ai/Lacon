@@ -247,18 +247,18 @@ Amplify: [amplifies/phase-11-amplify.md](amplifies/phase-11-amplify.md)
 ## Phase 12: Post-v1 Expansion
 Amplify: [amplifies/phase-12-amplify.md](amplifies/phase-12-amplify.md)
 
-- [ ] P12-T1 Add collaboration stack
-  - [ ] P12-T1.1 Shared-doc architecture
-  - [ ] P12-T1.2 Presence and role permissions
-  - [ ] P12-T1.3 Multi-user conflict handling
-- [ ] P12-T2 Add optional account and sync layer
-  - [ ] P12-T2.1 Account and auth model
-  - [ ] P12-T2.2 Encrypted sync
-  - [ ] P12-T2.3 Cross-device restore
-- [ ] P12-T3 Add compliance program roadmap
-  - [ ] P12-T3.1 SOC 2 control implementation
-  - [ ] P12-T3.2 Internal audits and evidence collection
-  - [ ] P12-T3.3 External audit readiness
+- [x] P12-T1 Add collaboration stack
+  - [x] P12-T1.1 Shared-doc architecture
+  - [x] P12-T1.2 Presence and role permissions
+  - [x] P12-T1.3 Multi-user conflict handling
+- [x] P12-T2 Add optional account and sync layer
+  - [x] P12-T2.1 Account and auth model
+  - [x] P12-T2.2 Encrypted sync
+  - [x] P12-T2.3 Cross-device restore
+- [x] P12-T3 Add compliance program roadmap
+  - [x] P12-T3.1 SOC 2 control implementation
+  - [x] P12-T3.2 Internal audits and evidence collection
+  - [x] P12-T3.3 External audit readiness
 
 ## Program-Level Exit Criteria
 

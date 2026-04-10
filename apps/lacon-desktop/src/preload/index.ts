@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { type IpcChannel, IPC_CHANNELS, isValidChannel } from '@/shared/ipc-schema'
-import type { IpcAPI, ReleaseAPI } from '@/shared/types'
+import type { IpcAPI, Phase12API, ReleaseAPI } from '@/shared/types'
 
 // Whitelist of allowed IPC channels
 const ALLOWED_CHANNELS = new Set(Object.values(IPC_CHANNELS))
@@ -149,6 +149,36 @@ const releaseAPI: ReleaseAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.RELEASE_GET_DEFAULT_ROLLBACK_RUNBOOK_TEMPLATE, { channel }),
 }
 
+// Phase 12 API
+const phase12API: Phase12API = {
+  createCollabSession: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COLLAB_CREATE_SESSION, payload),
+  getCollabSession: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.COLLAB_GET_SESSION, { documentId }),
+  addCollabMember: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COLLAB_ADD_MEMBER, payload),
+  updateCollabRole: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COLLAB_UPDATE_MEMBER_ROLE, payload),
+  updatePresence: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COLLAB_UPDATE_PRESENCE, payload),
+  listPresence: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.COLLAB_LIST_PRESENCE, { documentId }),
+  applyOperation: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COLLAB_APPLY_OPERATION, payload),
+  createTenant: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_CREATE_TENANT, payload),
+  createAccount: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_CREATE_IDENTITY, payload),
+  createAccountSession: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_CREATE_SESSION, payload),
+  addRecoveryMethod: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_ADD_RECOVERY_METHOD, payload),
+  queueSyncChange: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SYNC_QUEUE_CHANGE, payload),
+  processSyncQueue: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_PROCESS_QUEUE, {}),
+  resolveSyncConflict: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SYNC_RESOLVE_CONFLICT, payload),
+  createRestoreSnapshot: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SYNC_CREATE_RESTORE_SNAPSHOT, payload),
+  restoreToDevice: (snapshotId: string, encryptionKey: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SYNC_RESTORE_TO_DEVICE, { snapshotId, encryptionKey }),
+  getSyncStatus: (workspaceId: string) => ipcRenderer.invoke(IPC_CHANNELS.SYNC_GET_STATUS, { workspaceId }),
+  mapControl: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_MAP_CONTROL, payload),
+  captureEvidence: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_CAPTURE_EVIDENCE, payload),
+  recordInternalAudit: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_RECORD_INTERNAL_AUDIT, payload),
+  buildGapPlan: (gaps: string[]) => ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_BUILD_GAP_PLAN, { gaps }),
+  runDryAssessment: (summary: string) => ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_RUN_DRY_ASSESSMENT, { summary }),
+  prepareExternalAudit: (summary: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_PREPARE_EXTERNAL_AUDIT, { summary }),
+  getComplianceDashboard: () => ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_GET_DASHBOARD, {}),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -158,6 +188,7 @@ contextBridge.exposeInMainWorld('electron', {
   trace: traceAPI,
   policy: policyAPI,
   release: releaseAPI,
+  phase12: phase12API,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))

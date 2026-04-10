@@ -10,6 +10,7 @@ Use this file as a shared ledger across coding agents.
 - [x] Phase 3 - All tasks claimed by Kiro on 2026-04-09
 - [x] Phase 4 - All tasks claimed by Kiro on 2026-04-09
 - [ ] Phase 5 - All tasks claimed by Kiro on 2026-04-09
+- [x] Phase 12 - Claimed by Codex on 2026-04-10
 
 Claim entry:
 
@@ -107,6 +108,15 @@ Claim entry:
 - Agent: Codex
 - Phase: P11
 - Task ID: P11-T1, P11-T2, P11-T3, P11-T4, P11-T5, P11-T6, P11-T7
+- Claim status: CLAIMED
+- Expected completion window: 2026-04-10
+
+Claim entry:
+
+- Date: 2026-04-10
+- Agent: Codex
+- Phase: P12
+- Task ID: P12-T1, P12-T2, P12-T3, P12-T4, P12-T5, P12-T6
 - Claim status: CLAIMED
 - Expected completion window: 2026-04-10
 
@@ -581,6 +591,47 @@ Report:
   - Wire production signing/notarization credentials via secure CI secrets
   - Perform a live staged rollout and rollback drill in pre-production before GA
 
+Report:
+
+- Date: 2026-04-10
+- Agent: Codex
+- Phase: P12
+- Task ID: P12-T1, P12-T2, P12-T3, P12-T4, P12-T5, P12-T6
+- Final status: DONE
+- Files changed:
+  - apps/lacon-desktop/src/shared/phase12-types.ts
+  - apps/lacon-desktop/src/main/services/collaboration-service.ts
+  - apps/lacon-desktop/src/main/services/account-sync-service.ts
+  - apps/lacon-desktop/src/main/services/compliance-service.ts
+  - apps/lacon-desktop/src/main/ipc/phase12-handlers.ts
+  - apps/lacon-desktop/src/main/ipc/ipc-validator.ts
+  - apps/lacon-desktop/src/main/index.ts
+  - apps/lacon-desktop/src/shared/ipc-schema.ts
+  - apps/lacon-desktop/src/shared/types.ts
+  - apps/lacon-desktop/src/preload/index.ts
+  - apps/lacon-desktop/src/renderer/hooks/usePhase12.ts
+  - apps/lacon-desktop/src/renderer/App.tsx
+  - apps/lacon-desktop/tests/collaboration/collaboration-service.test.ts
+  - apps/lacon-desktop/tests/sync/account-sync-service.test.ts
+  - apps/lacon-desktop/tests/compliance/compliance-service.test.ts
+  - apps/lacon-desktop/tests/ipc/ipc-validator.test.ts
+  - Plan/amplifies/phase-12-amplify.md
+  - Plan/plan.md
+  - Plan/progress-tracker.md
+- Commands run:
+  - pnpm --filter lacon-desktop typecheck (successful)
+  - pnpm --filter lacon-desktop test -- tests/collaboration/collaboration-service.test.ts tests/sync/account-sync-service.test.ts tests/compliance/compliance-service.test.ts tests/ipc/ipc-validator.test.ts (successful - 33/33 tests passed)
+  - pnpm --filter lacon-desktop exec eslint src/main/ipc/ipc-validator.ts src/main/ipc/phase12-handlers.ts src/main/services/collaboration-service.ts src/main/services/account-sync-service.ts src/main/services/compliance-service.ts src/preload/index.ts src/shared/ipc-schema.ts src/shared/types.ts src/shared/phase12-types.ts src/renderer/App.tsx src/renderer/hooks/usePhase12.ts --fix (successful)
+- Validation summary:
+  - Collaboration stack implemented with shared document sessions, member roles, presence indicators, cursor/selection tracking, and conflict handling for concurrent operations
+  - Optional account and sync model implemented with tenant/workspace boundaries, account identity/session flow, recovery methods, encrypted queueing, conflict strategy handling, and cross-device restore snapshots
+  - Compliance maturity tooling implemented with control mapping, evidence capture, internal audit records, gap remediation planning, dry-run assessments, and external audit preparation states
+  - IPC channels, payload validators, preload bridge APIs, and renderer integration added for Phase 12 capabilities
+  - Targeted Phase 12 tests passing with full typecheck in changed scope
+- Follow-up actions:
+  - Run full lacon-desktop test suite and resolve pre-existing workspace lint baseline issues not introduced by Phase 12
+  - Add persistence-backed replay harness for high-concurrency collaboration simulation in CI
+
 Report template:
 
 - Date:
@@ -621,4 +672,4 @@ Blocker template:
 - [ ] P9 complete
 - [ ] P10 complete
 - [x] P11 complete
-- [ ] P12 complete
+- [x] P12 complete

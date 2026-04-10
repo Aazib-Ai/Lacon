@@ -4,6 +4,7 @@ import { AppShell } from './components/AppShell'
 import { Editor } from './components/Editor'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { useDocument } from './hooks/useDocument'
+import { usePhase12 } from './hooks/usePhase12'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
 
 function AppContent() {
   const { currentDocument, isDirty, error, createDocument, updateContent, markDirty } = useDocument()
+  const { state: phase12State, summary, bootstrapDocument, pushPresence, queueSyncChange } = usePhase12()
 
   // Mock documents list for sidebar (will be replaced with real data)
   const [documents] = useState([
@@ -48,6 +50,14 @@ function AppContent() {
       setWordCount(words.length)
     }
   }, [currentDocument?.content])
+
+  useEffect(() => {
+    if (!currentDocument) {
+      return
+    }
+
+    bootstrapDocument(currentDocument.metadata.id)
+  }, [bootstrapDocument, currentDocument])
 
   const handleNew = async () => {
     if (isDirty) {
@@ -104,6 +114,51 @@ function AppContent() {
           role="alert"
         >
           {error}
+        </div>
+      )}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: '0.5rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() =>
+            pushPresence({
+              documentId: currentDocument.metadata.id,
+              userId: 'owner-session',
+              cursorPos: 0,
+            })
+          }
+        >
+          Presence: {summary.collaborators}
+        </button>
+        <button
+          type="button"
+          onClick={() => queueSyncChange({ documentId: currentDocument.metadata.id, plainPayload: 'update' })}
+        >
+          Sync Queue: {summary.queuedSync}
+        </button>
+        <div>Sync Rev: {summary.latestSyncRevision}</div>
+        <div>SOC2 Controls: {summary.complianceControls}</div>
+      </div>
+
+      {phase12State.error && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            marginBottom: '1rem',
+            backgroundColor: 'var(--color-warningBg, #fff8e1)',
+            color: 'var(--color-warningText, #7a5a00)',
+            borderRadius: '4px',
+          }}
+          role="alert"
+        >
+          {phase12State.error}
         </div>
       )}
 

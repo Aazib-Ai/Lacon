@@ -6,6 +6,7 @@ import { getMigrationRunner } from './data/migrations'
 import { getDataStore } from './data/store'
 import { registerAuditHandlers } from './ipc/audit-handlers'
 import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
+import { registerPhase12Handlers } from './ipc/phase12-handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
 import { registerReleaseHandlers } from './ipc/release-handlers'
 import { registerToolHandlers } from './ipc/tool-handlers'
@@ -88,6 +89,7 @@ async function initializeApp() {
     registerAgentIpcHandlers()
     registerProviderHandlers()
     registerReleaseHandlers()
+    registerPhase12Handlers()
 
     // Register tool handlers (Phase 8)
     const workspaceRoot = app.getPath('userData')

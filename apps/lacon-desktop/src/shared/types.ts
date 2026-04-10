@@ -106,6 +106,34 @@ export interface ReleaseAPI {
   getDefaultRollbackRunbookTemplate: (channel: 'stable' | 'beta') => Promise<any>
 }
 
+// Phase 12 API
+export interface Phase12API {
+  createCollabSession: (payload: any) => Promise<any>
+  getCollabSession: (documentId: string) => Promise<any>
+  addCollabMember: (payload: any) => Promise<any>
+  updateCollabRole: (payload: any) => Promise<any>
+  updatePresence: (payload: any) => Promise<any>
+  listPresence: (documentId: string) => Promise<any[]>
+  applyOperation: (payload: any) => Promise<any>
+  createTenant: (payload: any) => Promise<any>
+  createAccount: (payload: any) => Promise<any>
+  createAccountSession: (payload: any) => Promise<any>
+  addRecoveryMethod: (payload: any) => Promise<any>
+  queueSyncChange: (payload: any) => Promise<any>
+  processSyncQueue: () => Promise<any[]>
+  resolveSyncConflict: (payload: any) => Promise<string>
+  createRestoreSnapshot: (payload: any) => Promise<any>
+  restoreToDevice: (snapshotId: string, encryptionKey: string) => Promise<string>
+  getSyncStatus: (workspaceId: string) => Promise<any>
+  mapControl: (payload: any) => Promise<any>
+  captureEvidence: (payload: any) => Promise<any>
+  recordInternalAudit: (payload: any) => Promise<any>
+  buildGapPlan: (gaps: string[]) => Promise<any>
+  runDryAssessment: (summary: string) => Promise<any>
+  prepareExternalAudit: (summary: string) => Promise<any>
+  getComplianceDashboard: () => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -118,6 +146,7 @@ declare global {
       trace: TraceAPI
       policy: PolicyAPI
       release: ReleaseAPI
+      phase12: Phase12API
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }

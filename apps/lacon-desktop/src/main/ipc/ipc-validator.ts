@@ -7,6 +7,23 @@ import {
   type IpcChannel,
   type IpcError,
   IPC_CHANNELS,
+  isAccountAddRecoveryMethodRequest,
+  isAccountCreateIdentityRequest,
+  isAccountCreateSessionRequest,
+  isAccountCreateTenantRequest,
+  isCollaborationAddMemberRequest,
+  isCollaborationApplyOperationRequest,
+  isCollaborationCreateSessionRequest,
+  isCollaborationGetSessionRequest,
+  isCollaborationListPresenceRequest,
+  isCollaborationUpdateMemberRoleRequest,
+  isCollaborationUpdatePresenceRequest,
+  isComplianceBuildGapPlanRequest,
+  isComplianceCaptureEvidenceRequest,
+  isComplianceMapControlRequest,
+  isCompliancePrepareExternalAuditRequest,
+  isComplianceRecordInternalAuditRequest,
+  isComplianceRunDryAssessmentRequest,
   isDataDeleteRequest,
   isDataExportRequest,
   isDataImportRequest,
@@ -38,6 +55,11 @@ import {
   isReleaseVerifyArtifactIntegrityRequest,
   isSettingsGetRequest,
   isSettingsSetRequest,
+  isSyncCreateRestoreSnapshotRequest,
+  isSyncGetStatusRequest,
+  isSyncQueueChangeRequest,
+  isSyncResolveConflictRequest,
+  isSyncRestoreToDeviceRequest,
   isValidChannel,
 } from '@/shared/ipc-schema'
 
@@ -374,6 +396,212 @@ export function validatePayload(channel: IpcChannel, payload: any): void {
           },
         )
       }
+      break
+
+    case IPC_CHANNELS.COLLAB_CREATE_SESSION:
+      if (!isCollaborationCreateSessionRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COLLAB_CREATE_SESSION payload', {
+          expected: 'CollaborationCreateSessionRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COLLAB_GET_SESSION:
+      if (!isCollaborationGetSessionRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COLLAB_GET_SESSION payload', {
+          expected: 'CollaborationGetSessionRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COLLAB_ADD_MEMBER:
+      if (!isCollaborationAddMemberRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COLLAB_ADD_MEMBER payload', {
+          expected: 'CollaborationAddMemberRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COLLAB_UPDATE_MEMBER_ROLE:
+      if (!isCollaborationUpdateMemberRoleRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COLLAB_UPDATE_MEMBER_ROLE payload', {
+          expected: 'CollaborationUpdateMemberRoleRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COLLAB_UPDATE_PRESENCE:
+      if (!isCollaborationUpdatePresenceRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COLLAB_UPDATE_PRESENCE payload', {
+          expected: 'CollaborationUpdatePresenceRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COLLAB_LIST_PRESENCE:
+      if (!isCollaborationListPresenceRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COLLAB_LIST_PRESENCE payload', {
+          expected: 'CollaborationListPresenceRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COLLAB_APPLY_OPERATION:
+      if (!isCollaborationApplyOperationRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COLLAB_APPLY_OPERATION payload', {
+          expected: 'CollaborationApplyOperationRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.ACCOUNT_CREATE_TENANT:
+      if (!isAccountCreateTenantRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid ACCOUNT_CREATE_TENANT payload', {
+          expected: 'AccountCreateTenantRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.ACCOUNT_CREATE_IDENTITY:
+      if (!isAccountCreateIdentityRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid ACCOUNT_CREATE_IDENTITY payload', {
+          expected: 'AccountCreateIdentityRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.ACCOUNT_CREATE_SESSION:
+      if (!isAccountCreateSessionRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid ACCOUNT_CREATE_SESSION payload', {
+          expected: 'AccountCreateSessionRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.ACCOUNT_ADD_RECOVERY_METHOD:
+      if (!isAccountAddRecoveryMethodRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid ACCOUNT_ADD_RECOVERY_METHOD payload', {
+          expected: 'AccountAddRecoveryMethodRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.SYNC_QUEUE_CHANGE:
+      if (!isSyncQueueChangeRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid SYNC_QUEUE_CHANGE payload', {
+          expected: 'SyncQueueChangeRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.SYNC_PROCESS_QUEUE:
+      // No payload required
+      break
+
+    case IPC_CHANNELS.SYNC_RESOLVE_CONFLICT:
+      if (!isSyncResolveConflictRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid SYNC_RESOLVE_CONFLICT payload', {
+          expected: 'SyncResolveConflictRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.SYNC_CREATE_RESTORE_SNAPSHOT:
+      if (!isSyncCreateRestoreSnapshotRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid SYNC_CREATE_RESTORE_SNAPSHOT payload', {
+          expected: 'SyncCreateRestoreSnapshotRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.SYNC_RESTORE_TO_DEVICE:
+      if (!isSyncRestoreToDeviceRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid SYNC_RESTORE_TO_DEVICE payload', {
+          expected: 'SyncRestoreToDeviceRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.SYNC_GET_STATUS:
+      if (!isSyncGetStatusRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid SYNC_GET_STATUS payload', {
+          expected: 'SyncGetStatusRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COMPLIANCE_MAP_CONTROL:
+      if (!isComplianceMapControlRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COMPLIANCE_MAP_CONTROL payload', {
+          expected: 'ComplianceMapControlRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COMPLIANCE_CAPTURE_EVIDENCE:
+      if (!isComplianceCaptureEvidenceRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COMPLIANCE_CAPTURE_EVIDENCE payload', {
+          expected: 'ComplianceCaptureEvidenceRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COMPLIANCE_RECORD_INTERNAL_AUDIT:
+      if (!isComplianceRecordInternalAuditRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COMPLIANCE_RECORD_INTERNAL_AUDIT payload', {
+          expected: 'ComplianceRecordInternalAuditRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COMPLIANCE_BUILD_GAP_PLAN:
+      if (!isComplianceBuildGapPlanRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COMPLIANCE_BUILD_GAP_PLAN payload', {
+          expected: 'ComplianceBuildGapPlanRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COMPLIANCE_RUN_DRY_ASSESSMENT:
+      if (!isComplianceRunDryAssessmentRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COMPLIANCE_RUN_DRY_ASSESSMENT payload', {
+          expected: 'ComplianceRunDryAssessmentRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COMPLIANCE_PREPARE_EXTERNAL_AUDIT:
+      if (!isCompliancePrepareExternalAuditRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid COMPLIANCE_PREPARE_EXTERNAL_AUDIT payload', {
+          expected: 'CompliancePrepareExternalAuditRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.COMPLIANCE_GET_DASHBOARD:
+      // No payload required
       break
 
     default:

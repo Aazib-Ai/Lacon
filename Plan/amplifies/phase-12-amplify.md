@@ -1,7 +1,7 @@
 # Phase 12 Amplify: Post-v1 Expansion
 
 Phase ID: P12
-Status: Not Started
+Status: Completed
 Depends on: P11
 Blocks: none for v1 launch
 
@@ -31,51 +31,51 @@ Expand product capabilities after GA with collaboration, optional account sync, 
 
 ## Epic P12-E1: Collaboration Capabilities
 
-- [ ] P12-T1 Design collaboration architecture
-  - [ ] P12-T1.1 Shared document model
-  - [ ] P12-T1.2 Permission and role model
-  - [ ] P12-T1.3 Conflict resolution strategy
+- [x] P12-T1 Design collaboration architecture
+  - [x] P12-T1.1 Shared document model
+  - [x] P12-T1.2 Permission and role model
+  - [x] P12-T1.3 Conflict resolution strategy
 
-- [ ] P12-T2 Implement real-time collaboration
-  - [ ] P12-T2.1 Presence indicators
-  - [ ] P12-T2.2 Remote cursor and selection indicators
-  - [ ] P12-T2.3 Shared editing resilience tests
+- [x] P12-T2 Implement real-time collaboration
+  - [x] P12-T2.1 Presence indicators
+  - [x] P12-T2.2 Remote cursor and selection indicators
+  - [x] P12-T2.3 Shared editing resilience tests
 
 ## Epic P12-E2: Optional Account and Sync
 
-- [ ] P12-T3 Design account and auth model
-  - [ ] P12-T3.1 Identity and session model
-  - [ ] P12-T3.2 Recovery and account security model
-  - [ ] P12-T3.3 Tenant and workspace boundaries
+- [x] P12-T3 Design account and auth model
+  - [x] P12-T3.1 Identity and session model
+  - [x] P12-T3.2 Recovery and account security model
+  - [x] P12-T3.3 Tenant and workspace boundaries
 
-- [ ] P12-T4 Implement encrypted sync
-  - [ ] P12-T4.1 Sync protocol and queueing
-  - [ ] P12-T4.2 Conflict handling and merge UX
-  - [ ] P12-T4.3 Cross-device restore flow
+- [x] P12-T4 Implement encrypted sync
+  - [x] P12-T4.1 Sync protocol and queueing
+  - [x] P12-T4.2 Conflict handling and merge UX
+  - [x] P12-T4.3 Cross-device restore flow
 
 ## Epic P12-E3: Compliance Program Maturity
 
-- [ ] P12-T5 Build controls and evidence catalog
-  - [ ] P12-T5.1 Control mapping
-  - [ ] P12-T5.2 Evidence capture process
-  - [ ] P12-T5.3 Internal audit cadence
+- [x] P12-T5 Build controls and evidence catalog
+  - [x] P12-T5.1 Control mapping
+  - [x] P12-T5.2 Evidence capture process
+  - [x] P12-T5.3 Internal audit cadence
 
-- [ ] P12-T6 External readiness
-  - [ ] P12-T6.1 Gap remediation plan
-  - [ ] P12-T6.2 Dry-run assessment
-  - [ ] P12-T6.3 External audit preparation
+- [x] P12-T6 External readiness
+  - [x] P12-T6.1 Gap remediation plan
+  - [x] P12-T6.2 Dry-run assessment
+  - [x] P12-T6.3 External audit preparation
 
 ## Validation
 
-- [ ] V12-1 Collaboration is stable under concurrent edits
-- [ ] V12-2 Sync conflicts resolve without data loss
-- [ ] V12-3 Compliance evidence process is repeatable
+- [x] V12-1 Collaboration is stable under concurrent edits
+- [x] V12-2 Sync conflicts resolve without data loss
+- [x] V12-3 Compliance evidence process is repeatable
 
 ## Definition of Done
 
-- [ ] Phase 12 checklist complete
-- [ ] Post-v1 expansion targets met
-- [ ] Master plan checkboxes updated in Plan/plan.md
+- [x] Phase 12 checklist complete
+- [x] Post-v1 expansion targets met
+- [x] Master plan checkboxes updated in Plan/plan.md
 
 ## Agent Handoff Template
 

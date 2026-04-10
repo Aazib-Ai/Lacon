@@ -146,6 +146,57 @@ describe('IPC Validator', () => {
     })
   })
 
+  describe('validatePayload - Phase 12 collaboration', () => {
+    it('should accept valid COLLAB_CREATE_SESSION payload', () => {
+      const payload = {
+        documentId: 'doc-1',
+        owner: {
+          userId: 'user-1',
+          displayName: 'Owner',
+        },
+      }
+
+      expect(() => validatePayload(IPC_CHANNELS.COLLAB_CREATE_SESSION, payload)).not.toThrow()
+    })
+
+    it('should reject invalid COLLAB_CREATE_SESSION payload', () => {
+      const payload = {
+        documentId: 'doc-1',
+      }
+
+      expect(() => validatePayload(IPC_CHANNELS.COLLAB_CREATE_SESSION, payload)).toThrow(IpcValidationError)
+    })
+  })
+
+  describe('validatePayload - Phase 12 sync', () => {
+    it('should accept valid SYNC_QUEUE_CHANGE payload', () => {
+      const payload = {
+        tenantId: 'tenant-1',
+        workspaceId: 'workspace-1',
+        deviceId: 'device-1',
+        documentId: 'doc-1',
+        baseRevision: 1,
+        plainPayload: 'content',
+        encryptionKey: 'secret',
+      }
+
+      expect(() => validatePayload(IPC_CHANNELS.SYNC_QUEUE_CHANGE, payload)).not.toThrow()
+    })
+  })
+
+  describe('validatePayload - Phase 12 compliance', () => {
+    it('should accept valid COMPLIANCE_MAP_CONTROL payload', () => {
+      const payload = {
+        framework: 'SOC2',
+        controlId: 'CC6.1',
+        owner: 'security',
+        description: 'Access controls enforced',
+      }
+
+      expect(() => validatePayload(IPC_CHANNELS.COMPLIANCE_MAP_CONTROL, payload)).not.toThrow()
+    })
+  })
+
   describe('validateIpcRequest', () => {
     it('should validate both channel and payload', () => {
       const payload = {
