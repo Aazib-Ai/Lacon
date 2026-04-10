@@ -72,10 +72,25 @@ const providerAPI = {
   },
 }
 
+// Tool API (Phase 8)
+const toolAPI = {
+  list: () => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_LIST),
+  listByCategory: (category: string) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_LIST_BY_CATEGORY, category),
+  execute: (toolName: string, input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_EXECUTE, toolName, input),
+  authoring: (toolName: string, input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_AUTHORING, toolName, input),
+  workspaceQA: (input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_WORKSPACE_QA, input),
+  webResearch: (input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_WEB_RESEARCH, input),
+  youtubeTranscript: (input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_YOUTUBE_TRANSCRIPT, input),
+  toneAnalyzer: (input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_TONE_ANALYZER, input),
+  brollGenerator: (input: any) => ipcRenderer.invoke(IPC_CHANNELS.TOOLS_BROLL_GENERATOR, input),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
   provider: providerAPI,
+  tool: toolAPI,
+  invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))
   },

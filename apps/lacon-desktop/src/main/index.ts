@@ -5,6 +5,7 @@ import { getMigrationRunner } from './data/migrations'
 import { getDataStore } from './data/store'
 import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
+import { registerToolHandlers } from './ipc/tool-handlers'
 import { getKeyStore } from './security/keystore'
 import { createSafeLogger } from './security/log-redaction'
 
@@ -35,6 +36,11 @@ async function initializeApp() {
     registerIpcHandlers()
     registerAgentIpcHandlers()
     registerProviderHandlers()
+    
+    // Register tool handlers (Phase 8)
+    const workspaceRoot = app.getPath('userData')
+    registerToolHandlers(workspaceRoot)
+    
     logger.info('IPC handlers registered')
 
     logger.info('Application initialized successfully')

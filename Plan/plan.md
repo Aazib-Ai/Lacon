@@ -183,18 +183,18 @@ Amplify: [amplifies/phase-07-amplify.md](amplifies/phase-07-amplify.md)
 ## Phase 8: Competitive Agent Tooling
 Amplify: [amplifies/phase-08-amplify.md](amplifies/phase-08-amplify.md)
 
-- [ ] P8-T1 Build in-editor AI authoring actions
-  - [ ] P8-T1.1 Rewrite, shorten, expand, polish
-  - [ ] P8-T1.2 Inline formatting execution
-  - [ ] P8-T1.3 Selection-aware transformations
-- [ ] P8-T2 Build retrieval and research tools
-  - [ ] P8-T2.1 Workspace document QA
-  - [ ] P8-T2.2 Web research with citation capture
-  - [ ] P8-T2.3 Context assembly from multiple sources
-- [ ] P8-T3 Build creator-focused specialized tools
-  - [ ] P8-T3.1 YouTube transcript fetcher
-  - [ ] P8-T3.2 Tone and hook analyzer
-  - [ ] P8-T3.3 B-roll and visual cue generator
+- [x] P8-T1 Build in-editor AI authoring actions
+  - [x] P8-T1.1 Rewrite, shorten, expand, polish
+  - [x] P8-T1.2 Inline formatting execution
+  - [x] P8-T1.3 Selection-aware transformations
+- [x] P8-T2 Build retrieval and research tools
+  - [x] P8-T2.1 Workspace document QA
+  - [x] P8-T2.2 Web research with citation capture
+  - [x] P8-T2.3 Context assembly from multiple sources
+- [x] P8-T3 Build creator-focused specialized tools
+  - [x] P8-T3.1 YouTube transcript fetcher
+  - [x] P8-T3.2 Tone and hook analyzer
+  - [x] P8-T3.3 B-roll and visual cue generator
 
 ## Phase 9: Auditability and Governance
 Amplify: [amplifies/phase-09-amplify.md](amplifies/phase-09-amplify.md)

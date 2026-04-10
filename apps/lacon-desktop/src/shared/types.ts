@@ -38,6 +38,19 @@ export interface ProviderAPI {
   onStreamError: (callback: (streamId: string, error: string) => void) => void
 }
 
+// Tool API (Phase 8)
+export interface ToolAPI {
+  list: () => Promise<any>
+  listByCategory: (category: string) => Promise<any>
+  execute: (toolName: string, input: any) => Promise<any>
+  authoring: (toolName: string, input: any) => Promise<any>
+  workspaceQA: (input: any) => Promise<any>
+  webResearch: (input: any) => Promise<any>
+  youtubeTranscript: (input: any) => Promise<any>
+  toneAnalyzer: (input: any) => Promise<any>
+  brollGenerator: (input: any) => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -45,6 +58,8 @@ declare global {
     electron: {
       agent: AgentAPI
       provider: ProviderAPI
+      tool: ToolAPI
+      invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }
   }

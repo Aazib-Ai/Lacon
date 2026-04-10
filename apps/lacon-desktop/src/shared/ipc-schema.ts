@@ -67,6 +67,17 @@ export const IPC_CHANNELS = {
   AGENT_REJECT_REQUEST: 'agent:rejectRequest',
   AGENT_GET_PENDING_APPROVALS: 'agent:getPendingApprovals',
   AGENT_REGISTER_TOOL: 'agent:registerTool',
+
+  // Tool operations (Phase 8)
+  TOOLS_LIST: 'tools:list',
+  TOOLS_LIST_BY_CATEGORY: 'tools:list-by-category',
+  TOOLS_EXECUTE: 'tools:execute',
+  TOOLS_AUTHORING: 'tools:authoring',
+  TOOLS_WORKSPACE_QA: 'tools:workspace-qa',
+  TOOLS_WEB_RESEARCH: 'tools:web-research',
+  TOOLS_YOUTUBE_TRANSCRIPT: 'tools:youtube-transcript',
+  TOOLS_TONE_ANALYZER: 'tools:tone-analyzer',
+  TOOLS_BROLL_GENERATOR: 'tools:broll-generator',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
