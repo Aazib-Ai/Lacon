@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { type IpcChannel, IPC_CHANNELS, isValidChannel } from '@/shared/ipc-schema'
-import type { IpcAPI } from '@/shared/types'
+import type { IpcAPI, ReleaseAPI } from '@/shared/types'
 
 // Whitelist of allowed IPC channels
 const ALLOWED_CHANNELS = new Set(Object.values(IPC_CHANNELS))
@@ -111,6 +111,44 @@ const policyAPI = {
   getStatistics: () => ipcRenderer.invoke(IPC_CHANNELS.POLICY_GET_STATISTICS),
 }
 
+// Release API (Phase 11)
+const releaseAPI: ReleaseAPI = {
+  setPipelineConfig: (config: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_SET_PIPELINE_CONFIG, { config }),
+  getPipelineConfig: () => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_GET_PIPELINE_CONFIG),
+  registerArtifact: (filePath: string, params: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_REGISTER_ARTIFACT, { filePath, params }),
+  verifyArtifactIntegrity: (artifact: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_VERIFY_ARTIFACT_INTEGRITY, { artifact }),
+  publishChannelManifest: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_PUBLISH_CHANNEL_MANIFEST, payload),
+  promoteChannel: (request: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_PROMOTE_CHANNEL, { request }),
+  executeRollback: (plan: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_EXECUTE_ROLLBACK, { plan }),
+  recordClientRollbackVerification: (verification: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_RECORD_CLIENT_ROLLBACK_VERIFICATION, { verification }),
+  captureCrashEvent: (event: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_CAPTURE_CRASH_EVENT, { event }),
+  createDiagnosticBundle: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_CREATE_DIAGNOSTIC_BUNDLE, payload),
+  createRcGateReview: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_CREATE_RC_GATE_REVIEW, payload),
+  createGaChecklist: (version: string, signOffRequiredBy: string[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_CREATE_GA_CHECKLIST, { version, signOffRequiredBy }),
+  completeGaChecklistItem: (payload: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_COMPLETE_GA_CHECKLIST_ITEM, payload),
+  signOffGa: (version: string, signOff: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_SIGN_OFF_GA, { version, signOff }),
+  buildAuditRecord: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_BUILD_AUDIT_RECORD, payload),
+  getIncidentSeverityMatrix: () => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_GET_INCIDENT_SEVERITY_MATRIX),
+  getEscalationMatrix: () => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_GET_ESCALATION_MATRIX),
+  createSupportTicket: (ticket: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_CREATE_SUPPORT_TICKET, { ticket }),
+  setSupportTriageTaxonomy: (taxonomy: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_SET_SUPPORT_TRIAGE_TAXONOMY, { taxonomy }),
+  getSupportTriageTaxonomy: () => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_GET_SUPPORT_TRIAGE_TAXONOMY),
+  createRollbackRunbook: (runbook: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_CREATE_ROLLBACK_RUNBOOK, { runbook }),
+  listRollbackRunbooks: () => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_LIST_ROLLBACK_RUNBOOKS),
+  recordRollbackDrill: (drill: any) => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_RECORD_ROLLBACK_DRILL, { drill }),
+  listRollbackDrills: () => ipcRenderer.invoke(IPC_CHANNELS.RELEASE_LIST_ROLLBACK_DRILLS),
+  getDefaultRollbackRunbookTemplate: (channel: 'stable' | 'beta') =>
+    ipcRenderer.invoke(IPC_CHANNELS.RELEASE_GET_DEFAULT_ROLLBACK_RUNBOOK_TEMPLATE, { channel }),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -119,6 +157,7 @@ contextBridge.exposeInMainWorld('electron', {
   audit: auditAPI,
   trace: traceAPI,
   policy: policyAPI,
+  release: releaseAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))

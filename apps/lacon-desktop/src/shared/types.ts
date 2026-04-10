@@ -77,6 +77,35 @@ export interface PolicyAPI {
   getStatistics: () => Promise<any>
 }
 
+// Release API (Phase 11)
+export interface ReleaseAPI {
+  setPipelineConfig: (config: any) => Promise<any>
+  getPipelineConfig: () => Promise<any>
+  registerArtifact: (filePath: string, params: any) => Promise<any>
+  verifyArtifactIntegrity: (artifact: any) => Promise<any>
+  publishChannelManifest: (payload: any) => Promise<any>
+  promoteChannel: (request: any) => Promise<any>
+  executeRollback: (plan: any) => Promise<any>
+  recordClientRollbackVerification: (verification: any) => Promise<any>
+  captureCrashEvent: (event: any) => Promise<any>
+  createDiagnosticBundle: (payload: any) => Promise<any>
+  createRcGateReview: (payload: any) => Promise<any>
+  createGaChecklist: (version: string, signOffRequiredBy: string[]) => Promise<any>
+  completeGaChecklistItem: (payload: any) => Promise<any>
+  signOffGa: (version: string, signOff: any) => Promise<any>
+  buildAuditRecord: (payload: any) => Promise<any>
+  getIncidentSeverityMatrix: () => Promise<any>
+  getEscalationMatrix: () => Promise<any>
+  createSupportTicket: (ticket: any) => Promise<any>
+  setSupportTriageTaxonomy: (taxonomy: any) => Promise<any>
+  getSupportTriageTaxonomy: () => Promise<any>
+  createRollbackRunbook: (runbook: any) => Promise<any>
+  listRollbackRunbooks: () => Promise<any[]>
+  recordRollbackDrill: (drill: any) => Promise<any>
+  listRollbackDrills: () => Promise<any[]>
+  getDefaultRollbackRunbookTemplate: (channel: 'stable' | 'beta') => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -88,6 +117,7 @@ declare global {
       audit: AuditAPI
       trace: TraceAPI
       policy: PolicyAPI
+      release: ReleaseAPI
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }

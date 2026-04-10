@@ -101,6 +101,15 @@ Claim entry:
 - Claim status: CLAIMED
 - Expected completion window: 2026-04-10
 
+Claim entry:
+
+- Date: 2026-04-10
+- Agent: Codex
+- Phase: P11
+- Task ID: P11-T1, P11-T2, P11-T3, P11-T4, P11-T5, P11-T6, P11-T7
+- Claim status: CLAIMED
+- Expected completion window: 2026-04-10
+
 Claim entry template:
 
 - Date:
@@ -533,6 +542,45 @@ Report:
   - Tool execution is auditable through agent runtime trace log
   - All tools use provider abstraction for model calls
 
+Report:
+
+- Date: 2026-04-10
+- Agent: Codex
+- Phase: P11
+- Task ID: P11-T1, P11-T2, P11-T3, P11-T4, P11-T5, P11-T6, P11-T7
+- Final status: DONE
+- Files changed:
+  - apps/lacon-desktop/src/shared/release-types.ts
+  - apps/lacon-desktop/src/main/release/release-operations-service.ts
+  - apps/lacon-desktop/src/main/release/updater-service.ts
+  - apps/lacon-desktop/src/main/ipc/release-handlers.ts
+  - apps/lacon-desktop/src/main/ipc/ipc-validator.ts
+  - apps/lacon-desktop/src/shared/ipc-schema.ts
+  - apps/lacon-desktop/src/main/index.ts
+  - apps/lacon-desktop/src/preload/index.ts
+  - apps/lacon-desktop/src/shared/types.ts
+  - apps/lacon-desktop/tests/release/release-operations.test.ts
+  - Plan/amplifies/phase-11-amplify.md
+  - Plan/plan.md
+- Commands run:
+  - pnpm --filter lacon-desktop typecheck (successful)
+  - pnpm --filter lacon-desktop test -- tests/release/release-operations.test.ts (successful - 15/15 tests passed)
+  - pnpm --filter lacon-desktop test -- tests/security/release-integrity.test.ts (successful - 12/12 tests passed)
+- Validation summary:
+  - Signed installer pipeline implementation added with artifact hashing, signature enforcement, and notarization gating
+  - Stable and beta channel publish flows implemented with promotion controls and staged rollout support
+  - Fast rollback publish path implemented with rollback verification recording and rollback runbook/drill support
+  - Crash capture events integrated in main lifecycle and updater error paths
+  - Diagnostic bundle export with sensitive data filtering implemented
+  - Support triage taxonomy, incident severity matrix, and escalation matrix implemented
+  - RC gate review and GA checklist/sign-off records implemented with auditable release record generation
+  - IPC contract, validation, preload bridge, and typed renderer API updated for release operations
+  - All targeted Phase 11 tests and type checks passing
+- Follow-up actions:
+  - Execute and capture real cross-platform signed artifact verification evidence in CI release jobs
+  - Wire production signing/notarization credentials via secure CI secrets
+  - Perform a live staged rollout and rollback drill in pre-production before GA
+
 Report template:
 
 - Date:
@@ -572,5 +620,5 @@ Blocker template:
 - [x] P8 complete
 - [ ] P9 complete
 - [ ] P10 complete
-- [ ] P11 complete
+- [x] P11 complete
 - [ ] P12 complete

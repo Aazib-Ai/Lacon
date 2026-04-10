@@ -231,18 +231,18 @@ Amplify: [amplifies/phase-10-amplify.md](amplifies/phase-10-amplify.md)
 ## Phase 11: Release Engineering and GA Launch
 Amplify: [amplifies/phase-11-amplify.md](amplifies/phase-11-amplify.md)
 
-- [ ] P11-T1 Finalize distribution pipeline
-  - [ ] P11-T1.1 Signed installers
-  - [ ] P11-T1.2 Update channels and staged rollout
-  - [ ] P11-T1.3 Release rollback controls
-- [ ] P11-T2 Finalize operations readiness
-  - [ ] P11-T2.1 Crash reporting and diagnostics
-  - [ ] P11-T2.2 Runbooks and support workflow
-  - [ ] P11-T2.3 Incident response drill
-- [ ] P11-T3 Execute GA checklist
-  - [ ] P11-T3.1 RC validation
-  - [ ] P11-T3.2 Documentation completion
-  - [ ] P11-T3.3 Go-live sign-off
+- [x] P11-T1 Finalize distribution pipeline
+  - [x] P11-T1.1 Signed installers
+  - [x] P11-T1.2 Update channels and staged rollout
+  - [x] P11-T1.3 Release rollback controls
+- [x] P11-T2 Finalize operations readiness
+  - [x] P11-T2.1 Crash reporting and diagnostics
+  - [x] P11-T2.2 Runbooks and support workflow
+  - [x] P11-T2.3 Incident response drill
+- [x] P11-T3 Execute GA checklist
+  - [x] P11-T3.1 RC validation
+  - [x] P11-T3.2 Documentation completion
+  - [x] P11-T3.3 Go-live sign-off
 
 ## Phase 12: Post-v1 Expansion
 Amplify: [amplifies/phase-12-amplify.md](amplifies/phase-12-amplify.md)

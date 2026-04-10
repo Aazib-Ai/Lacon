@@ -17,6 +17,25 @@ import {
   isKeyGetMetadataRequest,
   isKeyHasRequest,
   isKeySetRequest,
+  isReleaseBuildAuditRecordRequest,
+  isReleaseCaptureCrashEventRequest,
+  isReleaseCompleteGaChecklistItemRequest,
+  isReleaseCreateDiagnosticBundleRequest,
+  isReleaseCreateGaChecklistRequest,
+  isReleaseCreateRcGateReviewRequest,
+  isReleaseCreateRollbackRunbookRequest,
+  isReleaseCreateSupportTicketRequest,
+  isReleaseExecuteRollbackRequest,
+  isReleaseGetDefaultRollbackRunbookTemplateRequest,
+  isReleasePromoteChannelRequest,
+  isReleasePublishChannelManifestRequest,
+  isReleaseRecordClientRollbackVerificationRequest,
+  isReleaseRecordRollbackDrillRequest,
+  isReleaseRegisterArtifactRequest,
+  isReleaseSetPipelineConfigRequest,
+  isReleaseSetSupportTriageTaxonomyRequest,
+  isReleaseSignOffGaRequest,
+  isReleaseVerifyArtifactIntegrityRequest,
   isSettingsGetRequest,
   isSettingsSetRequest,
   isValidChannel,
@@ -164,6 +183,196 @@ export function validatePayload(channel: IpcChannel, payload: any): void {
           expected: 'SettingsSetRequest',
           received: typeof payload,
         })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_SET_PIPELINE_CONFIG:
+      if (!isReleaseSetPipelineConfigRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_SET_PIPELINE_CONFIG payload', {
+          expected: 'ReleaseSetPipelineConfigRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_GET_PIPELINE_CONFIG:
+      // No payload required
+      break
+
+    case IPC_CHANNELS.RELEASE_REGISTER_ARTIFACT:
+      if (!isReleaseRegisterArtifactRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_REGISTER_ARTIFACT payload', {
+          expected: 'ReleaseRegisterArtifactRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_VERIFY_ARTIFACT_INTEGRITY:
+      if (!isReleaseVerifyArtifactIntegrityRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_VERIFY_ARTIFACT_INTEGRITY payload', {
+          expected: 'ReleaseVerifyArtifactIntegrityRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_PUBLISH_CHANNEL_MANIFEST:
+      if (!isReleasePublishChannelManifestRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_PUBLISH_CHANNEL_MANIFEST payload', {
+          expected: 'ReleasePublishChannelManifestRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_PROMOTE_CHANNEL:
+      if (!isReleasePromoteChannelRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_PROMOTE_CHANNEL payload', {
+          expected: 'ReleasePromoteChannelRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_EXECUTE_ROLLBACK:
+      if (!isReleaseExecuteRollbackRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_EXECUTE_ROLLBACK payload', {
+          expected: 'ReleaseExecuteRollbackRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_RECORD_CLIENT_ROLLBACK_VERIFICATION:
+      if (!isReleaseRecordClientRollbackVerificationRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_RECORD_CLIENT_ROLLBACK_VERIFICATION payload', {
+          expected: 'ReleaseRecordClientRollbackVerificationRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_CAPTURE_CRASH_EVENT:
+      if (!isReleaseCaptureCrashEventRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_CAPTURE_CRASH_EVENT payload', {
+          expected: 'ReleaseCaptureCrashEventRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_CREATE_DIAGNOSTIC_BUNDLE:
+      if (!isReleaseCreateDiagnosticBundleRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_CREATE_DIAGNOSTIC_BUNDLE payload', {
+          expected: 'ReleaseCreateDiagnosticBundleRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_CREATE_RC_GATE_REVIEW:
+      if (!isReleaseCreateRcGateReviewRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_CREATE_RC_GATE_REVIEW payload', {
+          expected: 'ReleaseCreateRcGateReviewRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_CREATE_GA_CHECKLIST:
+      if (!isReleaseCreateGaChecklistRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_CREATE_GA_CHECKLIST payload', {
+          expected: 'ReleaseCreateGaChecklistRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_COMPLETE_GA_CHECKLIST_ITEM:
+      if (!isReleaseCompleteGaChecklistItemRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_COMPLETE_GA_CHECKLIST_ITEM payload', {
+          expected: 'ReleaseCompleteGaChecklistItemRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_SIGN_OFF_GA:
+      if (!isReleaseSignOffGaRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_SIGN_OFF_GA payload', {
+          expected: 'ReleaseSignOffGaRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_BUILD_AUDIT_RECORD:
+      if (!isReleaseBuildAuditRecordRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_BUILD_AUDIT_RECORD payload', {
+          expected: 'ReleaseBuildAuditRecordRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_GET_INCIDENT_SEVERITY_MATRIX:
+    case IPC_CHANNELS.RELEASE_GET_ESCALATION_MATRIX:
+      // No payload required
+      break
+
+    case IPC_CHANNELS.RELEASE_CREATE_SUPPORT_TICKET:
+      if (!isReleaseCreateSupportTicketRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_CREATE_SUPPORT_TICKET payload', {
+          expected: 'ReleaseCreateSupportTicketRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_SET_SUPPORT_TRIAGE_TAXONOMY:
+      if (!isReleaseSetSupportTriageTaxonomyRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_SET_SUPPORT_TRIAGE_TAXONOMY payload', {
+          expected: 'ReleaseSetSupportTriageTaxonomyRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_GET_SUPPORT_TRIAGE_TAXONOMY:
+    case IPC_CHANNELS.RELEASE_LIST_ROLLBACK_RUNBOOKS:
+    case IPC_CHANNELS.RELEASE_LIST_ROLLBACK_DRILLS:
+      // No payload required
+      break
+
+    case IPC_CHANNELS.RELEASE_CREATE_ROLLBACK_RUNBOOK:
+      if (!isReleaseCreateRollbackRunbookRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_CREATE_ROLLBACK_RUNBOOK payload', {
+          expected: 'ReleaseCreateRollbackRunbookRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_RECORD_ROLLBACK_DRILL:
+      if (!isReleaseRecordRollbackDrillRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid RELEASE_RECORD_ROLLBACK_DRILL payload', {
+          expected: 'ReleaseRecordRollbackDrillRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.RELEASE_GET_DEFAULT_ROLLBACK_RUNBOOK_TEMPLATE:
+      if (!isReleaseGetDefaultRollbackRunbookTemplateRequest(payload)) {
+        throw new IpcValidationError(
+          'INVALID_PAYLOAD',
+          'Invalid RELEASE_GET_DEFAULT_ROLLBACK_RUNBOOK_TEMPLATE payload',
+          {
+            expected: 'ReleaseGetDefaultRollbackRunbookTemplateRequest',
+            received: typeof payload,
+          },
+        )
       }
       break
 

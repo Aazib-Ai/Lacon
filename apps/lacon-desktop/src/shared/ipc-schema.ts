@@ -98,6 +98,33 @@ export const IPC_CHANNELS = {
   POLICY_EVALUATE: 'policy:evaluate',
   POLICY_GET_VIOLATIONS: 'policy:getViolations',
   POLICY_GET_STATISTICS: 'policy:getStatistics',
+
+  // Release engineering operations (Phase 11)
+  RELEASE_SET_PIPELINE_CONFIG: 'release:setPipelineConfig',
+  RELEASE_GET_PIPELINE_CONFIG: 'release:getPipelineConfig',
+  RELEASE_REGISTER_ARTIFACT: 'release:registerArtifact',
+  RELEASE_VERIFY_ARTIFACT_INTEGRITY: 'release:verifyArtifactIntegrity',
+  RELEASE_PUBLISH_CHANNEL_MANIFEST: 'release:publishChannelManifest',
+  RELEASE_PROMOTE_CHANNEL: 'release:promoteChannel',
+  RELEASE_EXECUTE_ROLLBACK: 'release:executeRollback',
+  RELEASE_RECORD_CLIENT_ROLLBACK_VERIFICATION: 'release:recordClientRollbackVerification',
+  RELEASE_CAPTURE_CRASH_EVENT: 'release:captureCrashEvent',
+  RELEASE_CREATE_DIAGNOSTIC_BUNDLE: 'release:createDiagnosticBundle',
+  RELEASE_CREATE_RC_GATE_REVIEW: 'release:createRcGateReview',
+  RELEASE_CREATE_GA_CHECKLIST: 'release:createGaChecklist',
+  RELEASE_COMPLETE_GA_CHECKLIST_ITEM: 'release:completeGaChecklistItem',
+  RELEASE_SIGN_OFF_GA: 'release:signOffGa',
+  RELEASE_BUILD_AUDIT_RECORD: 'release:buildAuditRecord',
+  RELEASE_GET_INCIDENT_SEVERITY_MATRIX: 'release:getIncidentSeverityMatrix',
+  RELEASE_GET_ESCALATION_MATRIX: 'release:getEscalationMatrix',
+  RELEASE_CREATE_SUPPORT_TICKET: 'release:createSupportTicket',
+  RELEASE_SET_SUPPORT_TRIAGE_TAXONOMY: 'release:setSupportTriageTaxonomy',
+  RELEASE_GET_SUPPORT_TRIAGE_TAXONOMY: 'release:getSupportTriageTaxonomy',
+  RELEASE_CREATE_ROLLBACK_RUNBOOK: 'release:createRollbackRunbook',
+  RELEASE_LIST_ROLLBACK_RUNBOOKS: 'release:listRollbackRunbooks',
+  RELEASE_RECORD_ROLLBACK_DRILL: 'release:recordRollbackDrill',
+  RELEASE_LIST_ROLLBACK_DRILLS: 'release:listRollbackDrills',
+  RELEASE_GET_DEFAULT_ROLLBACK_RUNBOOK_TEMPLATE: 'release:getDefaultRollbackRunbookTemplate',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -541,6 +568,142 @@ export type PolicyEvaluateResponse = IpcResponse<any> // PolicyEvaluationResult
 export type PolicyGetViolationsResponse = IpcResponse<any[]> // PolicyViolation[]
 export type PolicyGetStatisticsResponse = IpcResponse<any> // PolicyStatistics
 
+// Release operation types (Phase 11)
+export interface ReleaseSetPipelineConfigRequest {
+  config: any // Partial<SignedInstallerPipelineConfig>
+}
+
+export interface ReleaseRegisterArtifactRequest {
+  filePath: string
+  params: {
+    version: string
+    channel: 'stable' | 'beta'
+    platform: 'win32' | 'darwin'
+    arch: 'x64' | 'arm64'
+    signed?: boolean
+    notarized?: boolean
+    signature?: any // ArtifactSignature
+    metadata?: Record<string, unknown>
+  }
+}
+
+export interface ReleaseVerifyArtifactIntegrityRequest {
+  artifact: any // ReleaseArtifact
+}
+
+export interface ReleasePublishChannelManifestRequest {
+  version: string
+  channel: 'stable' | 'beta'
+  feedUrl: string
+  artifacts: any[] // ReleaseArtifact[]
+  stagedRollout?: any // StagedRollout
+}
+
+export interface ReleasePromoteChannelRequest {
+  request: any // ChannelPromotionRequest
+}
+
+export interface ReleaseExecuteRollbackRequest {
+  plan: any // RollbackPlan
+}
+
+export interface ReleaseRecordClientRollbackVerificationRequest {
+  verification: any // ClientRollbackVerification
+}
+
+export interface ReleaseCaptureCrashEventRequest {
+  event: any // Omit<CrashCaptureEvent, 'id' | 'occurredAt'>
+}
+
+export interface ReleaseCreateDiagnosticBundleRequest {
+  appVersion: string
+  platform: 'win32' | 'darwin'
+  arch: 'x64' | 'arm64'
+  sourceFiles: string[]
+}
+
+export interface ReleaseCreateRcGateReviewRequest {
+  version: string
+  channel: 'stable' | 'beta'
+  reviewedBy: string
+  functional: any[] // GateReviewCheck[]
+  security: any[] // GateReviewCheck[]
+  performance: any[] // GateReviewCheck[]
+}
+
+export interface ReleaseCreateGaChecklistRequest {
+  version: string
+  signOffRequiredBy: string[]
+}
+
+export interface ReleaseCompleteGaChecklistItemRequest {
+  version: string
+  itemId: string
+  completedBy: string
+  evidence?: string[]
+  notes?: string
+}
+
+export interface ReleaseSignOffGaRequest {
+  version: string
+  signOff: any // SignOffRecord
+}
+
+export interface ReleaseBuildAuditRecordRequest {
+  version: string
+  channel: 'stable' | 'beta'
+  artifacts: any[] // ReleaseArtifact[]
+  gateReview: any // ReleaseCandidateGateReview
+  gaChecklist: any // GaLaunchChecklist
+  rollbackPlan: any // RollbackPlan
+}
+
+export interface ReleaseCreateSupportTicketRequest {
+  ticket: any // Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt'>
+}
+
+export interface ReleaseSetSupportTriageTaxonomyRequest {
+  taxonomy: any // SupportTriageTaxonomy
+}
+
+export interface ReleaseCreateRollbackRunbookRequest {
+  runbook: any // Omit<RollbackRunbook, 'id'>
+}
+
+export interface ReleaseRecordRollbackDrillRequest {
+  drill: any // Omit<RollbackDrillRecord, 'id'>
+}
+
+export interface ReleaseGetDefaultRollbackRunbookTemplateRequest {
+  channel: 'stable' | 'beta'
+}
+
+export type ReleaseSetPipelineConfigResponse = IpcResponse<any> // SignedInstallerPipelineConfig
+export type ReleaseGetPipelineConfigResponse = IpcResponse<any> // SignedInstallerPipelineConfig
+export type ReleaseRegisterArtifactResponse = IpcResponse<any> // ReleaseArtifact
+export type ReleaseVerifyArtifactIntegrityResponse = IpcResponse<any> // ArtifactIntegrityResult
+export type ReleasePublishChannelManifestResponse = IpcResponse<any> // ReleaseManifest
+export type ReleasePromoteChannelResponse = IpcResponse<any> // ChannelPromotionResult
+export type ReleaseExecuteRollbackResponse = IpcResponse<any> // RollbackExecutionResult
+export type ReleaseRecordClientRollbackVerificationResponse = IpcResponse<any[]> // ClientRollbackVerification[]
+export type ReleaseCaptureCrashEventResponse = IpcResponse<any> // CrashCaptureEvent
+export type ReleaseCreateDiagnosticBundleResponse = IpcResponse<any> // DiagnosticBundle
+export type ReleaseCreateRcGateReviewResponse = IpcResponse<any> // ReleaseCandidateGateReview
+export type ReleaseCreateGaChecklistResponse = IpcResponse<any> // GaLaunchChecklist
+export type ReleaseCompleteGaChecklistItemResponse = IpcResponse<any> // GaLaunchChecklist
+export type ReleaseSignOffGaResponse = IpcResponse<any> // GaLaunchChecklist
+export type ReleaseBuildAuditRecordResponse = IpcResponse<any> // ReleaseAuditRecord
+export type ReleaseGetIncidentSeverityMatrixResponse = IpcResponse<any[]> // IncidentSeverityLevel[]
+export type ReleaseGetEscalationMatrixResponse = IpcResponse<any[]> // EscalationRule[]
+export type ReleaseCreateSupportTicketResponse = IpcResponse<any> // SupportTicket
+export type ReleaseSetSupportTriageTaxonomyResponse = IpcResponse<any> // SupportTriageTaxonomy
+export type ReleaseGetSupportTriageTaxonomyResponse = IpcResponse<any> // SupportTriageTaxonomy
+export type ReleaseCreateRollbackRunbookResponse = IpcResponse<any> // RollbackRunbook
+export type ReleaseListRollbackRunbooksResponse = IpcResponse<any[]> // RollbackRunbook[]
+export type ReleaseRecordRollbackDrillResponse = IpcResponse<any> // RollbackDrillRecord
+export type ReleaseListRollbackDrillsResponse = IpcResponse<any[]> // RollbackDrillRecord[]
+export type ReleaseGetDefaultRollbackRunbookTemplateResponse = IpcResponse<any> // Omit<RollbackRunbook, 'id'>
+
 // Type guards for audit operations
 export function isAuditQueryRequest(payload: any): payload is AuditQueryRequest {
   return typeof payload === 'object'
@@ -586,4 +749,124 @@ export function isPolicyEvaluateRequest(payload: any): payload is PolicyEvaluate
 
 export function isPolicyGetViolationsRequest(payload: any): payload is PolicyGetViolationsRequest {
   return typeof payload === 'object'
+}
+
+// Type guards for release operations (Phase 11)
+export function isReleaseSetPipelineConfigRequest(payload: any): payload is ReleaseSetPipelineConfigRequest {
+  return typeof payload === 'object' && payload.config !== undefined
+}
+
+export function isReleaseRegisterArtifactRequest(payload: any): payload is ReleaseRegisterArtifactRequest {
+  return typeof payload === 'object' && typeof payload.filePath === 'string' && typeof payload.params === 'object'
+}
+
+export function isReleaseVerifyArtifactIntegrityRequest(
+  payload: any,
+): payload is ReleaseVerifyArtifactIntegrityRequest {
+  return typeof payload === 'object' && payload.artifact !== undefined
+}
+
+export function isReleasePromoteChannelRequest(payload: any): payload is ReleasePromoteChannelRequest {
+  return typeof payload === 'object' && payload.request !== undefined
+}
+
+export function isReleaseExecuteRollbackRequest(payload: any): payload is ReleaseExecuteRollbackRequest {
+  return typeof payload === 'object' && payload.plan !== undefined
+}
+
+export function isReleaseRecordClientRollbackVerificationRequest(
+  payload: any,
+): payload is ReleaseRecordClientRollbackVerificationRequest {
+  return typeof payload === 'object' && payload.verification !== undefined
+}
+
+export function isReleaseCaptureCrashEventRequest(payload: any): payload is ReleaseCaptureCrashEventRequest {
+  return typeof payload === 'object' && payload.event !== undefined
+}
+
+export function isReleaseCreateDiagnosticBundleRequest(payload: any): payload is ReleaseCreateDiagnosticBundleRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.appVersion === 'string' &&
+    typeof payload.platform === 'string' &&
+    typeof payload.arch === 'string' &&
+    Array.isArray(payload.sourceFiles)
+  )
+}
+
+export function isReleaseCreateRcGateReviewRequest(payload: any): payload is ReleaseCreateRcGateReviewRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.version === 'string' &&
+    typeof payload.channel === 'string' &&
+    typeof payload.reviewedBy === 'string' &&
+    Array.isArray(payload.functional) &&
+    Array.isArray(payload.security) &&
+    Array.isArray(payload.performance)
+  )
+}
+
+export function isReleaseCreateGaChecklistRequest(payload: any): payload is ReleaseCreateGaChecklistRequest {
+  return typeof payload === 'object' && typeof payload.version === 'string' && Array.isArray(payload.signOffRequiredBy)
+}
+
+export function isReleaseCompleteGaChecklistItemRequest(
+  payload: any,
+): payload is ReleaseCompleteGaChecklistItemRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.version === 'string' &&
+    typeof payload.itemId === 'string' &&
+    typeof payload.completedBy === 'string'
+  )
+}
+
+export function isReleaseSignOffGaRequest(payload: any): payload is ReleaseSignOffGaRequest {
+  return typeof payload === 'object' && typeof payload.version === 'string' && payload.signOff !== undefined
+}
+
+export function isReleaseBuildAuditRecordRequest(payload: any): payload is ReleaseBuildAuditRecordRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.version === 'string' &&
+    typeof payload.channel === 'string' &&
+    Array.isArray(payload.artifacts) &&
+    payload.gateReview !== undefined &&
+    payload.gaChecklist !== undefined &&
+    payload.rollbackPlan !== undefined
+  )
+}
+
+export function isReleasePublishChannelManifestRequest(payload: any): payload is ReleasePublishChannelManifestRequest {
+  return (
+    typeof payload === 'object' &&
+    typeof payload.version === 'string' &&
+    (payload.channel === 'stable' || payload.channel === 'beta') &&
+    typeof payload.feedUrl === 'string' &&
+    Array.isArray(payload.artifacts)
+  )
+}
+
+export function isReleaseCreateSupportTicketRequest(payload: any): payload is ReleaseCreateSupportTicketRequest {
+  return typeof payload === 'object' && payload.ticket !== undefined
+}
+
+export function isReleaseSetSupportTriageTaxonomyRequest(
+  payload: any,
+): payload is ReleaseSetSupportTriageTaxonomyRequest {
+  return typeof payload === 'object' && payload.taxonomy !== undefined
+}
+
+export function isReleaseCreateRollbackRunbookRequest(payload: any): payload is ReleaseCreateRollbackRunbookRequest {
+  return typeof payload === 'object' && payload.runbook !== undefined
+}
+
+export function isReleaseRecordRollbackDrillRequest(payload: any): payload is ReleaseRecordRollbackDrillRequest {
+  return typeof payload === 'object' && payload.drill !== undefined
+}
+
+export function isReleaseGetDefaultRollbackRunbookTemplateRequest(
+  payload: any,
+): payload is ReleaseGetDefaultRollbackRunbookTemplateRequest {
+  return typeof payload === 'object' && (payload.channel === 'stable' || payload.channel === 'beta')
 }

@@ -7,7 +7,10 @@ import { getDataStore } from './data/store'
 import { registerAuditHandlers } from './ipc/audit-handlers'
 import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
+import { registerReleaseHandlers } from './ipc/release-handlers'
 import { registerToolHandlers } from './ipc/tool-handlers'
+import { getReleaseOperationsService } from './release-engineering/release-operations-service'
+import { getUpdaterService } from './release-engineering/updater-service'
 import { getKeyStore } from './security/keystore'
 import { createSafeLogger } from './security/log-redaction'
 
@@ -35,6 +38,47 @@ async function initializeApp() {
     await dataStore.initialize()
     logger.info('Data store initialized')
 
+    // Initialize release operations (Phase 11)
+    const releaseOperations = getReleaseOperationsService()
+    await releaseOperations.initialize()
+    logger.info('Release operations initialized')
+
+    // Initialize updater service (Phase 11)
+    const updater = getUpdaterService({
+      currentVersion: app.getVersion(),
+      channel: app.isPackaged ? 'stable' : 'beta',
+      feeds: {
+        stable: 'https://releases.lacon.app/stable',
+        beta: 'https://releases.lacon.app/beta',
+      },
+      platform: process.platform === 'darwin' ? 'darwin' : 'win32',
+      arch: process.arch === 'arm64' ? 'arm64' : 'x64',
+      stagedRollout: {
+        enabled: true,
+        percentage: app.isPackaged ? 25 : 100,
+        cohortKey: app.isPackaged ? 'stable-rollout' : 'beta-rollout',
+      },
+      allowPrerelease: !app.isPackaged,
+      autoDownload: false,
+      autoInstallOnAppQuit: false,
+      allowDowngradeForRollback: true,
+    })
+    await updater.initialize()
+    logger.info('Updater service initialized')
+
+    // Wire updater event diagnostics hooks
+    updater.on('error', payload => {
+      releaseOperations.captureCrashEvent({
+        processType: 'main',
+        appVersion: app.getVersion(),
+        platform: process.platform === 'darwin' ? 'darwin' : 'win32',
+        reason: 'updater-error',
+        message: payload.message,
+        stack: payload.details,
+      })
+      logger.error('Updater event error:', payload)
+    })
+
     // Initialize audit manager (Phase 9)
     auditManager = new AuditManager()
     logger.info('Audit manager initialized')
@@ -43,6 +87,7 @@ async function initializeApp() {
     registerIpcHandlers()
     registerAgentIpcHandlers()
     registerProviderHandlers()
+    registerReleaseHandlers()
 
     // Register tool handlers (Phase 8)
     const workspaceRoot = app.getPath('userData')
@@ -106,6 +151,47 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
+  }
+})
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  try {
+    const releaseOperations = getReleaseOperationsService()
+    releaseOperations.captureCrashEvent({
+      processType: 'renderer',
+      appVersion: app.getVersion(),
+      platform: process.platform === 'darwin' ? 'darwin' : 'win32',
+      reason: `render-process-gone:${details.reason}`,
+      message: details.exitCode
+        ? `Renderer exited with code ${details.exitCode}`
+        : 'Renderer process exited unexpectedly',
+    })
+  } catch (error) {
+    logger.error('Failed to capture renderer crash event:', error)
+  }
+})
+
+app.on('child-process-gone', (_event, details) => {
+  try {
+    const releaseOperations = getReleaseOperationsService()
+    let processType: 'gpu' | 'utility' | 'unknown' = 'unknown'
+    if (details.type === 'GPU') {
+      processType = 'gpu'
+    } else if (details.type === 'Utility') {
+      processType = 'utility'
+    }
+
+    releaseOperations.captureCrashEvent({
+      processType,
+      appVersion: app.getVersion(),
+      platform: process.platform === 'darwin' ? 'darwin' : 'win32',
+      reason: `child-process-gone:${details.reason}`,
+      message: details.exitCode
+        ? `Child process exited with code ${details.exitCode}`
+        : 'Child process exited unexpectedly',
+    })
+  } catch (error) {
+    logger.error('Failed to capture child process crash event:', error)
   }
 })
 
