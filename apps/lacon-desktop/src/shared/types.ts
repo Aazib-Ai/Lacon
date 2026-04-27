@@ -150,7 +150,7 @@ export interface WorkspaceAPI {
   updateSession: (documentId: string, updates: any) => Promise<any>
 }
 
-// Writer Loop API (Phase 2 - Writer Harness)
+// Writer Loop API (Phase 2-4 - Writer Harness)
 export interface WriterLoopAPI {
   getState: (documentId: string) => Promise<any>
   startPlanning: (
@@ -171,6 +171,19 @@ export interface WriterLoopAPI {
   transition: (documentId: string, stage: string) => Promise<any>
   pause: (documentId: string) => Promise<any>
   reset: (documentId: string) => Promise<any>
+  // Phase 3: Generator
+  generateSection: (documentId: string, sectionId: string) => Promise<any>
+  generateAll: (documentId: string) => Promise<any>
+  getProgress: (documentId: string) => Promise<any>
+  acceptGeneration: (documentId: string, sectionId: string) => Promise<any>
+  rejectGeneration: (documentId: string, sectionId: string) => Promise<any>
+  // Phase 4: Reviewer
+  runReview: (documentId: string, documentContent: any) => Promise<any>
+  getReview: (documentId: string) => Promise<any>
+  acceptReviewFlag: (documentId: string, flagId: string) => Promise<any>
+  rejectReviewFlag: (documentId: string, flagId: string) => Promise<any>
+  surgicalEdit: (documentId: string, paragraphId: string, instruction: string, fullDocumentContent: any) => Promise<any>
+  rewriteAll: (documentId: string, instruction: string, documentContent: any) => Promise<any>
 }
 
 // Extend Window interface to include our API

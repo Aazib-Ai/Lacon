@@ -290,3 +290,167 @@ export interface WorkspaceUpdateSessionRequest {
   documentId: string
   updates: Partial<WriterSession>
 }
+
+// ─────────────────────────── Phase 3: Generator Types ───────────────────────────
+
+/** Token usage for a single LLM action */
+export interface TokenUsage {
+  inputTokens: number
+  outputTokens: number
+  model: string
+  estimatedCost: number
+}
+
+/** Result of generating a single section */
+export interface GenerationResult {
+  sectionId: string
+  content: string
+  tokenUsage: TokenUsage
+  generatedAt: string
+}
+
+/** Progress of section-by-section generation */
+export interface SectionProgress {
+  totalSections: number
+  completedSections: number
+  currentSectionId: string | null
+  currentSectionTitle: string | null
+  results: GenerationResult[]
+  status: 'idle' | 'generating' | 'paused' | 'complete' | 'error'
+  error?: string
+}
+
+/** Rolling summary for continuity across sections */
+export interface RollingSummary {
+  summary: string
+  lastUpdated: string
+  sectionsCovered: string[]
+}
+
+// ─────────────────────────── Phase 4: Reviewer Types ───────────────────────────
+
+/** Severity of a reviewer flag */
+export type ReviewSeverity = 'suggestion' | 'warning' | 'error'
+
+/** Category of reviewer feedback */
+export type ReviewCategory =
+  | 'coherence'
+  | 'grammar'
+  | 'style'
+  | 'structure'
+  | 'factual'
+  | 'tone'
+  | 'redundancy'
+  | 'clarity'
+
+/** A single review flag from the Reviewer */
+export interface ReviewFlag {
+  id: string
+  paragraphId: string
+  severity: ReviewSeverity
+  category: ReviewCategory
+  message: string
+  suggestedRewrite: string
+  originalText: string
+}
+
+/** Result of a review pass */
+export interface ReviewResult {
+  passNumber: number
+  flags: ReviewFlag[]
+  tokenUsage: TokenUsage
+  reviewedAt: string
+  structureConflicts: string[]
+}
+
+/** A diff chunk for surgical paragraph editing */
+export interface DiffChunk {
+  type: 'unchanged' | 'added' | 'removed'
+  content: string
+  lineStart: number
+  lineEnd: number
+}
+
+/** Diff for a specific paragraph */
+export interface ParagraphDiff {
+  paragraphId: string
+  original: string
+  revised: string
+  chunks: DiffChunk[]
+}
+
+/** Request for a surgical AI edit of a specific paragraph */
+export interface SurgicalEditRequest {
+  documentId: string
+  paragraphId: string
+  instruction: string
+  fullDocumentContent: any
+}
+
+/** Result of a surgical paragraph edit */
+export interface SurgicalEditResult {
+  paragraphId: string
+  originalText: string
+  revisedText: string
+  diff: ParagraphDiff
+  tokenUsage: TokenUsage
+}
+
+// ─────────────────────────── Phase 3: Generator IPC Types ───────────────────────────
+
+export interface WriterLoopGenerateSectionRequest {
+  documentId: string
+  sectionId: string
+}
+
+export interface WriterLoopGenerateAllRequest {
+  documentId: string
+}
+
+export interface WriterLoopGetProgressRequest {
+  documentId: string
+}
+
+export interface WriterLoopAcceptGenerationRequest {
+  documentId: string
+  sectionId: string
+}
+
+export interface WriterLoopRejectGenerationRequest {
+  documentId: string
+  sectionId: string
+}
+
+// ─────────────────────────── Phase 4: Reviewer IPC Types ───────────────────────────
+
+export interface WriterLoopRunReviewRequest {
+  documentId: string
+  documentContent: any
+}
+
+export interface WriterLoopGetReviewRequest {
+  documentId: string
+}
+
+export interface WriterLoopAcceptReviewFlagRequest {
+  documentId: string
+  flagId: string
+}
+
+export interface WriterLoopRejectReviewFlagRequest {
+  documentId: string
+  flagId: string
+}
+
+export interface WriterLoopSurgicalEditRequest {
+  documentId: string
+  paragraphId: string
+  instruction: string
+  fullDocumentContent: any
+}
+
+export interface WriterLoopRewriteAllRequest {
+  documentId: string
+  instruction: string
+  documentContent: any
+}

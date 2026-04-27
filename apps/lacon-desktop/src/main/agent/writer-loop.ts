@@ -19,9 +19,13 @@ import { join } from 'path'
 import type {
   AutomationLevel,
   DocumentSnapshot,
+  GenerationResult,
   OutlineSection,
   OutlineSubsection,
   ResearchContext,
+  RollingSummary,
+  SectionProgress,
+  TokenUsage,
   WriterLoopStage,
   WriterOutline,
   WriterSession,
@@ -53,6 +57,9 @@ export type WriterLoopEventType =
   | 'outline-approved'
   | 'snapshot-created'
   | 'session-updated'
+  | 'generation-progress'
+  | 'generation-complete'
+  | 'review-complete'
   | 'error'
 
 export interface WriterLoopEvent {
@@ -79,7 +86,7 @@ export function generateOutline(
   // Parse a loose instruction into sections.
   // The instruction itself becomes the title; we derive sections from keywords or fall back to a sensible default.
 
-  const title = instruction.length > 120 ? `${instruction.slice(0, 117)  }...` : instruction
+  const title = instruction.length > 120 ? `${instruction.slice(0, 117)}...` : instruction
 
   // Simple heuristic: split on numbered lines, bullet points, or semi-colons
   const sectionHints = instruction
@@ -136,6 +143,19 @@ export class WriterLoop {
   private documentId: string
   private listeners: WriterLoopListener[] = []
   private currentOutline: WriterOutline | null = null
+  private sectionProgress: SectionProgress = {
+    totalSections: 0,
+    completedSections: 0,
+    currentSectionId: null,
+    currentSectionTitle: null,
+    results: [],
+    status: 'idle',
+  }
+  private rollingSummary: RollingSummary = {
+    summary: '',
+    lastUpdated: '',
+    sectionsCovered: [],
+  }
 
   constructor(documentId: string) {
     this.documentId = documentId
@@ -174,7 +194,9 @@ export class WriterLoop {
   }
 
   getOutline(): WriterOutline | null {
-    if (this.currentOutline) {return this.currentOutline}
+    if (this.currentOutline) {
+      return this.currentOutline
+    }
 
     // Try loading from persisted session
     const ws = getProjectWorkspaceService()
@@ -265,7 +287,9 @@ export class WriterLoop {
    */
   addSection(section: OutlineSection): WriterOutline {
     const outline = this.getOutline()
-    if (!outline) {throw new Error('No outline to modify')}
+    if (!outline) {
+      throw new Error('No outline to modify')
+    }
 
     outline.sections.push(section)
     return this.updateOutline(outline)
@@ -276,7 +300,9 @@ export class WriterLoop {
    */
   removeSection(sectionId: string): WriterOutline {
     const outline = this.getOutline()
-    if (!outline) {throw new Error('No outline to modify')}
+    if (!outline) {
+      throw new Error('No outline to modify')
+    }
 
     outline.sections = outline.sections.filter(s => s.id !== sectionId)
     return this.updateOutline(outline)
@@ -287,10 +313,14 @@ export class WriterLoop {
    */
   updateSection(sectionId: string, updates: Partial<OutlineSection>): WriterOutline {
     const outline = this.getOutline()
-    if (!outline) {throw new Error('No outline to modify')}
+    if (!outline) {
+      throw new Error('No outline to modify')
+    }
 
     const idx = outline.sections.findIndex(s => s.id === sectionId)
-    if (idx === -1) {throw new Error(`Section not found: ${sectionId}`)}
+    if (idx === -1) {
+      throw new Error(`Section not found: ${sectionId}`)
+    }
 
     outline.sections[idx] = { ...outline.sections[idx], ...updates }
     return this.updateOutline(outline)
@@ -301,10 +331,14 @@ export class WriterLoop {
    */
   addSubsection(sectionId: string, subsection: OutlineSubsection): WriterOutline {
     const outline = this.getOutline()
-    if (!outline) {throw new Error('No outline to modify')}
+    if (!outline) {
+      throw new Error('No outline to modify')
+    }
 
     const section = outline.sections.find(s => s.id === sectionId)
-    if (!section) {throw new Error(`Section not found: ${sectionId}`)}
+    if (!section) {
+      throw new Error(`Section not found: ${sectionId}`)
+    }
 
     section.subsections.push(subsection)
     return this.updateOutline(outline)
@@ -315,10 +349,14 @@ export class WriterLoop {
    */
   removeSubsection(sectionId: string, subsectionId: string): WriterOutline {
     const outline = this.getOutline()
-    if (!outline) {throw new Error('No outline to modify')}
+    if (!outline) {
+      throw new Error('No outline to modify')
+    }
 
     const section = outline.sections.find(s => s.id === sectionId)
-    if (!section) {throw new Error(`Section not found: ${sectionId}`)}
+    if (!section) {
+      throw new Error(`Section not found: ${sectionId}`)
+    }
 
     section.subsections = section.subsections.filter(ss => ss.id !== subsectionId)
     return this.updateOutline(outline)
@@ -378,16 +416,158 @@ export class WriterLoop {
    */
   reset(): WriterSession {
     const stage = this.getStage()
-    // Allow reset from any terminal-ish state
-    if (stage === 'idle') {return this.getSession()}
+    if (stage === 'idle') {
+      return this.getSession()
+    }
 
     this.currentOutline = null
+    this.sectionProgress = {
+      totalSections: 0,
+      completedSections: 0,
+      currentSectionId: null,
+      currentSectionTitle: null,
+      results: [],
+      status: 'idle',
+    }
+    this.rollingSummary = { summary: '', lastUpdated: '', sectionsCovered: [] }
     return this.transition('idle')
+  }
+
+  // ── Phase 3: Generation ──
+
+  /**
+   * Generate content for a single section.
+   * Uses composed skill prompt, section spec, neighboring paragraphs, and rolling summary.
+   */
+  generateSection(sectionId: string): GenerationResult {
+    const stage = this.getStage()
+    if (stage !== 'generating') {
+      throw new Error(`Cannot generate in stage: ${stage}`)
+    }
+    const outline = this.getOutline()
+    if (!outline) {
+      throw new Error('No outline available')
+    }
+    const section = outline.sections.find(s => s.id === sectionId)
+    if (!section) {
+      throw new Error(`Section not found: ${sectionId}`)
+    }
+
+    const sectionIdx = outline.sections.indexOf(section)
+
+    // Context assembly: neighboring section summaries + rolling summary
+    const prevSection = sectionIdx > 0 ? outline.sections[sectionIdx - 1] : null
+    const nextSection = sectionIdx < outline.sections.length - 1 ? outline.sections[sectionIdx + 1] : null
+    const neighborContext = [
+      prevSection ? `Previous section "${prevSection.title}": ${prevSection.keyPoints.join('; ')}` : '',
+      nextSection ? `Next section "${nextSection.title}": ${nextSection.keyPoints.join('; ')}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    // Context window guard: if rolling summary is too large, truncate
+    const MAX_CONTEXT_CHARS = 8000
+    let contextSummary = this.rollingSummary.summary
+    if (contextSummary.length > MAX_CONTEXT_CHARS) {
+      contextSummary = contextSummary.slice(-MAX_CONTEXT_CHARS)
+      contextSummary = `...${  contextSummary.slice(contextSummary.indexOf(' ') + 1)}`
+    }
+
+    // Simulated generation (Phase 3 deterministic template; LLM integration in production)
+    const keyPointsText = section.keyPoints.map((kp, i) => `${i + 1}. ${kp}`).join('\n')
+    const generatedContent = [
+      `## ${section.title}\n`,
+      section.subsections.map(ss => `### ${ss.title}\n\n${ss.keyPoints.map(kp => `${kp}.`).join(' ')}\n`).join('\n'),
+      `\n${keyPointsText}\n`,
+      `\nThis section covers approximately ${section.estimatedWords} words on the topic of "${section.title}".`,
+      neighborContext ? `\n\n[Context: ${neighborContext}]` : '',
+    ].join('')
+
+    // Simulated token usage
+    const inputTokens = Math.ceil((contextSummary.length + neighborContext.length + keyPointsText.length) / 4)
+    const outputTokens = Math.ceil(generatedContent.length / 4)
+    const tokenUsage: TokenUsage = {
+      inputTokens,
+      outputTokens,
+      model: 'simulated',
+      estimatedCost: inputTokens * 0.000003 + outputTokens * 0.000015,
+    }
+
+    const result: GenerationResult = {
+      sectionId,
+      content: generatedContent,
+      tokenUsage,
+      generatedAt: new Date().toISOString(),
+    }
+
+    // Update rolling summary
+    this.rollingSummary.summary += `\n[${section.title}]: ${section.keyPoints.join('; ')}`
+    this.rollingSummary.lastUpdated = new Date().toISOString()
+    this.rollingSummary.sectionsCovered.push(sectionId)
+
+    // Update progress
+    this.sectionProgress.results.push(result)
+    this.sectionProgress.completedSections += 1
+    this.sectionProgress.currentSectionId = sectionId
+    this.sectionProgress.currentSectionTitle = section.title
+
+    this.emit('generation-progress', this.sectionProgress)
+    return result
+  }
+
+  /**
+   * Generate all sections sequentially.
+   */
+  generateAll(): SectionProgress {
+    const outline = this.getOutline()
+    if (!outline) {
+      throw new Error('No outline available')
+    }
+
+    this.sectionProgress = {
+      totalSections: outline.sections.length,
+      completedSections: 0,
+      currentSectionId: null,
+      currentSectionTitle: null,
+      results: [],
+      status: 'generating',
+    }
+
+    for (const section of outline.sections) {
+      this.generateSection(section.id)
+    }
+
+    this.sectionProgress.status = 'complete'
+
+    // Auto-snapshot after generation
+    const generatedContent = this.sectionProgress.results.map(r => r.content).join('\n\n')
+    const snapshot = this.createSnapshot('after-generation', generatedContent)
+    this.emit('snapshot-created', snapshot)
+    this.emit('generation-complete', this.sectionProgress)
+
+    return this.sectionProgress
+  }
+
+  /** Get current generation progress. */
+  getProgress(): SectionProgress {
+    return { ...this.sectionProgress }
+  }
+
+  /** Accept a generated section (mark as finalized). */
+  acceptGeneration(sectionId: string): GenerationResult | null {
+    const result = this.sectionProgress.results.find(r => r.sectionId === sectionId)
+    return result || null
+  }
+
+  /** Reject a generated section (remove from results). */
+  rejectGeneration(sectionId: string): void {
+    this.sectionProgress.results = this.sectionProgress.results.filter(r => r.sectionId !== sectionId)
+    this.sectionProgress.completedSections = this.sectionProgress.results.length
   }
 
   // ── Snapshots ──
 
-  private createSnapshot(trigger: DocumentSnapshot['trigger'], content?: any): DocumentSnapshot {
+  createSnapshot(trigger: DocumentSnapshot['trigger'], content?: any): DocumentSnapshot {
     const ws = getProjectWorkspaceService()
     const snapshotsDir = ws.getSnapshotsPath(this.documentId)
 

@@ -229,6 +229,32 @@ const writerLoopAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_TRANSITION, { documentId, stage }),
   pause: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_PAUSE, { documentId }),
   reset: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_RESET, { documentId }),
+  // Phase 3: Generator
+  generateSection: (documentId: string, sectionId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GENERATE_SECTION, { documentId, sectionId }),
+  generateAll: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GENERATE_ALL, { documentId }),
+  getProgress: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GET_PROGRESS, { documentId }),
+  acceptGeneration: (documentId: string, sectionId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ACCEPT_GENERATION, { documentId, sectionId }),
+  rejectGeneration: (documentId: string, sectionId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REJECT_GENERATION, { documentId, sectionId }),
+  // Phase 4: Reviewer
+  runReview: (documentId: string, documentContent: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_RUN_REVIEW, { documentId, documentContent }),
+  getReview: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GET_REVIEW, { documentId }),
+  acceptReviewFlag: (documentId: string, flagId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ACCEPT_REVIEW_FLAG, { documentId, flagId }),
+  rejectReviewFlag: (documentId: string, flagId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REJECT_REVIEW_FLAG, { documentId, flagId }),
+  surgicalEdit: (documentId: string, paragraphId: string, instruction: string, fullDocumentContent: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_SURGICAL_EDIT, {
+      documentId,
+      paragraphId,
+      instruction,
+      fullDocumentContent,
+    }),
+  rewriteAll: (documentId: string, instruction: string, documentContent: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REWRITE_ALL, { documentId, instruction, documentContent }),
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -22,9 +22,10 @@
 import { randomUUID } from 'crypto'
 import { ipcMain } from 'electron'
 
-import { type IpcResponse,IPC_CHANNELS } from '@/shared/ipc-schema'
+import { type IpcResponse, IPC_CHANNELS } from '@/shared/ipc-schema'
 import type { OutlineSection, OutlineSubsection, WriterOutline } from '@/shared/writer-types'
 
+import { getReviewer } from '../agent/reviewer'
 import { getWriterLoop } from '../agent/writer-loop'
 import { redactObject } from '../security/log-redaction'
 import { getProjectWorkspaceService } from '../services/project-workspace-service'
@@ -272,5 +273,197 @@ export function registerWriterLoopHandlers(): void {
     },
   )
 
-  console.log('[IPC] Writer loop handlers registered')
+  // ── Phase 3: Generator IPC ──
+
+  // ── writerLoop:generateSection ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_GENERATE_SECTION,
+    async (_event, payload: { documentId: string; sectionId: string }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_GENERATE_SECTION, payload, async () => {
+        const loop = getWriterLoop(payload.documentId)
+        const result = loop.generateSection(payload.sectionId)
+        return { success: true, data: result }
+      })
+    },
+  )
+
+  // ── writerLoop:generateAll ──
+  ipcMain.handle(IPC_CHANNELS.WRITER_LOOP_GENERATE_ALL, async (_event, payload: { documentId: string }) => {
+    return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_GENERATE_ALL, payload, async () => {
+      const loop = getWriterLoop(payload.documentId)
+      const progress = loop.generateAll()
+      return { success: true, data: progress }
+    })
+  })
+
+  // ── writerLoop:getProgress ──
+  ipcMain.handle(IPC_CHANNELS.WRITER_LOOP_GET_PROGRESS, async (_event, payload: { documentId: string }) => {
+    return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_GET_PROGRESS, payload, async () => {
+      const loop = getWriterLoop(payload.documentId)
+      const progress = loop.getProgress()
+      return { success: true, data: progress }
+    })
+  })
+
+  // ── writerLoop:acceptGeneration ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_ACCEPT_GENERATION,
+    async (_event, payload: { documentId: string; sectionId: string }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_ACCEPT_GENERATION, payload, async () => {
+        const loop = getWriterLoop(payload.documentId)
+        const result = loop.acceptGeneration(payload.sectionId)
+        return { success: true, data: result }
+      })
+    },
+  )
+
+  // ── writerLoop:rejectGeneration ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_REJECT_GENERATION,
+    async (_event, payload: { documentId: string; sectionId: string }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_REJECT_GENERATION, payload, async () => {
+        const loop = getWriterLoop(payload.documentId)
+        loop.rejectGeneration(payload.sectionId)
+        return { success: true, data: null }
+      })
+    },
+  )
+
+  // ── Phase 4: Reviewer IPC ──
+
+  // ── writerLoop:runReview ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_RUN_REVIEW,
+    async (_event, payload: { documentId: string; documentContent: any }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_RUN_REVIEW, payload, async () => {
+        const loop = getWriterLoop(payload.documentId)
+        const outline = loop.getOutline()
+        const reviewer = getReviewer(payload.documentId)
+
+        // Extract paragraphs from document content
+        const paragraphs = extractParagraphs(payload.documentContent)
+
+        // Create pre-review snapshot
+        loop.createSnapshot('before-review', payload.documentContent)
+
+        // Transition to reviewing if not already
+        const stage = loop.getStage()
+        if (stage === 'generating') {
+          loop.transition('reviewing')
+        }
+
+        const contentText = paragraphs.map(p => p.text).join('\n\n')
+        const result = reviewer.runReview(contentText, outline, paragraphs)
+        return { success: true, data: result }
+      })
+    },
+  )
+
+  // ── writerLoop:getReview ──
+  ipcMain.handle(IPC_CHANNELS.WRITER_LOOP_GET_REVIEW, async (_event, payload: { documentId: string }) => {
+    return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_GET_REVIEW, payload, async () => {
+      const reviewer = getReviewer(payload.documentId)
+      const result = reviewer.getLatestResult()
+      return {
+        success: true,
+        data: { result, passCount: reviewer.getPassCount(), canAutoPass: reviewer.canAutoPass() },
+      }
+    })
+  })
+
+  // ── writerLoop:acceptReviewFlag ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_ACCEPT_REVIEW_FLAG,
+    async (_event, payload: { documentId: string; flagId: string }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_ACCEPT_REVIEW_FLAG, payload, async () => {
+        // Flag acceptance is tracked by the UI; here we just acknowledge
+        return { success: true, data: { flagId: payload.flagId, accepted: true } }
+      })
+    },
+  )
+
+  // ── writerLoop:rejectReviewFlag ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_REJECT_REVIEW_FLAG,
+    async (_event, payload: { documentId: string; flagId: string }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_REJECT_REVIEW_FLAG, payload, async () => {
+        return { success: true, data: { flagId: payload.flagId, accepted: false } }
+      })
+    },
+  )
+
+  // ── writerLoop:surgicalEdit ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_SURGICAL_EDIT,
+    async (
+      _event,
+      payload: { documentId: string; paragraphId: string; instruction: string; fullDocumentContent: any },
+    ) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_SURGICAL_EDIT, payload, async () => {
+        const reviewer = getReviewer(payload.documentId)
+        const paragraphs = extractParagraphs(payload.fullDocumentContent)
+        const target = paragraphs.find(p => p.id === payload.paragraphId)
+        if (!target) {
+          throw new Error(`Paragraph not found: ${payload.paragraphId}`)
+        }
+
+        const result = reviewer.surgicalEdit(
+          payload.paragraphId,
+          target.text,
+          payload.instruction,
+          payload.fullDocumentContent,
+        )
+        return { success: true, data: result }
+      })
+    },
+  )
+
+  // ── writerLoop:rewriteAll ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_REWRITE_ALL,
+    async (_event, payload: { documentId: string; instruction: string; documentContent: any }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_REWRITE_ALL, payload, async () => {
+        const loop = getWriterLoop(payload.documentId)
+        const reviewer = getReviewer(payload.documentId)
+
+        // Pre-snapshot before rewrite
+        loop.createSnapshot('before-review', payload.documentContent)
+
+        const contentText =
+          typeof payload.documentContent === 'string'
+            ? payload.documentContent
+            : JSON.stringify(payload.documentContent)
+
+        const result = reviewer.rewriteAll(contentText, payload.instruction)
+        return { success: true, data: result }
+      })
+    },
+  )
+
+  console.log('[IPC] Writer loop handlers registered (Phases 2-4)')
+}
+
+/**
+ * Extract paragraphs from TipTap JSON document content.
+ */
+function extractParagraphs(docContent: any): Array<{ id: string; text: string }> {
+  if (!docContent || !docContent.content) {return []}
+  const result: Array<{ id: string; text: string }> = []
+  for (const node of docContent.content) {
+    if (node.type === 'paragraph' || node.type === 'heading') {
+      const id = node.attrs?.paragraphId || `auto-${result.length}`
+      const text = extractNodeText(node)
+      result.push({ id, text })
+    }
+  }
+  return result
+}
+
+function extractNodeText(node: any): string {
+  if (!node) {return ''}
+  if (node.text) {return node.text}
+  if (node.content && Array.isArray(node.content)) {
+    return node.content.map(extractNodeText).join('')
+  }
+  return ''
 }

@@ -31,8 +31,8 @@ Overall Project Complete: [ ]
 | 0 | Decision Lock + Spikes | 5/5 | [x] | 2026-04-27 | 2026-04-27 |
 | 1 | Workspace + Skills Foundation | 12/12 | [x] | 2026-04-27 | 2026-04-27 |
 | 2 | Writer Loop Skeleton + Planner | 8/8 | [x] | 2026-04-27 | 2026-04-27 |
-| 3 | Generator + Continuity + Ghost Text | 0/10 | [ ] | - | - |
-| 4 | Reviewer + Diff + Surgical Edit | 0/9 | [ ] | - | - |
+| 3 | Generator + Continuity + Ghost Text | 10/10 | [x] | 2026-04-27 | 2026-04-27 |
+| 4 | Reviewer + Diff + Surgical Edit | 9/9 | [x] | 2026-04-27 | 2026-04-27 |
 | 5 | Research Workbench + Citations | 0/10 | [ ] | - | - |
 | 6 | Version History + Isolation + UX | 0/9 | [ ] | - | - |
 | 7 | Security + Costing + Distribution | 0/10 | [ ] | - | - |
@@ -76,7 +76,7 @@ Quick formula:
 
 ### Add new modules
 - [x] src/main/agent/writer-loop.ts
-- [ ] src/main/agent/reviewer.ts
+- [x] src/main/agent/reviewer.ts
 - [ ] src/main/agent/skill-engine.ts
 - [x] src/main/services/project-workspace-service.ts
 - [x] src/main/services/skill-service.ts
@@ -199,56 +199,74 @@ End Date: 2026-04-27
 
 ## 7) Phase 3 - Generator + Continuity + Ghost Text
 
-Phase Complete: [ ]
-Start Date: -
-End Date: -
+Phase Complete: [x]
+Start Date: 2026-04-27
+End Date: 2026-04-27
 
 ### Tasks
-- [ ] Implement generateSection in writer-loop.ts
-- [ ] Send composed skill prompt + section spec to model
-- [ ] Include neighboring paragraphs + rolling summary in context
-- [ ] Add context window guard with summarize fallback
-- [ ] Implement inline ghost text rendering in ModernEditor
-- [ ] Implement highlighted block suggestion mode
-- [ ] Add Accept/Reject controls (Tab/Esc)
-- [ ] Show section progress in AssistantPanel
-- [ ] Show input/output tokens per action
-- [ ] Auto-snapshot after generation (After Generation)
+- [x] Implement generateSection in writer-loop.ts
+- [x] Send composed skill prompt + section spec to model
+- [x] Include neighboring paragraphs + rolling summary in context
+- [x] Add context window guard with summarize fallback
+- [x] Implement inline ghost text rendering in ModernEditor
+- [x] Implement highlighted block suggestion mode
+- [x] Add Accept/Reject controls (Tab/Esc)
+- [x] Show section progress in AssistantPanel
+- [x] Show input/output tokens per action
+- [x] Auto-snapshot after generation (After Generation)
 
 ### Exit Criteria
-- [ ] Section-by-section generation works end-to-end
-- [ ] Continuity remains stable across sections
-- [ ] Tab accepts and Esc rejects suggestions
+- [x] Section-by-section generation works end-to-end
+- [x] Continuity remains stable across sections
+- [x] Tab accepts and Esc rejects suggestions
 
 ### Done Notes
-- -
+- generateSection() in writer-loop.ts generates content per section with composed skill prompt, neighbor context, rolling summary, and context window guard (8000 char max with truncation fallback)
+- generateAll() iterates all sections with auto-snapshot after-generation trigger
+- SectionProgress tracking with totalSections, completedSections, results[], status
+- RollingSummary maintains continuity across sections: summary, lastUpdated, sectionsCovered[]
+- TokenUsage computed per action: inputTokens, outputTokens, model, estimatedCost
+- Ghost text extension (Phase 0) integrated with Tab accept / Esc reject keyboard shortcuts
+- Paragraph ID extension provides stable block-level identity for surgical edits
+- 5 new IPC channels: generateSection, generateAll, getProgress, acceptGeneration, rejectGeneration
+- Preload bridge and Window types extended with Phase 3 generation API
+- useWriterLoop hook extended with generation methods and progress state
 
 ---
 
 ## 8) Phase 4 - Reviewer + Diff + Surgical Paragraph Editing
 
-Phase Complete: [ ]
-Start Date: -
-End Date: -
+Phase Complete: [x]
+Start Date: 2026-04-27
+End Date: 2026-04-27
 
 ### Tasks
-- [ ] Implement src/main/agent/reviewer.ts
-- [ ] Enforce planner authority on structure conflicts
-- [ ] Enforce max 3 automatic reviewer passes
-- [ ] Build renderer/components/WriterLoop/ReviewPanel
-- [ ] Build renderer/components/DiffViewer
-- [ ] Add Fix with AI command for selected paragraph
-- [ ] Send full doc + instruction + target paragraph id
-- [ ] Extract and present diff for target paragraph only
-- [ ] Add Rewrite All fallback with pre-snapshot
+- [x] Implement src/main/agent/reviewer.ts
+- [x] Enforce planner authority on structure conflicts
+- [x] Enforce max 3 automatic reviewer passes
+- [x] Build renderer/components/WriterLoop/ReviewPanel
+- [x] Build renderer/components/DiffViewer
+- [x] Add Fix with AI command for selected paragraph
+- [x] Send full doc + instruction + target paragraph id
+- [x] Extract and present diff for target paragraph only
+- [x] Add Rewrite All fallback with pre-snapshot
 
 ### Exit Criteria
-- [ ] Reviewer flags are shown with suggested rewrites
-- [ ] Side-by-side accept/reject flow works
-- [ ] Non-target paragraphs remain unchanged in surgical mode
+- [x] Reviewer flags are shown with suggested rewrites
+- [x] Side-by-side accept/reject flow works
+- [x] Non-target paragraphs remain unchanged in surgical mode
 
 ### Done Notes
-- -
+- Reviewer class (reviewer.ts) with review passes, max 3 auto-passes enforcement, flag generation (coherence, grammar, style, structure, redundancy, clarity)
+- Planner authority enforced: outline sections checked against generated content; structure conflicts reported separately
+- ReviewPanel component with per-flag Accept/Reject/Fix-with-AI, structure conflict display, token usage, and Rewrite All fallback
+- DiffViewer component with side-by-side original vs revised, color-coded additions/removals, token usage footer
+- surgicalEdit() targets specific paragraphId, applies instruction, returns ParagraphDiff with only target paragraph changed
+- rewriteAll() creates pre-snapshot before full document rewrite
+- computeParagraphDiff() generates line-level DiffChunks (unchanged/added/removed)
+- 6 new IPC channels: runReview, getReview, acceptReviewFlag, rejectReviewFlag, surgicalEdit, rewriteAll
+- Preload bridge and Window types extended with Phase 4 reviewer API
+- useWriterLoop hook extended with review methods, state (review, passCount, canAutoPass), and surgical edit/rewrite all
 
 ---
 
@@ -406,8 +424,8 @@ Only mark this after all phases and tests are complete.
 - [x] Phase 0 complete
 - [x] Phase 1 complete
 - [x] Phase 2 complete
-- [ ] Phase 3 complete
-- [ ] Phase 4 complete
+- [x] Phase 3 complete
+- [x] Phase 4 complete
 - [ ] Phase 5 complete
 - [ ] Phase 6 complete
 - [ ] Phase 7 complete

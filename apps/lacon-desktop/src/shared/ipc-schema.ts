@@ -183,6 +183,21 @@ export const IPC_CHANNELS = {
   WRITER_LOOP_TRANSITION: 'writerLoop:transition',
   WRITER_LOOP_PAUSE: 'writerLoop:pause',
   WRITER_LOOP_RESET: 'writerLoop:reset',
+
+  // Writer Harness: Generator operations (Phase 3)
+  WRITER_LOOP_GENERATE_SECTION: 'writerLoop:generateSection',
+  WRITER_LOOP_GENERATE_ALL: 'writerLoop:generateAll',
+  WRITER_LOOP_GET_PROGRESS: 'writerLoop:getProgress',
+  WRITER_LOOP_ACCEPT_GENERATION: 'writerLoop:acceptGeneration',
+  WRITER_LOOP_REJECT_GENERATION: 'writerLoop:rejectGeneration',
+
+  // Writer Harness: Reviewer operations (Phase 4)
+  WRITER_LOOP_RUN_REVIEW: 'writerLoop:runReview',
+  WRITER_LOOP_GET_REVIEW: 'writerLoop:getReview',
+  WRITER_LOOP_ACCEPT_REVIEW_FLAG: 'writerLoop:acceptReviewFlag',
+  WRITER_LOOP_REJECT_REVIEW_FLAG: 'writerLoop:rejectReviewFlag',
+  WRITER_LOOP_SURGICAL_EDIT: 'writerLoop:surgicalEdit',
+  WRITER_LOOP_REWRITE_ALL: 'writerLoop:rewriteAll',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

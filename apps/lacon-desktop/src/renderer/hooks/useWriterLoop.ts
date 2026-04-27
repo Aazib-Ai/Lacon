@@ -11,6 +11,8 @@ import type {
   AutomationLevel,
   OutlineSection,
   OutlineSubsection,
+  ReviewResult,
+  SectionProgress,
   WriterLoopStage,
   WriterOutline,
   WriterSession,
@@ -27,6 +29,14 @@ export interface WriterLoopState {
   loading: boolean
   /** Last error message */
   error: string | null
+  /** Phase 3: Section generation progress */
+  progress: SectionProgress | null
+  /** Phase 4: Latest review result */
+  review: ReviewResult | null
+  /** Phase 4: Review pass count */
+  reviewPassCount: number
+  /** Phase 4: Whether more auto-passes are available */
+  canAutoPass: boolean
 }
 
 const initialState: WriterLoopState = {
@@ -34,6 +44,10 @@ const initialState: WriterLoopState = {
   outline: null,
   loading: false,
   error: null,
+  progress: null,
+  review: null,
+  reviewPassCount: 0,
+  canAutoPass: true,
 }
 
 // ─────────────────────────── Reducer ───────────────────────────
@@ -45,6 +59,8 @@ type Action =
   | { type: 'SET_OUTLINE'; outline: WriterOutline | null }
   | { type: 'SET_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
+  | { type: 'SET_PROGRESS'; progress: SectionProgress }
+  | { type: 'SET_REVIEW'; review: ReviewResult | null; passCount: number; canAutoPass: boolean }
 
 function reducer(state: WriterLoopState, action: Action): WriterLoopState {
   switch (action.type) {
@@ -60,6 +76,17 @@ function reducer(state: WriterLoopState, action: Action): WriterLoopState {
       return { ...state, error: action.error, loading: false }
     case 'CLEAR_ERROR':
       return { ...state, error: null }
+    case 'SET_PROGRESS':
+      return { ...state, progress: action.progress, loading: false, error: null }
+    case 'SET_REVIEW':
+      return {
+        ...state,
+        review: action.review,
+        reviewPassCount: action.passCount,
+        canAutoPass: action.canAutoPass,
+        loading: false,
+        error: null,
+      }
     default:
       return state
   }
@@ -88,7 +115,9 @@ export function useWriterLoop(documentId: string | undefined) {
   }
 
   const handleResponse = useCallback((response: any, onSuccess?: (data: any) => void) => {
-    if (!mountedRef.current) {return}
+    if (!mountedRef.current) {
+      return
+    }
 
     if (!response?.success) {
       dispatch({ type: 'SET_ERROR', error: response?.error?.message || 'Unknown error' })
@@ -103,7 +132,9 @@ export function useWriterLoop(documentId: string | undefined) {
   // ── Fetch State ──
 
   const fetchState = useCallback(async () => {
-    if (!documentId) {return}
+    if (!documentId) {
+      return
+    }
     dispatch({ type: 'START_LOADING' })
     try {
       const res = await writerLoop().getState(documentId)
@@ -124,7 +155,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const startPlanning = useCallback(
     async (instruction: string, composedSkillPrompt?: string, researchContext?: any) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       dispatch({ type: 'START_LOADING' })
       try {
         const res = await writerLoop().startPlanning(documentId, instruction, composedSkillPrompt, researchContext)
@@ -144,7 +177,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const updateOutline = useCallback(
     async (outline: WriterOutline) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().updateOutline(documentId, outline)
         handleResponse(res, updated => {
@@ -159,7 +194,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const updateSection = useCallback(
     async (sectionId: string, updates: Partial<OutlineSection>) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().updateSection(documentId, sectionId, updates)
         handleResponse(res, updated => {
@@ -174,7 +211,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const addSection = useCallback(
     async (section?: Partial<OutlineSection>) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().addSection(documentId, section)
         handleResponse(res, updated => {
@@ -189,7 +228,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const removeSection = useCallback(
     async (sectionId: string) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().removeSection(documentId, sectionId)
         handleResponse(res, updated => {
@@ -204,7 +245,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const addSubsection = useCallback(
     async (sectionId: string, subsection?: Partial<OutlineSubsection>) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().addSubsection(documentId, sectionId, subsection)
         handleResponse(res, updated => {
@@ -219,7 +262,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const removeSubsection = useCallback(
     async (sectionId: string, subsectionId: string) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().removeSubsection(documentId, sectionId, subsectionId)
         handleResponse(res, updated => {
@@ -236,7 +281,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const approveOutline = useCallback(
     async (documentContent?: any) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       dispatch({ type: 'START_LOADING' })
       try {
         const res = await writerLoop().approveOutline(documentId, documentContent)
@@ -259,7 +306,9 @@ export function useWriterLoop(documentId: string | undefined) {
       activeSkillIds?: string[]
       modelConfig?: { providerId: string; modelId: string }
     }) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().updateConfig(documentId, config)
         handleResponse(res, session => {
@@ -275,7 +324,9 @@ export function useWriterLoop(documentId: string | undefined) {
   // ── Stage Control ──
 
   const pause = useCallback(async () => {
-    if (!documentId) {return}
+    if (!documentId) {
+      return
+    }
     try {
       const res = await writerLoop().pause(documentId)
       handleResponse(res, session => {
@@ -287,7 +338,9 @@ export function useWriterLoop(documentId: string | undefined) {
   }, [documentId, handleResponse])
 
   const reset = useCallback(async () => {
-    if (!documentId) {return}
+    if (!documentId) {
+      return
+    }
     try {
       const res = await writerLoop().reset(documentId)
       handleResponse(res, session => {
@@ -300,7 +353,9 @@ export function useWriterLoop(documentId: string | undefined) {
 
   const transition = useCallback(
     async (stage: WriterLoopStage) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await writerLoop().transition(documentId, stage)
         handleResponse(res, session => {
@@ -311,6 +366,202 @@ export function useWriterLoop(documentId: string | undefined) {
       }
     },
     [documentId, handleResponse],
+  )
+
+  // ── Phase 3: Generation ──
+
+  const generateSection = useCallback(
+    async (sectionId: string) => {
+      if (!documentId) {
+        return
+      }
+      dispatch({ type: 'START_LOADING' })
+      try {
+        const res = await writerLoop().generateSection(documentId, sectionId)
+        handleResponse(res)
+        // Refresh progress
+        const progressRes = await writerLoop().getProgress(documentId)
+        handleResponse(progressRes, progress => {
+          dispatch({ type: 'SET_PROGRESS', progress })
+        })
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId, handleResponse],
+  )
+
+  const generateAll = useCallback(async () => {
+    if (!documentId) {
+      return
+    }
+    dispatch({ type: 'START_LOADING' })
+    try {
+      const res = await writerLoop().generateAll(documentId)
+      handleResponse(res, progress => {
+        dispatch({ type: 'SET_PROGRESS', progress })
+      })
+    } catch (err: any) {
+      dispatch({ type: 'SET_ERROR', error: err.message })
+    }
+  }, [documentId, handleResponse])
+
+  const getGenerationProgress = useCallback(async () => {
+    if (!documentId) {
+      return
+    }
+    try {
+      const res = await writerLoop().getProgress(documentId)
+      handleResponse(res, progress => {
+        dispatch({ type: 'SET_PROGRESS', progress })
+      })
+    } catch (err: any) {
+      dispatch({ type: 'SET_ERROR', error: err.message })
+    }
+  }, [documentId, handleResponse])
+
+  const acceptGeneration = useCallback(
+    async (sectionId: string) => {
+      if (!documentId) {
+        return
+      }
+      try {
+        await writerLoop().acceptGeneration(documentId, sectionId)
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId],
+  )
+
+  const rejectGeneration = useCallback(
+    async (sectionId: string) => {
+      if (!documentId) {
+        return
+      }
+      try {
+        await writerLoop().rejectGeneration(documentId, sectionId)
+        await getGenerationProgress()
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId, getGenerationProgress],
+  )
+
+  // ── Phase 4: Review ──
+
+  const runReview = useCallback(
+    async (documentContent: any) => {
+      if (!documentId) {
+        return
+      }
+      dispatch({ type: 'START_LOADING' })
+      try {
+        const res = await writerLoop().runReview(documentId, documentContent)
+        handleResponse(res)
+        // Refresh review state
+        const reviewRes = await writerLoop().getReview(documentId)
+        handleResponse(reviewRes, data => {
+          dispatch({
+            type: 'SET_REVIEW',
+            review: data.result,
+            passCount: data.passCount,
+            canAutoPass: data.canAutoPass,
+          })
+        })
+        await fetchState()
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId, handleResponse, fetchState],
+  )
+
+  const getReviewState = useCallback(async () => {
+    if (!documentId) {
+      return
+    }
+    try {
+      const res = await writerLoop().getReview(documentId)
+      handleResponse(res, data => {
+        dispatch({ type: 'SET_REVIEW', review: data.result, passCount: data.passCount, canAutoPass: data.canAutoPass })
+      })
+    } catch (err: any) {
+      dispatch({ type: 'SET_ERROR', error: err.message })
+    }
+  }, [documentId, handleResponse])
+
+  const acceptReviewFlag = useCallback(
+    async (flagId: string) => {
+      if (!documentId) {
+        return
+      }
+      try {
+        await writerLoop().acceptReviewFlag(documentId, flagId)
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId],
+  )
+
+  const rejectReviewFlag = useCallback(
+    async (flagId: string) => {
+      if (!documentId) {
+        return
+      }
+      try {
+        await writerLoop().rejectReviewFlag(documentId, flagId)
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId],
+  )
+
+  const surgicalEdit = useCallback(
+    async (paragraphId: string, instruction: string, fullDocumentContent: any) => {
+      if (!documentId) {
+        return null
+      }
+      dispatch({ type: 'START_LOADING' })
+      try {
+        const res = await writerLoop().surgicalEdit(documentId, paragraphId, instruction, fullDocumentContent)
+        if (res?.success) {
+          dispatch({ type: 'CLEAR_ERROR' })
+          return res.data
+        }
+        dispatch({ type: 'SET_ERROR', error: res?.error?.message || 'Surgical edit failed' })
+        return null
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+        return null
+      }
+    },
+    [documentId],
+  )
+
+  const rewriteAll = useCallback(
+    async (instruction: string, documentContent: any) => {
+      if (!documentId) {
+        return null
+      }
+      dispatch({ type: 'START_LOADING' })
+      try {
+        const res = await writerLoop().rewriteAll(documentId, instruction, documentContent)
+        if (res?.success) {
+          dispatch({ type: 'CLEAR_ERROR' })
+          return res.data
+        }
+        dispatch({ type: 'SET_ERROR', error: res?.error?.message || 'Rewrite failed' })
+        return null
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+        return null
+      }
+    },
+    [documentId],
   )
 
   return {
@@ -329,5 +580,18 @@ export function useWriterLoop(documentId: string | undefined) {
     pause,
     reset,
     transition,
+    // Phase 3
+    generateSection,
+    generateAll,
+    getGenerationProgress,
+    acceptGeneration,
+    rejectGeneration,
+    // Phase 4
+    runReview,
+    getReviewState,
+    acceptReviewFlag,
+    rejectReviewFlag,
+    surgicalEdit,
+    rewriteAll,
   }
 }
