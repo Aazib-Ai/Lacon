@@ -179,6 +179,26 @@ const phase12API: Phase12API = {
   getComplianceDashboard: () => ipcRenderer.invoke(IPC_CHANNELS.COMPLIANCE_GET_DASHBOARD, {}),
 }
 
+// Skill API (Phase 1 - Writer Harness)
+const skillAPI = {
+  list: (payload?: any) => ipcRenderer.invoke(IPC_CHANNELS.SKILL_LIST, payload || {}),
+  get: (id: string, documentId?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKILL_GET, { id, documentId }),
+  create: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SKILL_CREATE, payload),
+  compose: (skillIds: string[], documentId?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKILL_COMPOSE, { skillIds, documentId }),
+  research: (topic: string, documentId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKILL_RESEARCH, { topic, documentId }),
+}
+
+// Workspace API (Phase 1 - Writer Harness)
+const workspaceAPI = {
+  ensure: (documentId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_ENSURE, { documentId }),
+  getSession: (documentId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_SESSION, { documentId }),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -189,8 +209,11 @@ contextBridge.exposeInMainWorld('electron', {
   policy: policyAPI,
   release: releaseAPI,
   phase12: phase12API,
+  skill: skillAPI,
+  workspace: workspaceAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))
   },
 })
+

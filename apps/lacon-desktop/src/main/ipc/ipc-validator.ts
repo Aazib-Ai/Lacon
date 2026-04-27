@@ -30,6 +30,21 @@ import {
   isDataListRequest,
   isDataLoadRequest,
   isDataSaveRequest,
+  isDocArchiveRequest,
+  isDocClearRecoverySnapshotRequest,
+  isDocCreateRequest,
+  isDocDeleteRequest,
+  isDocDuplicateRequest,
+  isDocExportRequest,
+  isDocImportRequest,
+  isDocListRequest,
+  isDocOpenRequest,
+  isDocRenameRequest,
+  isDocRestoreRequest,
+  isDocSaveAsRequest,
+  isDocSaveRequest,
+  isDocScheduleAutosaveRequest,
+  isDocSetLastOpenedRequest,
   isKeyDeleteRequest,
   isKeyGetMetadataRequest,
   isKeyHasRequest,
@@ -203,6 +218,146 @@ export function validatePayload(channel: IpcChannel, payload: any): void {
       if (!isSettingsSetRequest(payload)) {
         throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid SETTINGS_SET payload', {
           expected: 'SettingsSetRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_CREATE:
+      if (!isDocCreateRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_CREATE payload', {
+          expected: 'DocCreateRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_OPEN:
+      if (!isDocOpenRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_OPEN payload', {
+          expected: 'DocOpenRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_SAVE:
+      if (!isDocSaveRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_SAVE payload', {
+          expected: 'DocSaveRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_SAVE_AS:
+      if (!isDocSaveAsRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_SAVE_AS payload', {
+          expected: 'DocSaveAsRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_RENAME:
+      if (!isDocRenameRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_RENAME payload', {
+          expected: 'DocRenameRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_DUPLICATE:
+      if (!isDocDuplicateRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_DUPLICATE payload', {
+          expected: 'DocDuplicateRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_ARCHIVE:
+      if (!isDocArchiveRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_ARCHIVE payload', {
+          expected: 'DocArchiveRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_RESTORE:
+      if (!isDocRestoreRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_RESTORE payload', {
+          expected: 'DocRestoreRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_DELETE:
+      if (!isDocDeleteRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_DELETE payload', {
+          expected: 'DocDeleteRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_LIST:
+      if (!isDocListRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_LIST payload', {
+          expected: 'DocListRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_IMPORT:
+      if (!isDocImportRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_IMPORT payload', {
+          expected: 'DocImportRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_EXPORT:
+      if (!isDocExportRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_EXPORT payload', {
+          expected: 'DocExportRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_GET_LAST_OPENED:
+    case IPC_CHANNELS.DOC_GET_RECOVERY_SNAPSHOTS:
+      // No payload required
+      break
+
+    case IPC_CHANNELS.DOC_SET_LAST_OPENED:
+      if (!isDocSetLastOpenedRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_SET_LAST_OPENED payload', {
+          expected: 'DocSetLastOpenedRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_SCHEDULE_AUTOSAVE:
+      if (!isDocScheduleAutosaveRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_SCHEDULE_AUTOSAVE payload', {
+          expected: 'DocScheduleAutosaveRequest',
+          received: typeof payload,
+        })
+      }
+      break
+
+    case IPC_CHANNELS.DOC_CLEAR_RECOVERY_SNAPSHOT:
+      if (!isDocClearRecoverySnapshotRequest(payload)) {
+        throw new IpcValidationError('INVALID_PAYLOAD', 'Invalid DOC_CLEAR_RECOVERY_SNAPSHOT payload', {
+          expected: 'DocClearRecoverySnapshotRequest',
           received: typeof payload,
         })
       }

@@ -8,16 +8,19 @@ export const SCHEMA_VERSION = 1
 
 // Document schema
 export interface Document {
-  id: string
-  title: string
-  content: any // JSON content from editor
-  createdAt: number
-  updatedAt: number
-  archivedAt?: number
   metadata: {
-    wordCount: number
-    characterCount: number
-    tags: string[]
+    id: string
+    title: string
+    createdAt: number
+    updatedAt: number
+    lastSavedAt?: number
+    isDirty: boolean
+    isArchived: boolean
+    version: number
+  }
+  content: {
+    type: 'doc'
+    content: any[]
   }
 }
 
@@ -144,11 +147,17 @@ export type CollectionData<T extends CollectionName> = T extends 'documents'
 export function isValidDocument(data: any): data is Document {
   return (
     typeof data === 'object' &&
-    typeof data.id === 'string' &&
-    typeof data.title === 'string' &&
-    typeof data.createdAt === 'number' &&
-    typeof data.updatedAt === 'number' &&
-    typeof data.metadata === 'object'
+    typeof data.metadata === 'object' &&
+    typeof data.metadata.id === 'string' &&
+    typeof data.metadata.title === 'string' &&
+    typeof data.metadata.createdAt === 'number' &&
+    typeof data.metadata.updatedAt === 'number' &&
+    typeof data.metadata.isDirty === 'boolean' &&
+    typeof data.metadata.isArchived === 'boolean' &&
+    typeof data.metadata.version === 'number' &&
+    typeof data.content === 'object' &&
+    data.content.type === 'doc' &&
+    Array.isArray(data.content.content)
   )
 }
 

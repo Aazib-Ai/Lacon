@@ -1,0 +1,527 @@
+# LACON Writer's Harness — Implementation Plan
+
+> **Derived from:** `Questions.md` answers + codebase audit  
+> **Target platform:** Electron + React + TipTap (existing `apps/lacon-desktop`)  
+> **North star:** *"The best tool for writing and researching — AI is constrained by structure, not the other way around."*
+
+---
+
+## 1. Product Vision (Synthesized from Q1–Q8)
+
+LACON is a **structured, opinionated writing harness** — not a chat wrapper. The AI is *harnessed* (constrained by Skills and the cognitive loop) so that writers get disciplined, researched, genre-aware output. It is strongly opinionated about what good writing looks like, anti-chatbot by UX proof (not by bashing competitors), and ships as a **free direct-download app** where users bring their own API keys.
+
+**Unique value stack (all must ship together):**
+1. **Skill file system** — auto-researched, genre-aware prompt packs
+2. **Planner → Generator → Reviewer cognitive loop** — configurable automation depth
+3. **Surgical paragraph-level editing** — diff-first, never regenerate blindly
+4. **Persistent, auditable Research Log** — cross-session, with citations
+5. **Zero-bias isolated project contexts** — no chat history bleed
+
+---
+
+## 2. Architecture Overview
+
+```
+apps/lacon-desktop/
+  src/
+    main/                          ← Electron main process
+      agent/                       ← ✅ EXISTS — extend with Writer loop
+        orchestrator.ts            ← ✅ EXISTS
+        planner.ts                 ← ✅ EXISTS — repurpose for Planner stage
+        [NEW] writer-loop.ts       ← Planner→Generator→Reviewer state machine
+        [NEW] reviewer.ts          ← Reviewer agent (flag + suggest rewrites)
+        [NEW] skill-engine.ts      ← Skill file loader, composer, injector
+      tools/
+        [NEW] research-tools.ts    ← Web search + file upload tools
+        [NEW] skill-research-tool.ts ← Agent-driven skill generation
+      services/
+        document-service.ts        ← ✅ EXISTS — add snapshot versioning
+        [NEW] research-log-service.ts ← Persistent research log (JSON on disk)
+        [NEW] skill-service.ts     ← Manage skill library on disk
+        [NEW] version-service.ts   ← Milestone snapshot store
+      providers/                   ← ✅ EXISTS — all major LLMs covered
+    renderer/
+      components/
+        ModernEditor.tsx           ← ✅ EXISTS — primary editor surface
+        [NEW] WriterLoop/          ← Loop control panel (progress, pass counter)
+        [NEW] SkillPicker/         ← Select/stack up to 3 Skills
+        [NEW] ResearchLog/         ← Sidebar panel: query→sources→usage
+        [NEW] VersionHistory/      ← Creative snapshot timeline
+        [NEW] DiffViewer/          ← Side-by-side old vs new paragraph
+        [NEW] ZenMode/             ← Distraction-free overlay
+        [NEW] UploadSource/        ← PDF/DOCX/TXT/slides upload
+        [MODIFY] AssistantPanel    ← Integrate loop controls + skill status
+    shared/
+      [NEW] writer-types.ts        ← WriterSession, Skill, ResearchEntry, Snapshot types
+```
+
+### Agent Workspace Folder Structure (hidden from writers)
+```
+[Project Root]/
+  .lacon/                  ← hidden agent folder
+    research.md            ← auto-written research log
+    [skill-name].skill.md  ← generated skill files
+    snapshots/             ← version snapshots (JSON)
+  [document].md            ← only file writers see directly
+```
+
+---
+
+## 3. Core Data Types (NEW: `shared/writer-types.ts`)
+
+```typescript
+// Skill file definition
+interface Skill {
+  id: string
+  name: string
+  genre: string                    // "horror", "academic", "essay", etc.
+  structuralRules: string[]        // "A horror story needs a tension curve in act 2"
+  evaluationRubric?: string[]      // Optional — Reviewer uses these
+  examples: string[]               // Best-practice excerpts
+  generatedAt: number
+  source: 'built-in' | 'user-created' | 'agent-researched'
+}
+
+// Writer Loop session
+interface WriterSession {
+  id: string
+  documentId: string
+  activeSkills: Skill[]            // Up to 3, with priority order
+  wordCountTarget: number          // Soft target (±20% triggers flag)
+  automationLevel: 'full-auto' | 'supervised' | 'manual'
+  passCount: number                // Current reviewer pass (max 3)
+  stage: 'planning' | 'generating' | 'reviewing' | 'complete' | 'paused'
+  outline?: Outline
+  researchLogId: string
+}
+
+// Hierarchical outline
+interface Outline {
+  sections: {
+    id: string
+    title: string
+    subsections: { id: string; title: string; keyPoints: string[] }[]
+  }[]
+  approvedByUser: boolean
+}
+
+// Research log entry
+interface ResearchEntry {
+  id: string
+  query: string
+  sources: { url: string; title: string; excerpt: string }[]
+  savedExcerpts: string[]
+  usedInSections: string[]         // section IDs
+  timestamp: number
+}
+
+// Version snapshot
+interface DocumentSnapshot {
+  id: string
+  documentId: string
+  label: string                    // "After Planner", "After Pass 2", "User milestone"
+  content: unknown                 // TipTap JSON
+  wordCount: number
+  createdAt: number
+}
+
+// Reviewer flag
+interface ReviewerFlag {
+  paragraphId: string
+  type: 'word-count' | 'structure' | 'tone' | 'factual' | 'skill-rubric'
+  severity: 'info' | 'warning' | 'error'
+  message: string
+  suggestedRewrite: string         // AI-generated alternative
+  accepted: boolean | null         // null = pending
+}
+```
+
+---
+
+## 4. Phased Execution Plan
+
+---
+
+### Phase 1 — Foundation: Types, Skill Files, Project Workspace
+**Goal:** Lay the data model and file-system contract everything else will build on.
+
+#### Tasks
+- [ ] **Create `shared/writer-types.ts`** — All types from Section 3 above.
+- [ ] **Create `main/services/skill-service.ts`**
+  - Load built-in skills from `resources/skills/` (bundled with app)
+  - Load user skills from `[project]/.lacon/skills/`
+  - `compositeSkillPrompt(skills: Skill[]): string` — merges up to 3 skills with priority weighting
+- [ ] **Create `main/services/research-log-service.ts`**
+  - CRUD for `ResearchEntry` stored in `[project]/.lacon/research.md` (Markdown) + `.lacon/research.json` (machine-readable)
+  - Cross-session persistence via `fs` module in Electron main process
+- [ ] **Create `main/services/version-service.ts`**
+  - `createSnapshot(label, content)` → writes to `.lacon/snapshots/[timestamp].json`
+  - `listSnapshots(documentId)` → sorted list
+  - `restoreSnapshot(id)` → returns TipTap JSON
+- [ ] **Bundle 5 built-in Skill files** in `resources/skills/`:
+  - `essay.skill.md` — Argumentative essay structure
+  - `story.skill.md` — Narrative arc, tension curve, character rules
+  - `academic.skill.md` — Thesis/evidence/citation structure
+  - `newsletter.skill.md` — Hook, value, CTA flow
+  - `script.skill.md` — Scene/action/dialogue formatting
+- [ ] **Add IPC channels** in `shared/ipc-schema.ts`:
+  - `skill:list`, `skill:get`, `skill:create`, `skill:compose`
+  - `research:addEntry`, `research:getLog`, `research:linkToSection`
+  - `version:createSnapshot`, `version:listSnapshots`, `version:restore`
+
+#### Acceptance Criteria
+- Skills load from disk, compose into a single system prompt string
+- Research log round-trips to disk across app restarts
+- Snapshots can be created and restored
+
+---
+
+### Phase 2 — Skill Research Agent
+**Goal:** Agent auto-researches how to write a genre and generates a `.skill.md` file.
+
+#### Tasks
+- [ ] **Create `main/tools/skill-research-tool.ts`**
+  - `researchGenre(genre: string): Promise<Skill>` — calls web search → synthesizes rules → writes skill file
+  - Uses existing `retrieval-tools.ts` + provider manager
+- [ ] **Create `main/agent/skill-engine.ts`**
+  - Orchestrates: "user wants to write a horror story" → identify genre → check if skill exists → if not, run research → save skill → return composed prompt
+  - Writes all intermediate research to `.lacon/research.md`
+- [ ] **`SkillPicker` UI** (renderer component):
+  - Library view: built-in skills grid + user skills
+  - "Generate Skill" button → shows progress → auto-adds to library
+  - Stack selector: drag-and-drop up to 3 skills with priority labels (1st, 2nd, 3rd)
+  - Skill card: name, genre, rule count, last updated
+- [ ] **Add IPC**: `skill:research` (triggers agent, streams progress back)
+
+#### Acceptance Criteria
+- User picks "I want to write a horror story" → agent searches, generates `horror.skill.md`, displays it in library
+- Composing 3 skills produces a coherent system prompt with priority blending
+
+---
+
+### Phase 3 — Planner Stage (Outline Generation)
+**Goal:** The Planner outputs a hierarchical outline the user approves before generation begins.
+
+#### Tasks
+- [ ] **Create `main/agent/writer-loop.ts`** — state machine for the full loop:
+  ```
+  idle → planning → awaiting-outline-approval → generating → 
+  reviewing (up to 3 passes) → awaiting-user → complete
+  ```
+- [ ] **Extend existing `planner.ts`** with `generateOutline(instruction, skills, researchNotes)`:
+  - Returns `Outline` (sections → subsections → key points)
+  - Research is a **pre-step** (Q14: research is manual, before the loop)
+  - Planner receives: user instruction + active skills + any manually uploaded research
+- [ ] **`WriterLoop/OutlineEditor` component** (renderer):
+  - Renders the hierarchical outline as an interactive tree
+  - User can edit, reorder, delete nodes
+  - "Approve Outline" button → triggers generation
+  - Planner "wins" if Reviewer later contradicts it (Q12)
+- [ ] **Auto-snapshot** on outline approval: label "Before Generation"
+- [ ] **Word count target input** in the session setup panel (soft target, ±20% flag)
+
+#### Acceptance Criteria
+- Planner generates a structured outline from a user prompt + active skills
+- User can edit/approve the outline
+- Word count target is stored in the session
+
+---
+
+### Phase 4 — Generator Stage (Section-by-Section Writing)
+**Goal:** Generator writes the document section by section, context-aware, within the word target.
+
+#### Tasks
+- [ ] **`main/agent/writer-loop.ts`** — `generateSection(sectionId, outline, skills, documentSummary)`:
+  - Sends: skill composite prompt + section outline + neighboring paragraph context + document-level summary
+  - Receives: markdown → converts to TipTap JSON (use existing `@tiptap/markdown`)
+  - Updates document summary after each section (Q23 — rolling summary for continuity)
+  - Tracks running word count vs. target
+- [ ] **Context window management** (Q35A — auto-truncate/summarize):
+  - Rolling document summary maintained in session state
+  - If context nears limit: summarize completed sections, keep only recent + current
+- [ ] **TipTap inline ghost text** (Q41A) — show generated text as ghost before commit:
+  - Use TipTap `Decoration` API to render pending content in muted color
+  - "Accept All" / "Reject" buttons in floating toolbar
+- [ ] **Progress UI** in AssistantPanel:
+  - Section progress bar: "Writing section 2/5..."
+  - Token count + estimated cost badge (Q36A)
+  - Cancel button
+- [ ] **Auto-snapshot** after full generation: label "After Generation Pass 1"
+
+#### Acceptance Criteria
+- Generator produces each section in sequence with correct context
+- Ghost text appears in editor, user can accept/reject
+- Token cost is visible per generation call
+
+---
+
+### Phase 5 — Reviewer Stage + Surgical Editing
+**Goal:** Reviewer flags issues; surgical edits apply to individual paragraphs with diff view.
+
+#### Tasks
+- [ ] **Create `main/agent/reviewer.ts`**:
+  - `reviewDocument(content, session): Promise<ReviewerFlag[]>`
+  - Checks: word count delta (>20%), structural compliance vs. skill rubric, tone consistency
+  - Returns flags with `suggestedRewrite` per paragraph
+  - Max 3 automatic passes; on 4th, pauses and asks user (Q13B)
+  - Planner's outline is the authority if structure conflicts (Q12B)
+- [ ] **`WriterLoop/ReviewPanel` component**:
+  - Flag list with severity icons (info / warning / error)
+  - Each flag has: paragraph preview, issue description, suggested rewrite
+  - Accept/Reject buttons per flag → accepted rewrites go to DiffViewer
+- [ ] **`DiffViewer` component** (Q25B — side-by-side):
+  - Left pane: original paragraph (read-only)
+  - Right pane: suggested rewrite (editable)
+  - Accept / Edit & Accept / Reject actions
+  - Accepted changes highlight in editor as `<mark>` for 3 seconds then normalize
+- [ ] **Surgical paragraph editing** (Q22B):
+  - User selects paragraph → right-click / toolbar → "Fix with AI"
+  - Sends: full document + instruction + target paragraph ID
+  - Response: full new document → extract target paragraph → show in DiffViewer
+  - Does **not** touch other paragraphs
+- [ ] **Full document rewrite** as fallback (Q26A):
+  - "Rewrite All" button in session panel → creates snapshot → triggers full generation
+- [ ] **Auto-snapshot** before each Reviewer pass
+
+#### Acceptance Criteria
+- Reviewer flags off-target paragraphs with suggested rewrites
+- DiffViewer shows side-by-side with accept/reject
+- Surgical "Fix paragraph" isolates changes correctly
+- After 3 auto passes, loop pauses for user decision
+
+---
+
+### Phase 6 — Research Log + File Upload + Citations
+**Goal:** Full research workflow — web search, file upload, auditable log, citation styles.
+
+#### Tasks
+- [ ] **Web research tool** (extend `retrieval-tools.ts`):
+  - During generation (auto mode): agent searches → logs all queries + sources automatically
+  - High-importance documents (supervised mode): agent proposes search queries → user approves → executes
+  - Default = auto; user toggles in session settings
+- [ ] **File upload** (Q30A): PDF, DOCX, TXT, slides (PPTX)
+  - Electron `dialog.showOpenDialog` → read file → extract text (use `pdf-parse`, `mammoth`, `pptx-to-text`)
+  - Extracted text stored as `ResearchEntry` in research log
+  - Shown in Research Log panel as "Uploaded: [filename]"
+- [ ] **`ResearchLog` panel** (renderer):
+  - Timeline view: each entry = query + sources found + excerpts + sections used
+  - Click source → open in external browser
+  - Knowledge graph mode (Q28C): visual connections between sources and sections
+  - Cross-session: persists in `.lacon/research.json`
+- [ ] **Citations** (Q31D — user picks style):
+  - Citation style picker in document settings: APA, MLA, Chicago, IEEE, Footnotes, Inline links
+  - When Generator uses a source → inserts citation in chosen style
+  - Citation manager: deduplicate, sort bibliography
+- [ ] **Fact-check on demand** (Q33B):
+  - "Fact-check this section" button → agent searches claims → returns confidence + sources
+  - Flags low-confidence claims in yellow
+
+#### Acceptance Criteria
+- Research log persists across sessions, shows full audit trail
+- PDF/DOCX upload extracts text and adds to research context
+- Citations inserted in user-selected style
+- Fact-check surfaces sources for flagged claims
+
+---
+
+### Phase 7 — Version History + Project Isolation + UX Polish
+**Goal:** Creative version control, isolated project contexts, Zen mode, and inline completions.
+
+#### Tasks
+- [ ] **`VersionHistory` component** (Q24B — creative, not git-scary):
+  - Visual timeline: cards with label, date, word count
+  - Labels: user can name milestones ("Draft 1 done", "Before rewrite")
+  - Auto-labels: "After Planner", "After Generation Pass 1", "After Reviewer Pass 2"
+  - Restore: shows DiffViewer between snapshot and current before confirming
+  - Stored in `.lacon/snapshots/`
+- [ ] **Project isolation** (Q45A — zero bleed):
+  - Each project = its own `.lacon/` folder + isolated provider config
+  - No cross-project context leaking
+  - Session state (active skills, research log, loop state) is per-project
+- [ ] **Zen mode** (Q42A):
+  - Hides: sidebar, assistant panel, status bar
+  - Shows: editor + floating word count
+  - Triggered: `F11` or toolbar button
+  - Smooth CSS transition
+- [ ] **Inline ghost text / accept** (Q41 A+C combined):
+  - Ghost text (pale) for AI completions → `Tab` to accept, `Esc` to reject
+  - Highlighted blocks for larger suggestions → Accept/Reject toolbar appears inline
+- [ ] **Formatting preservation** (Q27C):
+  - Generator always outputs Markdown
+  - `@tiptap/markdown` parses back to TipTap ProseMirror JSON
+  - Existing user formatting preserved in surrounding paragraphs
+- [ ] **Keyboard-first** (Q43C — equal keyboard + mouse):
+  - All loop actions have keyboard shortcuts documented in tooltip
+  - Focus management: Tab moves through Loop stages logically
+- [ ] **Automation level per project** (Q9D):
+  - Session settings: "Full Auto" / "Supervised" / "Manual" toggle
+  - Affects: research approval, reviewer auto-pass count, generation chunk size
+
+#### Acceptance Criteria
+- Version timeline shows auto + manual snapshots, restore works
+- Zen mode hides all chrome, word count remains
+- Ghost text tab-accepts correctly
+
+---
+
+### Phase 8 — Settings, Distribution, Model Strategy
+**Goal:** API key management, provider selection, cost tracking, local model support, app packaging.
+
+#### Tasks
+- [ ] **Settings page** (extend existing `ProviderSettings.tsx`):
+  - API key per provider: encrypted storage (Electron `safeStorage`) + test-connection button (Q47B)
+  - Model selector per provider (Q38B — user chooses their model, no suggestions)
+  - Local model support: Ollama / LM Studio URL config with disclaimer banner (Q37C)
+  - One model per project (Q34B — keep it simple)
+- [ ] **Cost tracking** (Q36A):
+  - Token count badge: input tokens / output tokens per call
+  - Estimated USD cost calculated from provider pricing table
+  - Session total: running cost counter in status bar
+  - Model pricing table bundled in app (updated manually per release)
+- [ ] **Context window guard** (Q35A):
+  - Monitor token count before each LLM call
+  - Auto-truncate: keep outline + current section + last 2 completed sections + document summary
+  - Warn user if summary is being used instead of full context
+- [ ] **Privacy** (Q46A — 100% local):
+  - No telemetry, no analytics, no server calls except directly to chosen LLM provider
+  - User API keys never leave the machine except to the provider's API
+- [ ] **Distribution** (Q48A — direct download):
+  - `electron-builder` produces `.exe` (Windows), `.dmg` (macOS), `.AppImage` (Linux)
+  - Download page (static site) — no app store
+  - Manual update only (Q49C): in-app "Check for update" button → opens download page
+- [ ] **Pricing** (Q50E — free, BYOK):
+  - App is free, no license check, no paywalls
+  - Onboarding: "Bring your API key from OpenAI / Anthropic / Gemini / OpenRouter"
+
+#### Acceptance Criteria
+- API keys stored encrypted, test-connection works for each provider
+- Token cost visible per call and as session total
+- App builds as installable package for Windows
+
+---
+
+## 5. UX Layout Contract (Q39A — Writer's Desk)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [Sidebar]          [Editor — Center]           [AI Panel]      │
+│  - Document list    - TipTap editor              - Loop status   │
+│  - Skill picker     - Ghost text / highlights    - Reviewer flags│
+│  - Research Log     - Inline accept/reject       - Cost badge    │
+│  - Version History  - Word count (floating)      - Send / Cancel │
+│                                                                   │
+│  [Status Bar: word count | tokens | cost | provider | mode]      │
+└─────────────────────────────────────────────────────────────────┘
+
+Zen Mode: only Editor + floating word count visible
+AI Panel: toggleable, default visible (Q40C)
+```
+
+---
+
+## 6. Skill File Format (`.skill.md`)
+
+```markdown
+---
+name: Horror Story
+genre: horror
+version: 1.0
+generated_by: agent | user
+created_at: 2026-04-27
+---
+
+## Structural Rules
+- The story must establish dread in Act 1 before the first incident
+- Act 2 requires an escalating tension curve with at least one false resolution
+- The climax must answer the central fear introduced in Act 1
+- Show don't tell: fear through sensory details, not direct statements
+
+## Evaluation Rubric
+- [ ] Tension curve present and escalating
+- [ ] Protagonist has a clear primal fear
+- [ ] Setting contributes to atmosphere
+- [ ] Ending delivers consequence, not escape
+
+## Examples
+> "The house had been empty for thirty years. Sarah's hand shook as she turned the key..."
+
+## Writing Instructions
+When generating, maintain a slow burn in Act 1, accelerate the pacing after the midpoint,
+and ensure the final paragraph echoes the opening image.
+```
+
+---
+
+## 7. What Exists vs. What Needs to Be Built
+
+| System | Status | Action |
+|---|---|---|
+| Electron shell | ✅ Exists | No changes |
+| TipTap editor (ModernEditor) | ✅ Exists | Add ghost text + diff highlights |
+| Provider adapters (OpenAI, Anthropic, Gemini, OpenRouter, Local) | ✅ Exists | No changes |
+| Agent orchestrator + planner + state machine | ✅ Exists | Extend for Writer Loop |
+| Tool registry + authoring/retrieval tools | ✅ Exists | Add skill-research + research tools |
+| Document service | ✅ Exists | Add snapshot versioning |
+| IPC schema | ✅ Exists | Add new channels |
+| Writer Loop (Planner→Generator→Reviewer) | ❌ Missing | Build Phase 3-5 |
+| Skill system (files, research, compose) | ❌ Missing | Build Phase 1-2 |
+| Research Log (persistent, cross-session) | ❌ Missing | Build Phase 1 + 6 |
+| Surgical paragraph editing + DiffViewer | ❌ Missing | Build Phase 5 |
+| Version / snapshot history | ❌ Missing | Build Phase 7 |
+| Zen mode | ❌ Missing | Build Phase 7 |
+| Citation manager | ❌ Missing | Build Phase 6 |
+| File upload (PDF/DOCX/slides) | ❌ Missing | Build Phase 6 |
+| Cost / token tracking UI | ❌ Missing | Build Phase 8 |
+| Skill Picker UI | ❌ Missing | Build Phase 2 |
+| VersionHistory UI | ❌ Missing | Build Phase 7 |
+
+---
+
+## 8. Build Order Summary
+
+| Phase | Name | Key Output |
+|---|---|---|
+| 1 | Foundation | Types, Skill/Research/Version services, IPC channels, 5 built-in skills |
+| 2 | Skill Research Agent | Auto-generate skills via web search, SkillPicker UI |
+| 3 | Planner Stage | Outline generation, outline editor UI, session setup |
+| 4 | Generator Stage | Section-by-section writing, ghost text, cost badge |
+| 5 | Reviewer + Surgical Edit | Reviewer flags, DiffViewer, paragraph fix, 3-pass limit |
+| 6 | Research + Citations | Web research log, file upload, citation styles, fact-check |
+| 7 | Version History + UX | Snapshot timeline, Zen mode, project isolation, keyboard-first |
+| 8 | Settings + Distribution | Encrypted API keys, cost tracking, app packaging |
+
+---
+
+## 9. All Design Decisions (Locked)
+
+| Question | Decision |
+|---|---|
+| One model per project or per stage? | **One per project** (Q34B) |
+| Research before or during loop? | **Before loop, manual** (Q14D) |
+| How many reviewer passes? | **Max 3 auto, then ask user** (Q13B) |
+| Planner vs Reviewer conflict? | **Planner wins** (Q12B) |
+| Skill composability? | **Stack up to 3 with priority** (Q18B) |
+| Citation style? | **User picks from APA/MLA/Chicago/etc.** (Q31D) |
+| Pricing? | **Free, BYOK** (Q50E) |
+| Distribution? | **Direct download, manual updates** (Q48A, Q49C) |
+| Telemetry? | **None — 100% local** (Q46A) |
+| Command palette? | **No — toolbar and menus** (Q44C) |
+| Word count enforcement? | **Soft target — flag if >20% off** (Q15B) |
+| Reviewer rewrite power? | **Flag + suggest, user decides** (Q11B) |
+| Outline format? | **Hierarchical: sections → subsections → key points** (Q10B) |
+| Edit display? | **Side-by-side diff (old vs new)** (Q25B) |
+| Full rewrite allowed? | **Yes as fallback** (Q26A) |
+| Formatting strategy? | **AI outputs Markdown → convert to TipTap** (Q27C) |
+| Research log format? | **Structured entries + knowledge graph** (Q28 B+C) |
+| Research mode? | **Auto by default, supervised for important docs** (Q29D) |
+| Upload types? | **PDF, DOCX, TXT, PPTX slides** (Q30A) |
+| Research persistence? | **Yes, cross-session** (Q32A) |
+| Skill evaluation rubrics? | **Optional per skill** (Q20C) |
+| Skill file location? | **User-accessible local dir + agent folder** (Q21B) |
+| AI panel visibility? | **Toggleable, default visible** (Q40C) |
+| AI suggestions in editor? | **Ghost text + highlighted blocks** (Q41 A+C) |
+| Zen mode? | **Yes — editor + word count only** (Q42A) |
+| Keyboard vs mouse? | **Equal — shortcuts + GUI** (Q43C) |
+| Document continuity strategy? | **Rolling summary + neighboring paragraphs** (Q23 A+C) |
+| Version history style? | **Snapshots at milestones, creative labels** (Q24B) |
+| Skill built-in count? | **5 core, agent researches rest** (Q19A) |

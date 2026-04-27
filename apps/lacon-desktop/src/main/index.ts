@@ -10,6 +10,8 @@ import { registerPhase12Handlers } from './ipc/phase12-handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
 import { registerReleaseHandlers } from './ipc/release-handlers'
 import { registerToolHandlers } from './ipc/tool-handlers'
+import { registerSkillHandlers } from './ipc/skill-handlers'
+import { getSkillService } from './services/skill-service'
 import { getReleaseOperationsService } from './release-engineering/release-operations-service'
 import { getUpdaterService } from './release-engineering/updater-service'
 import { getKeyStore } from './security/keystore'
@@ -95,6 +97,14 @@ async function initializeApp() {
     const workspaceRoot = app.getPath('userData')
     registerToolHandlers(workspaceRoot)
 
+    // Initialize skill service (Phase 1 - Writer Harness)
+    const skillService = getSkillService()
+    await skillService.initialize()
+    logger.info('Skill service initialized')
+
+    // Register skill & workspace handlers (Phase 1)
+    registerSkillHandlers()
+
     // Register audit handlers (Phase 9)
     registerAuditHandlers(auditManager)
 
@@ -124,7 +134,8 @@ function createWindow() {
 
   // Load the app
   if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
+    const rendererUrl = new URL('/src/renderer/index.html', process.env.VITE_DEV_SERVER_URL).toString()
+    mainWindow.loadURL(rendererUrl)
     mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))

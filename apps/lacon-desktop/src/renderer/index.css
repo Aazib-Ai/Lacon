@@ -1,4 +1,4 @@
-﻿* {
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -801,4 +801,50 @@ hr {
 }
 
 
+/* Phase 0 - Ghost Text Suggestions */
+.ghost-text-suggestion {
+  color: var(--color-textTertiary, #999);
+  opacity: 0.6;
+  font-style: italic;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes ghostFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.6;
+  }
+}
+
+.ghost-text-suggestion {
+  animation: ghostFadeIn 0.3s ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost-text-suggestion {
+    animation: none;
+  }
+}
+
+/* Phase 0 - Paragraph Identity Highlights */
+[data-paragraph-id] {
+  position: relative;
+}
+
+[data-paragraph-id]:hover::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary, #0066cc);
+  opacity: 0.3;
+  border-radius: 2px;
+}
+
 /* Phase 9 component styles injected via build */
+

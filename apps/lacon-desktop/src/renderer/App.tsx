@@ -2,14 +2,22 @@ import React, { useEffect, useState } from 'react'
 
 import { AppShell } from './components/AppShell'
 import { Editor } from './components/Editor'
+import { ModernEditorDemo } from './components/ModernEditorDemo'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { useDocument } from './hooks/useDocument'
 import { usePhase12 } from './hooks/usePhase12'
 
 function App() {
+  // Toggle between old and new editor
+  const [useModernEditor, setUseModernEditor] = useState(true)
+
   return (
     <ThemeProvider>
-      <AppContent />
+      {useModernEditor ? (
+        <ModernEditorDemo />
+      ) : (
+        <AppContent />
+      )}
     </ThemeProvider>
   )
 }

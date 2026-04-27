@@ -155,6 +155,17 @@ export const IPC_CHANNELS = {
   COMPLIANCE_RUN_DRY_ASSESSMENT: 'compliance:runDryAssessment',
   COMPLIANCE_PREPARE_EXTERNAL_AUDIT: 'compliance:prepareExternalAudit',
   COMPLIANCE_GET_DASHBOARD: 'compliance:getDashboard',
+
+  // Writer Harness: Skill operations (Phase 1)
+  SKILL_LIST: 'skill:list',
+  SKILL_GET: 'skill:get',
+  SKILL_CREATE: 'skill:create',
+  SKILL_COMPOSE: 'skill:compose',
+  SKILL_RESEARCH: 'skill:research',
+
+  // Writer Harness: Workspace operations (Phase 1)
+  WORKSPACE_ENSURE: 'workspace:ensure',
+  WORKSPACE_GET_SESSION: 'workspace:getSession',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

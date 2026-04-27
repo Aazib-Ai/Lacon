@@ -134,6 +134,21 @@ export interface Phase12API {
   getComplianceDashboard: () => Promise<any>
 }
 
+// Skill API (Phase 1 - Writer Harness)
+export interface SkillAPI {
+  list: (payload?: any) => Promise<any>
+  get: (id: string, documentId?: string) => Promise<any>
+  create: (payload: any) => Promise<any>
+  compose: (skillIds: string[], documentId?: string) => Promise<any>
+  research: (topic: string, documentId: string) => Promise<any>
+}
+
+// Workspace API (Phase 1 - Writer Harness)
+export interface WorkspaceAPI {
+  ensure: (documentId: string) => Promise<any>
+  getSession: (documentId: string) => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -147,6 +162,8 @@ declare global {
       policy: PolicyAPI
       release: ReleaseAPI
       phase12: Phase12API
+      skill: SkillAPI
+      workspace: WorkspaceAPI
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }
@@ -154,3 +171,4 @@ declare global {
 }
 
 export {}
+
