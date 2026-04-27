@@ -182,8 +182,7 @@ const phase12API: Phase12API = {
 // Skill API (Phase 1 - Writer Harness)
 const skillAPI = {
   list: (payload?: any) => ipcRenderer.invoke(IPC_CHANNELS.SKILL_LIST, payload || {}),
-  get: (id: string, documentId?: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.SKILL_GET, { id, documentId }),
+  get: (id: string, documentId?: string) => ipcRenderer.invoke(IPC_CHANNELS.SKILL_GET, { id, documentId }),
   create: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SKILL_CREATE, payload),
   compose: (skillIds: string[], documentId?: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.SKILL_COMPOSE, { skillIds, documentId }),
@@ -193,10 +192,43 @@ const skillAPI = {
 
 // Workspace API (Phase 1 - Writer Harness)
 const workspaceAPI = {
-  ensure: (documentId: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_ENSURE, { documentId }),
-  getSession: (documentId: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_SESSION, { documentId }),
+  ensure: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_ENSURE, { documentId }),
+  getSession: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_SESSION, { documentId }),
+  updateSession: (documentId: string, updates: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_UPDATE_SESSION, { documentId, updates }),
+}
+
+// Writer Loop API (Phase 2 - Writer Harness)
+const writerLoopAPI = {
+  getState: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GET_STATE, { documentId }),
+  startPlanning: (documentId: string, instruction: string, composedSkillPrompt?: string, researchContext?: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_START_PLANNING, {
+      documentId,
+      instruction,
+      composedSkillPrompt,
+      researchContext,
+    }),
+  getOutline: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GET_OUTLINE, { documentId }),
+  updateOutline: (documentId: string, outline: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_UPDATE_OUTLINE, { documentId, outline }),
+  updateSection: (documentId: string, sectionId: string, updates: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_UPDATE_SECTION, { documentId, sectionId, updates }),
+  addSection: (documentId: string, section?: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ADD_SECTION, { documentId, section }),
+  removeSection: (documentId: string, sectionId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REMOVE_SECTION, { documentId, sectionId }),
+  addSubsection: (documentId: string, sectionId: string, subsection?: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ADD_SUBSECTION, { documentId, sectionId, subsection }),
+  removeSubsection: (documentId: string, sectionId: string, subsectionId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REMOVE_SUBSECTION, { documentId, sectionId, subsectionId }),
+  approveOutline: (documentId: string, documentContent?: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_APPROVE_OUTLINE, { documentId, documentContent }),
+  updateConfig: (documentId: string, config: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_UPDATE_CONFIG, { documentId, ...config }),
+  transition: (documentId: string, stage: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_TRANSITION, { documentId, stage }),
+  pause: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_PAUSE, { documentId }),
+  reset: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_RESET, { documentId }),
 }
 
 contextBridge.exposeInMainWorld('api', api)
@@ -211,9 +243,9 @@ contextBridge.exposeInMainWorld('electron', {
   phase12: phase12API,
   skill: skillAPI,
   workspace: workspaceAPI,
+  writerLoop: writerLoopAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))
   },
 })
-

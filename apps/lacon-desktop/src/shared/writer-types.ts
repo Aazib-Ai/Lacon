@@ -177,12 +177,7 @@ export interface DocumentSnapshot {
   trigger: SnapshotTrigger
 }
 
-export type SnapshotTrigger =
-  | 'outline-approved'
-  | 'before-generation'
-  | 'after-generation'
-  | 'before-review'
-  | 'manual'
+export type SnapshotTrigger = 'outline-approved' | 'before-generation' | 'after-generation' | 'before-review' | 'manual'
 
 // ─────────────────────────── IPC Request/Response Types ───────────────────────────
 
@@ -213,4 +208,85 @@ export interface SkillComposeRequest {
 export interface SkillResearchRequest {
   /** The genre/topic to research and create a skill for */
   topic: string
+}
+
+// ─────────────────────────── Phase 2: Writer Loop IPC Types ───────────────────────────
+
+export interface WriterLoopGetStateRequest {
+  documentId: string
+}
+
+export interface WriterLoopStartPlanningRequest {
+  documentId: string
+  instruction: string
+  composedSkillPrompt?: string
+  researchContext?: ResearchContext
+}
+
+export interface WriterLoopGetOutlineRequest {
+  documentId: string
+}
+
+export interface WriterLoopUpdateOutlineRequest {
+  documentId: string
+  outline: WriterOutline
+}
+
+export interface WriterLoopUpdateSectionRequest {
+  documentId: string
+  sectionId: string
+  updates: Partial<OutlineSection>
+}
+
+export interface WriterLoopAddSectionRequest {
+  documentId: string
+  section?: Partial<OutlineSection>
+}
+
+export interface WriterLoopRemoveSectionRequest {
+  documentId: string
+  sectionId: string
+}
+
+export interface WriterLoopAddSubsectionRequest {
+  documentId: string
+  sectionId: string
+  subsection?: Partial<OutlineSubsection>
+}
+
+export interface WriterLoopRemoveSubsectionRequest {
+  documentId: string
+  sectionId: string
+  subsectionId: string
+}
+
+export interface WriterLoopApproveOutlineRequest {
+  documentId: string
+  documentContent?: any
+}
+
+export interface WriterLoopUpdateConfigRequest {
+  documentId: string
+  wordTarget?: number
+  automationLevel?: AutomationLevel
+  activeSkillIds?: string[]
+  modelConfig?: ProjectModelConfig
+}
+
+export interface WriterLoopTransitionRequest {
+  documentId: string
+  stage: WriterLoopStage
+}
+
+export interface WriterLoopPauseRequest {
+  documentId: string
+}
+
+export interface WriterLoopResetRequest {
+  documentId: string
+}
+
+export interface WorkspaceUpdateSessionRequest {
+  documentId: string
+  updates: Partial<WriterSession>
 }

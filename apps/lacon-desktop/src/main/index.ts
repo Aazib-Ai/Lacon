@@ -9,13 +9,14 @@ import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
 import { registerPhase12Handlers } from './ipc/phase12-handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
 import { registerReleaseHandlers } from './ipc/release-handlers'
-import { registerToolHandlers } from './ipc/tool-handlers'
 import { registerSkillHandlers } from './ipc/skill-handlers'
-import { getSkillService } from './services/skill-service'
+import { registerToolHandlers } from './ipc/tool-handlers'
+import { registerWriterLoopHandlers } from './ipc/writer-loop-handlers'
 import { getReleaseOperationsService } from './release-engineering/release-operations-service'
 import { getUpdaterService } from './release-engineering/updater-service'
 import { getKeyStore } from './security/keystore'
 import { createSafeLogger } from './security/log-redaction'
+import { getSkillService } from './services/skill-service'
 
 const logger = createSafeLogger('Main')
 
@@ -104,6 +105,9 @@ async function initializeApp() {
 
     // Register skill & workspace handlers (Phase 1)
     registerSkillHandlers()
+
+    // Register writer loop handlers (Phase 2)
+    registerWriterLoopHandlers()
 
     // Register audit handlers (Phase 9)
     registerAuditHandlers(auditManager)

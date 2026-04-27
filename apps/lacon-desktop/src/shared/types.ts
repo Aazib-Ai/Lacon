@@ -147,6 +147,30 @@ export interface SkillAPI {
 export interface WorkspaceAPI {
   ensure: (documentId: string) => Promise<any>
   getSession: (documentId: string) => Promise<any>
+  updateSession: (documentId: string, updates: any) => Promise<any>
+}
+
+// Writer Loop API (Phase 2 - Writer Harness)
+export interface WriterLoopAPI {
+  getState: (documentId: string) => Promise<any>
+  startPlanning: (
+    documentId: string,
+    instruction: string,
+    composedSkillPrompt?: string,
+    researchContext?: any,
+  ) => Promise<any>
+  getOutline: (documentId: string) => Promise<any>
+  updateOutline: (documentId: string, outline: any) => Promise<any>
+  updateSection: (documentId: string, sectionId: string, updates: any) => Promise<any>
+  addSection: (documentId: string, section?: any) => Promise<any>
+  removeSection: (documentId: string, sectionId: string) => Promise<any>
+  addSubsection: (documentId: string, sectionId: string, subsection?: any) => Promise<any>
+  removeSubsection: (documentId: string, sectionId: string, subsectionId: string) => Promise<any>
+  approveOutline: (documentId: string, documentContent?: any) => Promise<any>
+  updateConfig: (documentId: string, config: any) => Promise<any>
+  transition: (documentId: string, stage: string) => Promise<any>
+  pause: (documentId: string) => Promise<any>
+  reset: (documentId: string) => Promise<any>
 }
 
 // Extend Window interface to include our API
@@ -164,6 +188,7 @@ declare global {
       phase12: Phase12API
       skill: SkillAPI
       workspace: WorkspaceAPI
+      writerLoop: WriterLoopAPI
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }
@@ -171,4 +196,3 @@ declare global {
 }
 
 export {}
-

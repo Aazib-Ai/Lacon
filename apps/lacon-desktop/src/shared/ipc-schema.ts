@@ -166,6 +166,23 @@ export const IPC_CHANNELS = {
   // Writer Harness: Workspace operations (Phase 1)
   WORKSPACE_ENSURE: 'workspace:ensure',
   WORKSPACE_GET_SESSION: 'workspace:getSession',
+  WORKSPACE_UPDATE_SESSION: 'workspace:updateSession',
+
+  // Writer Harness: Writer Loop operations (Phase 2)
+  WRITER_LOOP_GET_STATE: 'writerLoop:getState',
+  WRITER_LOOP_START_PLANNING: 'writerLoop:startPlanning',
+  WRITER_LOOP_GET_OUTLINE: 'writerLoop:getOutline',
+  WRITER_LOOP_UPDATE_OUTLINE: 'writerLoop:updateOutline',
+  WRITER_LOOP_UPDATE_SECTION: 'writerLoop:updateSection',
+  WRITER_LOOP_ADD_SECTION: 'writerLoop:addSection',
+  WRITER_LOOP_REMOVE_SECTION: 'writerLoop:removeSection',
+  WRITER_LOOP_ADD_SUBSECTION: 'writerLoop:addSubsection',
+  WRITER_LOOP_REMOVE_SUBSECTION: 'writerLoop:removeSubsection',
+  WRITER_LOOP_APPROVE_OUTLINE: 'writerLoop:approveOutline',
+  WRITER_LOOP_UPDATE_CONFIG: 'writerLoop:updateConfig',
+  WRITER_LOOP_TRANSITION: 'writerLoop:transition',
+  WRITER_LOOP_PAUSE: 'writerLoop:pause',
+  WRITER_LOOP_RESET: 'writerLoop:reset',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

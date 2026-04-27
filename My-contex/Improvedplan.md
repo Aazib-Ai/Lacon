@@ -30,7 +30,7 @@ Overall Project Complete: [ ]
 |---|---|---|---|---|---|
 | 0 | Decision Lock + Spikes | 5/5 | [x] | 2026-04-27 | 2026-04-27 |
 | 1 | Workspace + Skills Foundation | 12/12 | [x] | 2026-04-27 | 2026-04-27 |
-| 2 | Writer Loop Skeleton + Planner | 0/8 | [ ] | - | - |
+| 2 | Writer Loop Skeleton + Planner | 8/8 | [x] | 2026-04-27 | 2026-04-27 |
 | 3 | Generator + Continuity + Ghost Text | 0/10 | [ ] | - | - |
 | 4 | Reviewer + Diff + Surgical Edit | 0/9 | [ ] | - | - |
 | 5 | Research Workbench + Citations | 0/10 | [ ] | - | - |
@@ -75,7 +75,7 @@ Quick formula:
 - [x] src/shared/ipc-schema.ts
 
 ### Add new modules
-- [ ] src/main/agent/writer-loop.ts
+- [x] src/main/agent/writer-loop.ts
 - [ ] src/main/agent/reviewer.ts
 - [ ] src/main/agent/skill-engine.ts
 - [x] src/main/services/project-workspace-service.ts
@@ -165,26 +165,35 @@ End Date: 2026-04-27
 
 ## 6) Phase 2 - Writer Loop Skeleton + Planner
 
-Phase Complete: [ ]
-Start Date: -
-End Date: -
+Phase Complete: [x]
+Start Date: 2026-04-27
+End Date: 2026-04-27
 
 ### Tasks
-- [ ] Implement src/main/agent/writer-loop.ts state machine
-- [ ] Add loop stages: idle -> planning -> awaiting-outline-approval -> generating -> reviewing -> awaiting-user -> complete/paused
-- [ ] Extend planner with generateOutline(instruction, skills, researchContext)
-- [ ] Build renderer/components/WriterLoop/OutlineEditor
-- [ ] Support section/subsection/key-point editing
-- [ ] Persist WriterSession (word target, automation level, stage)
-- [ ] Auto-snapshot on outline approval (Before Generation)
-- [ ] Wire planner + loop through IPC
+- [x] Implement src/main/agent/writer-loop.ts state machine
+- [x] Add loop stages: idle -> planning -> awaiting-outline-approval -> generating -> reviewing -> awaiting-user -> complete/paused
+- [x] Extend planner with generateOutline(instruction, skills, researchContext)
+- [x] Build renderer/components/WriterLoop/OutlineEditor
+- [x] Support section/subsection/key-point editing
+- [x] Persist WriterSession (word target, automation level, stage)
+- [x] Auto-snapshot on outline approval (Before Generation)
+- [x] Wire planner + loop through IPC
 
 ### Exit Criteria
-- [ ] User can generate, edit, and approve outline
-- [ ] Session transitions persist and restore correctly
+- [x] User can generate, edit, and approve outline
+- [x] Session transitions persist and restore correctly
 
 ### Done Notes
-- -
+- WriterLoop state machine (writer-loop.ts) with full transition validation: idle → planning → awaiting-outline-approval → generating → reviewing → awaiting-user → complete/paused
+- generateOutline() planner function creates structured outlines from instructions with research context integration
+- OutlineEditor component with section/subsection/key-point CRUD, title editing, word estimate adjustment
+- WriterLoopPanel container with session config bar (automation level, word target, stage indicator)
+- useWriterLoop React hook wraps all IPC calls with loading/error state management
+- 14 IPC channels registered (writerLoop:getState, startPlanning, getOutline, updateOutline, updateSection, addSection, removeSection, addSubsection, removeSubsection, approveOutline, updateConfig, transition, pause, reset)
+- workspace:updateSession IPC channel added for direct session persistence
+- Auto-snapshot on outline approval with 'outline-approved' trigger persisted to .lacon/snapshots/
+- Outline persisted to .lacon/outline.json, session state to .lacon/session.json
+- Preload API bridge and Window type definitions extended with WriterLoopAPI
 
 ---
 
@@ -396,7 +405,7 @@ Only mark this after all phases and tests are complete.
 
 - [x] Phase 0 complete
 - [x] Phase 1 complete
-- [ ] Phase 2 complete
+- [x] Phase 2 complete
 - [ ] Phase 3 complete
 - [ ] Phase 4 complete
 - [ ] Phase 5 complete
