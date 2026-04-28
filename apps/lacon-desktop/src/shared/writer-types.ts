@@ -454,3 +454,175 @@ export interface WriterLoopRewriteAllRequest {
   instruction: string
   documentContent: any
 }
+
+// ─────────────────────────── Phase 5: Research + Citation Types ───────────────────────────
+
+/** Available citation formatting styles */
+export type CitationStyle = 'apa' | 'mla' | 'chicago' | 'ieee' | 'inline'
+
+/** Research automation mode */
+export type ResearchMode = 'auto' | 'supervised' | 'manual'
+
+/** Extended research entry with section linkage and citation formatting */
+export interface ResearchLogEntry {
+  id: string
+  query: string
+  sources: ResearchSource[]
+  excerpts: string[]
+  /** Section IDs this research is linked to */
+  linkedSectionIds: string[]
+  /** Tags for filtering */
+  tags: string[]
+  /** Pre-formatted citation text */
+  citationFormatted: string
+  /** Research mode used to obtain this entry */
+  mode: ResearchMode
+  createdAt: string
+  updatedAt: string
+}
+
+/** The full research log persisted in .lacon/research.json */
+export interface ResearchLog {
+  entries: ResearchLogEntry[]
+  summary: string
+  mode: ResearchMode
+  citationStyle: CitationStyle
+  lastUpdatedAt: string
+}
+
+/** Result of a fact-check operation */
+export interface FactCheckResult {
+  sectionId: string
+  confidence: number // 0–1
+  supportingSources: FactCheckSource[]
+  contradictingSources: FactCheckSource[]
+  summary: string
+  checkedAt: string
+}
+
+export interface FactCheckSource {
+  entryId: string
+  sourceTitle: string
+  excerpt: string
+  relevance: number // 0–1
+  supports: boolean
+}
+
+// ─────────────────────────── Phase 5: Research IPC Types ───────────────────────────
+
+export interface ResearchGetLogRequest {
+  documentId: string
+}
+
+export interface ResearchAddEntryRequest {
+  documentId: string
+  query: string
+  sources?: ResearchSource[]
+  excerpts?: string[]
+  linkedSectionIds?: string[]
+  tags?: string[]
+}
+
+export interface ResearchUpdateEntryRequest {
+  documentId: string
+  entryId: string
+  updates: Partial<ResearchLogEntry>
+}
+
+export interface ResearchDeleteEntryRequest {
+  documentId: string
+  entryId: string
+}
+
+export interface ResearchSetModeRequest {
+  documentId: string
+  mode: ResearchMode
+}
+
+export interface ResearchImportFileRequest {
+  documentId: string
+  filePath: string
+  fileType: 'pdf' | 'docx' | 'txt' | 'pptx'
+}
+
+export interface ResearchFactCheckRequest {
+  documentId: string
+  sectionId: string
+  sectionContent: string
+}
+
+export interface CitationFormatRequest {
+  documentId: string
+  entryId: string
+  style?: CitationStyle
+}
+
+export interface CitationGetStyleRequest {
+  documentId: string
+}
+
+export interface CitationSetStyleRequest {
+  documentId: string
+  style: CitationStyle
+}
+
+// ─────────────────────────── Phase 6: Version + Snapshot Types ───────────────────────────
+
+/** Extended snapshot with optional milestone label */
+export interface VersionSnapshot extends DocumentSnapshot {
+  milestoneLabel?: string
+}
+
+/** Lightweight snapshot summary for list views */
+export interface SnapshotListItem {
+  id: string
+  documentId: string
+  label: string
+  trigger: SnapshotTrigger
+  milestoneLabel?: string
+  createdAt: string
+}
+
+/** Result of a snapshot restore operation */
+export interface RestoreResult {
+  restoredSnapshotId: string
+  safetySnapshotId: string
+  content: any
+  restoredAt: string
+}
+
+// ─────────────────────────── Phase 6: Version IPC Types ───────────────────────────
+
+export interface VersionListSnapshotsRequest {
+  documentId: string
+}
+
+export interface VersionGetSnapshotRequest {
+  documentId: string
+  snapshotId: string
+}
+
+export interface VersionRestoreSnapshotRequest {
+  documentId: string
+  snapshotId: string
+  currentContent: any
+}
+
+export interface VersionAddMilestoneRequest {
+  documentId: string
+  snapshotId: string
+  label: string
+}
+
+export interface VersionDeleteSnapshotRequest {
+  documentId: string
+  snapshotId: string
+}
+
+export interface UxSetZenModeRequest {
+  enabled: boolean
+}
+
+export interface UxToggleAssistantRequest {
+  visible?: boolean
+}

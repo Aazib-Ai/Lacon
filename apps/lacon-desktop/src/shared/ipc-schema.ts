@@ -198,6 +198,32 @@ export const IPC_CHANNELS = {
   WRITER_LOOP_REJECT_REVIEW_FLAG: 'writerLoop:rejectReviewFlag',
   WRITER_LOOP_SURGICAL_EDIT: 'writerLoop:surgicalEdit',
   WRITER_LOOP_REWRITE_ALL: 'writerLoop:rewriteAll',
+
+  // Writer Harness: Research operations (Phase 5)
+  RESEARCH_GET_LOG: 'research:getLog',
+  RESEARCH_ADD_ENTRY: 'research:addEntry',
+  RESEARCH_UPDATE_ENTRY: 'research:updateEntry',
+  RESEARCH_DELETE_ENTRY: 'research:deleteEntry',
+  RESEARCH_SET_MODE: 'research:setMode',
+  RESEARCH_IMPORT_FILE: 'research:importFile',
+  RESEARCH_FACT_CHECK: 'research:factCheck',
+
+  // Writer Harness: Citation operations (Phase 5)
+  CITATION_FORMAT: 'citation:format',
+  CITATION_GET_STYLE: 'citation:getStyle',
+  CITATION_SET_STYLE: 'citation:setStyle',
+
+  // Writer Harness: Version operations (Phase 6)
+  VERSION_LIST_SNAPSHOTS: 'version:listSnapshots',
+  VERSION_GET_SNAPSHOT: 'version:getSnapshot',
+  VERSION_RESTORE_SNAPSHOT: 'version:restoreSnapshot',
+  VERSION_ADD_MILESTONE: 'version:addMilestone',
+  VERSION_DELETE_SNAPSHOT: 'version:deleteSnapshot',
+
+  // Writer Harness: UX operations (Phase 6)
+  UX_SET_ZEN_MODE: 'ux:setZenMode',
+  UX_GET_ZEN_MODE: 'ux:getZenMode',
+  UX_TOGGLE_ASSISTANT: 'ux:toggleAssistant',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

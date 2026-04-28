@@ -1,4 +1,6 @@
 export { DiffViewer } from './DiffViewer'
 export { OutlineEditor } from './OutlineEditor'
+export { ResearchWorkbench } from './ResearchWorkbench'
 export { ReviewPanel } from './ReviewPanel'
+export { VersionHistory } from './VersionHistory'
 export { WriterLoopPanel } from './WriterLoopPanel'

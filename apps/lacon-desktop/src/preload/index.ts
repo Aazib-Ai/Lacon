@@ -257,6 +257,66 @@ const writerLoopAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REWRITE_ALL, { documentId, instruction, documentContent }),
 }
 
+// Research API (Phase 5 - Writer Harness)
+const researchAPI = {
+  getLog: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_GET_LOG, { documentId }),
+  addEntry: (
+    documentId: string,
+    query: string,
+    sources?: any[],
+    excerpts?: string[],
+    linkedSectionIds?: string[],
+    tags?: string[],
+  ) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ADD_ENTRY, {
+      documentId,
+      query,
+      sources,
+      excerpts,
+      linkedSectionIds,
+      tags,
+    }),
+  updateEntry: (documentId: string, entryId: string, updates: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_UPDATE_ENTRY, { documentId, entryId, updates }),
+  deleteEntry: (documentId: string, entryId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_DELETE_ENTRY, { documentId, entryId }),
+  setMode: (documentId: string, mode: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SET_MODE, { documentId, mode }),
+  importFile: (documentId: string, filePath: string, fileType: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_IMPORT_FILE, { documentId, filePath, fileType }),
+  factCheck: (documentId: string, sectionId: string, sectionContent: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_FACT_CHECK, { documentId, sectionId, sectionContent }),
+}
+
+// Citation API (Phase 5 - Writer Harness)
+const citationAPI = {
+  format: (documentId: string, entryId: string, style?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CITATION_FORMAT, { documentId, entryId, style }),
+  getStyle: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.CITATION_GET_STYLE, { documentId }),
+  setStyle: (documentId: string, style: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CITATION_SET_STYLE, { documentId, style }),
+}
+
+// Version API (Phase 6 - Writer Harness)
+const versionAPI = {
+  listSnapshots: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.VERSION_LIST_SNAPSHOTS, { documentId }),
+  getSnapshot: (documentId: string, snapshotId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.VERSION_GET_SNAPSHOT, { documentId, snapshotId }),
+  restoreSnapshot: (documentId: string, snapshotId: string, currentContent: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.VERSION_RESTORE_SNAPSHOT, { documentId, snapshotId, currentContent }),
+  addMilestone: (documentId: string, snapshotId: string, label: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.VERSION_ADD_MILESTONE, { documentId, snapshotId, label }),
+  deleteSnapshot: (documentId: string, snapshotId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.VERSION_DELETE_SNAPSHOT, { documentId, snapshotId }),
+}
+
+// UX API (Phase 6 - Writer Harness)
+const uxAPI = {
+  setZenMode: (enabled: boolean) => ipcRenderer.invoke(IPC_CHANNELS.UX_SET_ZEN_MODE, { enabled }),
+  getZenMode: () => ipcRenderer.invoke(IPC_CHANNELS.UX_GET_ZEN_MODE),
+  toggleAssistant: (visible?: boolean) => ipcRenderer.invoke(IPC_CHANNELS.UX_TOGGLE_ASSISTANT, { visible }),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -270,6 +330,10 @@ contextBridge.exposeInMainWorld('electron', {
   skill: skillAPI,
   workspace: workspaceAPI,
   writerLoop: writerLoopAPI,
+  research: researchAPI,
+  citation: citationAPI,
+  version: versionAPI,
+  ux: uxAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))

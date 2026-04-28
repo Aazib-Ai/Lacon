@@ -186,6 +186,47 @@ export interface WriterLoopAPI {
   rewriteAll: (documentId: string, instruction: string, documentContent: any) => Promise<any>
 }
 
+// Research API (Phase 5 - Writer Harness)
+export interface ResearchAPI {
+  getLog: (documentId: string) => Promise<any>
+  addEntry: (
+    documentId: string,
+    query: string,
+    sources?: any[],
+    excerpts?: string[],
+    linkedSectionIds?: string[],
+    tags?: string[],
+  ) => Promise<any>
+  updateEntry: (documentId: string, entryId: string, updates: any) => Promise<any>
+  deleteEntry: (documentId: string, entryId: string) => Promise<any>
+  setMode: (documentId: string, mode: string) => Promise<any>
+  importFile: (documentId: string, filePath: string, fileType: string) => Promise<any>
+  factCheck: (documentId: string, sectionId: string, sectionContent: string) => Promise<any>
+}
+
+// Citation API (Phase 5 - Writer Harness)
+export interface CitationAPI {
+  format: (documentId: string, entryId: string, style?: string) => Promise<any>
+  getStyle: (documentId: string) => Promise<any>
+  setStyle: (documentId: string, style: string) => Promise<any>
+}
+
+// Version API (Phase 6 - Writer Harness)
+export interface VersionAPI {
+  listSnapshots: (documentId: string) => Promise<any>
+  getSnapshot: (documentId: string, snapshotId: string) => Promise<any>
+  restoreSnapshot: (documentId: string, snapshotId: string, currentContent: any) => Promise<any>
+  addMilestone: (documentId: string, snapshotId: string, label: string) => Promise<any>
+  deleteSnapshot: (documentId: string, snapshotId: string) => Promise<any>
+}
+
+// UX API (Phase 6 - Writer Harness)
+export interface UxAPI {
+  setZenMode: (enabled: boolean) => Promise<any>
+  getZenMode: () => Promise<any>
+  toggleAssistant: (visible?: boolean) => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -202,6 +243,10 @@ declare global {
       skill: SkillAPI
       workspace: WorkspaceAPI
       writerLoop: WriterLoopAPI
+      research: ResearchAPI
+      citation: CitationAPI
+      version: VersionAPI
+      ux: UxAPI
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }

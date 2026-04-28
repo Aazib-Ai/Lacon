@@ -9,8 +9,10 @@ import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
 import { registerPhase12Handlers } from './ipc/phase12-handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
 import { registerReleaseHandlers } from './ipc/release-handlers'
+import { registerResearchHandlers } from './ipc/research-handlers'
 import { registerSkillHandlers } from './ipc/skill-handlers'
 import { registerToolHandlers } from './ipc/tool-handlers'
+import { registerVersionHandlers } from './ipc/version-handlers'
 import { registerWriterLoopHandlers } from './ipc/writer-loop-handlers'
 import { getReleaseOperationsService } from './release-engineering/release-operations-service'
 import { getUpdaterService } from './release-engineering/updater-service'
@@ -108,6 +110,12 @@ async function initializeApp() {
 
     // Register writer loop handlers (Phase 2)
     registerWriterLoopHandlers()
+
+    // Register research & citation handlers (Phase 5)
+    registerResearchHandlers()
+
+    // Register version & UX handlers (Phase 6)
+    registerVersionHandlers()
 
     // Register audit handlers (Phase 9)
     registerAuditHandlers(auditManager)

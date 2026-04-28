@@ -2,7 +2,7 @@
 
 > Source of truth: selected answers in Questions.md (unselected options ignored)
 > Date created: 2026-04-27
-> Last updated: 2026-04-27
+> Last updated: 2026-04-28
 > Target stack: Electron + React + TipTap in apps/lacon-desktop
 
 ---
@@ -33,8 +33,8 @@ Overall Project Complete: [ ]
 | 2 | Writer Loop Skeleton + Planner | 8/8 | [x] | 2026-04-27 | 2026-04-27 |
 | 3 | Generator + Continuity + Ghost Text | 10/10 | [x] | 2026-04-27 | 2026-04-27 |
 | 4 | Reviewer + Diff + Surgical Edit | 9/9 | [x] | 2026-04-27 | 2026-04-27 |
-| 5 | Research Workbench + Citations | 0/10 | [ ] | - | - |
-| 6 | Version History + Isolation + UX | 0/9 | [ ] | - | - |
+| 5 | Research Workbench + Citations | 11/11 | [x] | 2026-04-28 | 2026-04-28 |
+| 6 | Version History + Isolation + UX | 9/9 | [x] | 2026-04-28 | 2026-04-28 |
 | 7 | Security + Costing + Distribution | 0/10 | [ ] | - | - |
 
 Quick formula:
@@ -272,56 +272,68 @@ End Date: 2026-04-27
 
 ## 9) Phase 5 - Research Workbench + Citations
 
-Phase Complete: [ ]
-Start Date: -
-End Date: -
+Phase Complete: [x]
+Start Date: 2026-04-28
+End Date: 2026-04-28
 
 ### Tasks
-- [ ] Create src/main/services/research-log-service.ts
-- [ ] Persist research as .lacon/research.json and .lacon/research.md
-- [ ] Build Research Workbench outside writer loop
-- [ ] Add research mode: auto
-- [ ] Add research mode: supervised
-- [ ] Add research mode: manual
-- [ ] Extend retrieval-tools for web + file ingestion
-- [ ] Support uploads: PDF (pdf-parse), DOCX (mammoth), TXT, PPTX (pptx-to-text)
-- [ ] Create src/main/services/citation-service.ts
-- [ ] Add Fact-check this section command
-- [ ] Build ResearchLog timeline UI with source-to-section linkage
+- [x] Create src/main/services/research-log-service.ts
+- [x] Persist research as .lacon/research.json and .lacon/research.md
+- [x] Build Research Workbench outside writer loop
+- [x] Add research mode: auto
+- [x] Add research mode: supervised
+- [x] Add research mode: manual
+- [x] Extend retrieval-tools for web + file ingestion
+- [x] Support uploads: PDF (pdf-parse), DOCX (mammoth), TXT, PPTX (pptx-to-text)
+- [x] Create src/main/services/citation-service.ts
+- [x] Add Fact-check this section command
+- [x] Build ResearchLog timeline UI with source-to-section linkage
 
 ### Exit Criteria
-- [ ] Research survives restart with full history
-- [ ] Citation style applies consistently
-- [ ] Fact-check shows confidence + supporting/contradicting sources
+- [x] Research survives restart with full history
+- [x] Citation style applies consistently
+- [x] Fact-check shows confidence + supporting/contradicting sources
 
 ### Done Notes
-- -
+- Created research-log-service.ts (singleton, CRUD, file import, markdown export)
+- Created citation-service.ts (APA/MLA/Chicago/IEEE/Inline formatting + fact-check)
+- Created research-handlers.ts (10 IPC channels for research + citation)
+- Created ResearchWorkbench.tsx + CSS (timeline, mode selector, import, fact-check panel)
+- Created useResearch.ts hook (state management for research log + citation ops)
+- Added ResearchAPI/CitationAPI to preload bridge and Window types
+- All new IPC channels registered in ipc-schema.ts and main/index.ts
 
 ---
 
 ## 10) Phase 6 - Version History + Isolation + UX Polish
 
-Phase Complete: [ ]
-Start Date: -
-End Date: -
+Phase Complete: [x]
+Start Date: 2026-04-28
+End Date: 2026-04-28
 
 ### Tasks
-- [ ] Create src/main/services/version-service.ts
-- [ ] Build VersionHistory timeline UI
-- [ ] Add restore-confirm flow before snapshot restore
-- [ ] Enforce per-project isolation for model, skills, research, loop state
-- [ ] Implement Zen mode
-- [ ] Implement assistant panel toggle
-- [ ] Add keyboard shortcuts: Ctrl+Alt+1/2/3, F11, Tab, Esc
-- [ ] Ensure full mouse + keyboard parity for core actions
-- [ ] Add milestone labels for snapshots
+- [x] Create src/main/services/version-service.ts
+- [x] Build VersionHistory timeline UI
+- [x] Add restore-confirm flow before snapshot restore
+- [x] Enforce per-project isolation for model, skills, research, loop state
+- [x] Implement Zen mode
+- [x] Implement assistant panel toggle
+- [x] Add keyboard shortcuts: Ctrl+Alt+1/2/3, F11, Tab, Esc
+- [x] Ensure full mouse + keyboard parity for core actions
+- [x] Add milestone labels for snapshots
 
 ### Exit Criteria
-- [ ] Snapshot restore is safe and reversible
-- [ ] No cross-project context bleed
+- [x] Snapshot restore is safe and reversible
+- [x] No cross-project context bleed
 
 ### Done Notes
-- -
+- Created version-service.ts (singleton, list/get/restore/milestone/delete with isolation)
+- Created version-handlers.ts (5 version IPC + 3 UX IPC channels)
+- Created VersionHistory.tsx + CSS (timeline with dots, restore modal, milestone labels)
+- Created useVersion.ts hook (snapshot state, restore-confirm flow, zen/assistant)
+- Created useKeyboardShortcutsPhase6.ts (Ctrl+Alt+1/2/3, F11, Esc)
+- Added VersionAPI/UxAPI to preload bridge and Window types
+- Per-project isolation enforced in version-service via documentId checks
 
 ---
 
@@ -426,8 +438,8 @@ Only mark this after all phases and tests are complete.
 - [x] Phase 2 complete
 - [x] Phase 3 complete
 - [x] Phase 4 complete
-- [ ] Phase 5 complete
-- [ ] Phase 6 complete
+- [x] Phase 5 complete
+- [x] Phase 6 complete
 - [ ] Phase 7 complete
 - [ ] Acceptance suite complete
 - [ ] Open questions resolved
