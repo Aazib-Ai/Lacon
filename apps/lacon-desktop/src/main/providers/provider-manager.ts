@@ -18,6 +18,7 @@ import type {
   UsageRecord,
 } from '../../shared/provider-types'
 import { getKeyStore } from '../security/keystore'
+import { getPricingService } from '../services/pricing-service'
 import { AnthropicAdapter } from './anthropic-adapter'
 import { CustomAdapter } from './custom-adapter'
 import { GeminiAdapter } from './gemini-adapter'
@@ -389,9 +390,9 @@ export class ProviderManager {
       return
     }
 
-    // Estimate cost based on model pricing
-    const estimatedCost = 0
-    // Cost calculation would be based on model pricing from ModelInfo
+    // Calculate real cost using PricingService
+    const pricingService = getPricingService()
+    const costBreakdown = pricingService.calculateCost(usage.promptTokens, usage.completionTokens, model, config.type)
 
     this.usageRecords.push({
       id: crypto.randomUUID(),
@@ -400,7 +401,7 @@ export class ProviderManager {
       promptTokens: usage.promptTokens,
       completionTokens: usage.completionTokens,
       totalTokens: usage.promptTokens + usage.completionTokens,
-      estimatedCost,
+      estimatedCost: costBreakdown.totalCost,
       feature,
       timestamp: Date.now(),
     })

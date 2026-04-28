@@ -21,7 +21,9 @@
     "package": "electron-builder --dir",
     "package:win": "electron-builder --win",
     "package:mac": "electron-builder --mac",
-    "dist": "electron-builder"
+    "package:linux": "electron-builder --linux",
+    "dist": "electron-builder",
+    "dist:all": "electron-builder --win --mac --linux"
   },
   "dependencies": {
     "@tiptap/core": "workspace:*",

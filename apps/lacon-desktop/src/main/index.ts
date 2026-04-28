@@ -6,6 +6,7 @@ import { getMigrationRunner } from './data/migrations'
 import { getDataStore } from './data/store'
 import { registerAuditHandlers } from './ipc/audit-handlers'
 import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
+import { registerPhase7Handlers } from './ipc/phase7-handlers'
 import { registerPhase12Handlers } from './ipc/phase12-handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
 import { registerReleaseHandlers } from './ipc/release-handlers'
@@ -116,6 +117,9 @@ async function initializeApp() {
 
     // Register version & UX handlers (Phase 6)
     registerVersionHandlers()
+
+    // Register pricing, security & update handlers (Phase 7)
+    registerPhase7Handlers()
 
     // Register audit handlers (Phase 9)
     registerAuditHandlers(auditManager)

@@ -227,6 +227,32 @@ export interface UxAPI {
   toggleAssistant: (visible?: boolean) => Promise<any>
 }
 
+// Pricing API (Phase 7 - Writer Harness)
+export interface PricingAPI {
+  calculate: (inputTokens: number, outputTokens: number, modelId: string, provider: string) => Promise<any>
+  getSessionCost: (documentId: string) => Promise<any>
+  resetSession: (documentId: string) => Promise<any>
+  getGlobalSummary: () => Promise<any>
+  getAllModels: () => Promise<any>
+  recordAction: (
+    documentId: string,
+    action: string,
+    inputTokens: number,
+    outputTokens: number,
+    modelId: string,
+    provider: string,
+  ) => Promise<any>
+  testConnection: (providerId: string) => Promise<any>
+  setProjectModel: (documentId: string, providerId: string, modelId: string) => Promise<any>
+  getProjectModel: (documentId: string) => Promise<any>
+}
+
+// Update API (Phase 7 - Writer Harness)
+export interface UpdateAPI {
+  check: () => Promise<any>
+  getInfo: () => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -247,6 +273,8 @@ declare global {
       citation: CitationAPI
       version: VersionAPI
       ux: UxAPI
+      pricing: PricingAPI
+      update: UpdateAPI
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }

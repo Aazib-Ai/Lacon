@@ -224,6 +224,23 @@ export const IPC_CHANNELS = {
   UX_SET_ZEN_MODE: 'ux:setZenMode',
   UX_GET_ZEN_MODE: 'ux:getZenMode',
   UX_TOGGLE_ASSISTANT: 'ux:toggleAssistant',
+
+  // Writer Harness: Pricing operations (Phase 7)
+  PRICING_CALCULATE: 'pricing:calculate',
+  PRICING_GET_SESSION_COST: 'pricing:getSessionCost',
+  PRICING_RESET_SESSION: 'pricing:resetSession',
+  PRICING_GET_GLOBAL_SUMMARY: 'pricing:getGlobalSummary',
+  PRICING_GET_ALL_MODELS: 'pricing:getAllModels',
+  PRICING_RECORD_ACTION: 'pricing:recordAction',
+
+  // Writer Harness: Provider test + model selection (Phase 7)
+  PROVIDER_TEST_CONNECTION: 'provider:testConnection',
+  PROJECT_SET_MODEL: 'project:setModel',
+  PROJECT_GET_MODEL: 'project:getModel',
+
+  // Writer Harness: Update operations (Phase 7)
+  UPDATE_CHECK: 'update:check',
+  UPDATE_GET_INFO: 'update:getInfo',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

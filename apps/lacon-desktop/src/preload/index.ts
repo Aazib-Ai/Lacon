@@ -317,6 +317,42 @@ const uxAPI = {
   toggleAssistant: (visible?: boolean) => ipcRenderer.invoke(IPC_CHANNELS.UX_TOGGLE_ASSISTANT, { visible }),
 }
 
+// Pricing API (Phase 7 - Writer Harness)
+const pricingAPI = {
+  calculate: (inputTokens: number, outputTokens: number, modelId: string, provider: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRICING_CALCULATE, { inputTokens, outputTokens, modelId, provider }),
+  getSessionCost: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.PRICING_GET_SESSION_COST, { documentId }),
+  resetSession: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.PRICING_RESET_SESSION, { documentId }),
+  getGlobalSummary: () => ipcRenderer.invoke(IPC_CHANNELS.PRICING_GET_GLOBAL_SUMMARY),
+  getAllModels: () => ipcRenderer.invoke(IPC_CHANNELS.PRICING_GET_ALL_MODELS),
+  recordAction: (
+    documentId: string,
+    action: string,
+    inputTokens: number,
+    outputTokens: number,
+    modelId: string,
+    provider: string,
+  ) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRICING_RECORD_ACTION, {
+      documentId,
+      action,
+      inputTokens,
+      outputTokens,
+      modelId,
+      provider,
+    }),
+  testConnection: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_TEST_CONNECTION, { providerId }),
+  setProjectModel: (documentId: string, providerId: string, modelId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SET_MODEL, { documentId, providerId, modelId }),
+  getProjectModel: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_GET_MODEL, { documentId }),
+}
+
+// Update API (Phase 7 - Writer Harness)
+const updateAPI = {
+  check: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
+  getInfo: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_INFO),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -334,6 +370,8 @@ contextBridge.exposeInMainWorld('electron', {
   citation: citationAPI,
   version: versionAPI,
   ux: uxAPI,
+  pricing: pricingAPI,
+  update: updateAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))

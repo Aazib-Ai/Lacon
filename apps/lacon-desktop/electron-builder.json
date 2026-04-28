@@ -16,6 +16,10 @@
       {
         "target": "nsis",
         "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
       }
     ],
     "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
@@ -56,6 +60,24 @@
         "path": "/Applications"
       }
     ]
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64"]
+      }
+    ],
+    "category": "Office",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "icon": "build/icons"
+  },
+  "appImage": {
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "publish": [
     {
