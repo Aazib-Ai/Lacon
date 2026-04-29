@@ -239,6 +239,10 @@ export function useDocument() {
   // Load last opened document on mount
   useEffect(() => {
     const loadLastDocument = async () => {
+      if (!window.api?.invoke) {
+        console.warn('IPC API not available (running outside Electron)')
+        return
+      }
       try {
         const response = await window.api.invoke(IPC_CHANNELS.DOC_GET_LAST_OPENED, {})
         if (response.success && response.data) {
