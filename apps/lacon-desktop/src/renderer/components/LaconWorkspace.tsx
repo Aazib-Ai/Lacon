@@ -2,7 +2,7 @@
  * LaconWorkspace — Unified writer workspace
  *
  * Three-column layout: Sidebar | Editor | Right Panel (AI tabs)
- * Replaces both ModernEditorDemo and AppContent.
+ * Now powered by the folder-based project system.
  */
 
 import {
@@ -19,29 +19,44 @@ import {
   Search,
   Sun,
 } from 'lucide-react'
-import React, { useCallback, useEffect,useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/renderer/lib/utils'
 
-import { useDocument } from '../hooks/useDocument'
-import { useResearch } from '../hooks/useResearch'
-import { useVersion } from '../hooks/useVersion'
+import { useProject } from '../hooks/useProject'
 import { useWriterLoop } from '../hooks/useWriterLoop'
 import { FloatingAIBar } from './FloatingAIBar'
 import { LaconSidebar } from './LaconSidebar'
 import { LaconStatusBar } from './LaconStatusBar'
 import { ModernEditor } from './ModernEditor'
+import type { ModernEditorHandle } from './ModernEditor'
+import { NewDocumentDialog } from './NewDocumentDialog'
 import { OnboardingBanner } from './OnboardingBanner'
 import { ProviderSettings } from './ProviderSettings'
 import { Badge } from './ui/Badge'
 import { Button } from './ui/Button'
 import { ScrollArea } from './ui/ScrollArea'
 import { Separator } from './ui/Separator'
-import { Tabs, TabsContent,TabsList, TabsTrigger } from './ui/Tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs'
 import { ResearchWorkbench } from './WriterLoop/ResearchWorkbench'
 import { ReviewPanelWrapper as ReviewPanel } from './WriterLoop/ReviewPanelWrapper'
 import { VersionHistory } from './WriterLoop/VersionHistory'
 import { WriterLoopPanel } from './WriterLoop/WriterLoopPanel'
+
+/** Sidebar resize constraints */
+const SIDEBAR_MIN_WIDTH = 200
+const SIDEBAR_MAX_WIDTH = 500
+const SIDEBAR_DEFAULT_WIDTH = 260
+const SIDEBAR_SNAP_THRESHOLD = 150
+
+/** Right panel resize constraints */
+const RPANEL_MIN_WIDTH = 280
+const RPANEL_MAX_WIDTH = 600
+const RPANEL_DEFAULT_WIDTH = 380
+const RPANEL_SNAP_THRESHOLD = 200
+
+
+
 
 export function LaconWorkspace() {
   // Layout state
@@ -51,6 +66,19 @@ export function LaconWorkspace() {
   const [zenMode, setZenMode] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [newFileDialogOpen, setNewFileDialogOpen] = useState(false)
+
+  // Sidebar resize state
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
+  const isResizingRef = useRef(false)
+  const resizeStartXRef = useRef(0)
+  const resizeStartWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH)
+
+  // Right panel resize state
+  const [rightPanelWidth, setRightPanelWidth] = useState(RPANEL_DEFAULT_WIDTH)
+  const isResizingRightRef = useRef(false)
+  const resizeRightStartXRef = useRef(0)
+  const resizeRightStartWidthRef = useRef(RPANEL_DEFAULT_WIDTH)
   const [showOnboarding, setShowOnboarding] = useState(() => {
     try {
       return !localStorage.getItem('lacon-onboarding-dismissed')
@@ -59,14 +87,33 @@ export function LaconWorkspace() {
     }
   })
 
-  // Document state
-  const { currentDocument, isDirty, error, createDocument, updateContent } = useDocument()
-  const documentId = currentDocument?.metadata?.id
+  // ─── Project system ───
+  const projectState = useProject()
+  const {
+    project,
+    files,
+    activeFilePath,
+    activeFileContent,
+    isDirty,
+    error: projectError,
+    openProject,
+    openFile,
+    createFile,
+    saveActiveFile,
+    updateContent: updateProjectContent,
+    deleteFile,
+    renameFile,
+    refreshFiles,
+  } = projectState
+
+  // Derive a documentId for writer loop compatibility
+  const documentId = activeFilePath || undefined
 
   // Writer harness hooks
   const writerLoop = useWriterLoop(documentId)
-  useVersion(documentId)
-  useResearch(documentId)
+
+  // Editor ref for accessing getMarkdown/getHTML
+  const editorRef = useRef<ModernEditorHandle>(null)
 
   // Dark mode
   useEffect(() => {
@@ -85,8 +132,8 @@ export function LaconWorkspace() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+B: Toggle sidebar
-      if (e.ctrlKey && e.key === 'b') {
+      // Ctrl+Shift+B: Toggle sidebar (Ctrl+B is reserved for Bold in the editor)
+      if (e.ctrlKey && e.shiftKey && e.key === 'B') {
         e.preventDefault()
         setSidebarOpen(v => !v)
       }
@@ -106,25 +153,34 @@ export function LaconWorkspace() {
         setSidebarOpen(true)
         setRightPanelOpen(true)
       }
-      // Ctrl+Alt+1: Writer tab
+      // Ctrl+S: Save
+      if (e.ctrlKey && e.key === 's') {
+        e.preventDefault()
+        saveActiveFile()
+      }
+      // Ctrl+N: New file
+      if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault()
+        if (project) {
+          setNewFileDialogOpen(true)
+        }
+      }
+      // Ctrl+Alt+1-4: Tab switching
       if (e.ctrlKey && e.altKey && e.key === '1') {
         e.preventDefault()
         setActiveTab('writer')
         setRightPanelOpen(true)
       }
-      // Ctrl+Alt+2: Research tab
       if (e.ctrlKey && e.altKey && e.key === '2') {
         e.preventDefault()
         setActiveTab('research')
         setRightPanelOpen(true)
       }
-      // Ctrl+Alt+3: Review tab
       if (e.ctrlKey && e.altKey && e.key === '3') {
         e.preventDefault()
         setActiveTab('review')
         setRightPanelOpen(true)
       }
-      // Ctrl+Alt+4: History tab
       if (e.ctrlKey && e.altKey && e.key === '4') {
         e.preventDefault()
         setActiveTab('history')
@@ -138,16 +194,24 @@ export function LaconWorkspace() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [zenMode])
+  }, [zenMode, saveActiveFile, project])
 
-  const handleNewDocument = useCallback(async () => {
-    if (isDirty && !window.confirm('You have unsaved changes. Create new document anyway?')) {return}
-    try {
-      await createDocument('Untitled')
-    } catch (err) {
-      console.error('Create failed:', err)
-    }
-  }, [isDirty, createDocument])
+  // Handle editor content changes — editor emits HTML directly now
+  const handleEditorContentChange = useCallback(
+    (html: string) => {
+      if (!activeFilePath) return
+      updateProjectContent(html)
+    },
+    [activeFilePath, updateProjectContent],
+  )
+
+  const handleCreateFile = useCallback(
+    async (fileName: string) => {
+      const result = await createFile(fileName)
+      return result
+    },
+    [createFile],
+  )
 
   const handleDismissOnboarding = useCallback(() => {
     setShowOnboarding(false)
@@ -155,6 +219,91 @@ export function LaconWorkspace() {
       localStorage.setItem('lacon-onboarding-dismissed', 'true')
     } catch {} // eslint-disable-line no-empty
   }, [])
+
+  // ─── Sidebar Resize Handlers ───
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      isResizingRef.current = true
+      resizeStartXRef.current = e.clientX
+      resizeStartWidthRef.current = sidebarWidth
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        if (!isResizingRef.current) return
+        const delta = ev.clientX - resizeStartXRef.current
+        const newWidth = resizeStartWidthRef.current + delta
+
+        if (newWidth < SIDEBAR_SNAP_THRESHOLD) {
+          setSidebarOpen(false)
+          setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)
+        } else {
+          setSidebarOpen(true)
+          setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, newWidth)))
+        }
+      }
+
+      const handleMouseUp = () => {
+        isResizingRef.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+    },
+    [sidebarWidth],
+  )
+
+  // ─── Right Panel Resize Handlers ───
+  const handleRightResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      isResizingRightRef.current = true
+      resizeRightStartXRef.current = e.clientX
+      resizeRightStartWidthRef.current = rightPanelWidth
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        if (!isResizingRightRef.current) return
+        const delta = resizeRightStartXRef.current - ev.clientX
+        const newWidth = resizeRightStartWidthRef.current + delta
+
+        if (newWidth < RPANEL_SNAP_THRESHOLD) {
+          setRightPanelOpen(false)
+          setRightPanelWidth(RPANEL_DEFAULT_WIDTH)
+        } else {
+          setRightPanelOpen(true)
+          setRightPanelWidth(Math.min(RPANEL_MAX_WIDTH, Math.max(RPANEL_MIN_WIDTH, newWidth)))
+        }
+      }
+
+      const handleMouseUp = () => {
+        isResizingRightRef.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+    },
+    [rightPanelWidth],
+  )
+
+  // Derive display title
+  const displayTitle = activeFilePath
+    ? activeFilePath.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') || 'LACON'
+    : project
+      ? project.name
+      : 'LACON'
 
   // Review flag count for badge
   const reviewFlagCount = writerLoop.review?.flags?.length || 0
@@ -166,21 +315,43 @@ export function LaconWorkspace() {
         {/* ─── LEFT SIDEBAR ─── */}
         <aside
           className={cn(
-            'lacon-sidebar flex-shrink-0 border-r border-border bg-card transition-all duration-300 ease-in-out overflow-hidden',
-            sidebarOpen ? 'w-[var(--lacon-sidebar-width)]' : 'w-0',
+            'lacon-sidebar flex-shrink-0 bg-card overflow-hidden relative',
+            sidebarOpen
+              ? 'border-r border-border'
+              : 'w-0 border-r-0',
           )}
+          style={sidebarOpen ? { width: `${sidebarWidth}px`, transition: isResizingRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)' } : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }}
           data-testid="lacon-sidebar"
         >
           {sidebarOpen && (
             <LaconSidebar
-              documentId={documentId}
-              onNewDocument={handleNewDocument}
-              onOpenSettings={() => setSettingsOpen(true)}
+              project={project}
+              files={files}
+              activeFilePath={activeFilePath}
+              isDirty={isDirty}
               writerStage={writerLoop.stage}
               activeSkillCount={writerLoop.session?.activeSkillIds?.length || 0}
+              onOpenProject={openProject}
+              onOpenFile={openFile}
+              onNewFile={() => setNewFileDialogOpen(true)}
+              onDeleteFile={deleteFile}
+              onRenameFile={renameFile}
+              onOpenSettings={() => setSettingsOpen(true)}
             />
           )}
         </aside>
+
+        {/* ─── SIDEBAR RESIZE HANDLE ─── */}
+        {sidebarOpen && (
+          <div
+            className="sidebar-resize-handle flex-shrink-0 w-[5px] cursor-col-resize relative z-10 group"
+            onMouseDown={handleResizeStart}
+            data-testid="sidebar-resize-handle"
+            title="Drag to resize sidebar"
+          >
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[1px] bg-border group-hover:w-[3px] group-hover:bg-primary/40 group-active:bg-primary/60 transition-all duration-150 rounded-full" />
+          </div>
+        )}
 
         {/* ─── CENTER: Toolbar + Editor ─── */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden" role="main">
@@ -196,7 +367,7 @@ export function LaconWorkspace() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                title={sidebarOpen ? 'Close sidebar (Ctrl+B)' : 'Open sidebar (Ctrl+B)'}
+                title={sidebarOpen ? 'Close sidebar (Ctrl+Shift+B)' : 'Open sidebar (Ctrl+Shift+B)'}
                 className="h-8 w-8"
               >
                 {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
@@ -205,10 +376,10 @@ export function LaconWorkspace() {
               <Separator orientation="vertical" className="h-5 mx-1" />
 
               <span className="text-sm font-semibold text-foreground tracking-tight">
-                {currentDocument?.metadata?.title || 'LACON'}
+                {displayTitle}
               </span>
 
-              {isDirty && <span className="w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />}
+              {isDirty && <span className="w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes (auto-saving...)" />}
             </div>
 
             {/* Right controls */}
@@ -248,12 +419,12 @@ export function LaconWorkspace() {
           </div>
 
           {/* Error banner */}
-          {error && (
+          {projectError && (
             <div
               className="px-4 py-2 bg-destructive/10 text-destructive text-sm border-b border-destructive/20 animate-slide-in-up"
               role="alert"
             >
-              {error}
+              {projectError}
             </div>
           )}
 
@@ -270,11 +441,33 @@ export function LaconWorkspace() {
 
           {/* Editor area */}
           <div className="flex-1 overflow-y-auto">
-            <ModernEditor content={currentDocument?.content} onChange={updateContent} />
+            {activeFilePath ? (
+              <ModernEditor
+                key={activeFilePath}
+                content={activeFileContent || ''}
+                onChangeHTML={handleEditorContentChange}
+                editorRef={editorRef}
+              />
+            ) : (
+              /* ── No file open empty state ── */
+              <div className="flex-1 flex flex-col items-center justify-center h-full text-center px-8">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mb-6">
+                  <PenLine className="h-10 w-10 text-primary/60" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">
+                  {project ? 'Select a file to start writing' : 'Open a project to begin'}
+                </h2>
+                <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+                  {project
+                    ? 'Choose a file from the sidebar or create a new one with Ctrl+N.'
+                    : 'Click "Open Folder" in the sidebar to choose your writing project folder.'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Floating AI bar */}
-          {!zenMode && (
+          {!zenMode && activeFilePath && (
             <FloatingAIBar
               documentId={documentId}
               writerStage={writerLoop.stage}
@@ -283,52 +476,81 @@ export function LaconWorkspace() {
                 setActiveTab('writer')
                 setRightPanelOpen(true)
               }}
-              onSurgicalEdit={writerLoop.surgicalEdit}
+              _onSurgicalEdit={writerLoop.surgicalEdit}
             />
           )}
         </main>
 
+        {/* ─── RIGHT PANEL RESIZE HANDLE ─── */}
+        {rightPanelOpen && (
+          <div
+            className="right-panel-resize-handle flex-shrink-0 w-[5px] cursor-col-resize relative z-10 group"
+            onMouseDown={handleRightResizeStart}
+            data-testid="right-panel-resize-handle"
+            title="Drag to resize panel"
+          >
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[1px] bg-border group-hover:w-[3px] group-hover:bg-primary/40 group-active:bg-primary/60 transition-all duration-150 rounded-full" />
+          </div>
+        )}
+
         {/* ─── RIGHT PANEL: AI Tabs ─── */}
         <aside
           className={cn(
-            'lacon-right-panel flex-shrink-0 border-l border-border bg-card transition-all duration-300 ease-in-out overflow-hidden',
-            rightPanelOpen ? 'w-[var(--lacon-panel-width)]' : 'w-0',
+            'lacon-right-panel flex-shrink-0 bg-card overflow-hidden relative',
+            rightPanelOpen
+              ? 'border-l border-border'
+              : 'w-0 border-l-0',
           )}
+          style={rightPanelOpen ? { width: `${rightPanelWidth}px`, transition: isResizingRightRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)' } : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }}
           data-testid="lacon-right-panel"
         >
           {rightPanelOpen && (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-              {/* Tab triggers */}
-              <div className="flex-shrink-0 p-2 border-b border-border">
-                <TabsList className="w-full grid grid-cols-4 h-9">
-                  <TabsTrigger value="writer" className="text-xs gap-1 relative">
-                    <PenLine className="h-3.5 w-3.5" />
-                    <span className="hidden xl:inline">Writer</span>
-                    {writerLoop.stage !== 'idle' && (
-                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="research" className="text-xs gap-1">
-                    <Search className="h-3.5 w-3.5" />
-                    <span className="hidden xl:inline">Research</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="review" className="text-xs gap-1 relative">
-                    <MessageSquareText className="h-3.5 w-3.5" />
-                    <span className="hidden xl:inline">Review</span>
-                    {reviewFlagCount > 0 && (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -top-1 -right-1 h-4 min-w-4 text-[10px] p-0 flex items-center justify-center"
-                      >
-                        {reviewFlagCount}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="history" className="text-xs gap-1">
-                    <History className="h-3.5 w-3.5" />
-                    <span className="hidden xl:inline">History</span>
-                  </TabsTrigger>
-                </TabsList>
+              {/* ── Panel Header ── */}
+              <div className="flex-shrink-0 border-b border-border bg-card">
+                {/* Tab Navigation */}
+                <div className="px-1 pt-1">
+                  <TabsList className="w-full grid grid-cols-4 h-9 bg-secondary/50 rounded-lg p-0.5">
+                    <TabsTrigger value="writer" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                      <PenLine className="h-3.5 w-3.5" />
+                      Writer
+                      {writerLoop.stage !== 'idle' && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="research" className="text-[11px] font-medium gap-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                      <Search className="h-3.5 w-3.5" />
+                      Research
+                    </TabsTrigger>
+                    <TabsTrigger value="review" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                      <MessageSquareText className="h-3.5 w-3.5" />
+                      Review
+                      {reviewFlagCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-1 -right-1 h-4 min-w-4 text-[10px] p-0 flex items-center justify-center"
+                        >
+                          {reviewFlagCount}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="history" className="text-[11px] font-medium gap-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                      <History className="h-3.5 w-3.5" />
+                      History
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+
+                {/* Active Tab Description Bar */}
+                <div className="px-3 py-2 flex items-center gap-2">
+                  <div className="w-1 h-4 rounded-full bg-primary/60" />
+                  <span className="text-[11px] font-medium text-muted-foreground tracking-wide">
+                    {activeTab === 'writer' && 'Planner · Generator · Reviewer'}
+                    {activeTab === 'research' && 'Sources · Citations · Notes'}
+                    {activeTab === 'review' && 'Flags · Suggestions · Diff'}
+                    {activeTab === 'history' && 'Snapshots · Versions · Timeline'}
+                  </span>
+                </div>
               </div>
 
               {/* Tab contents */}
@@ -367,6 +589,13 @@ export function LaconWorkspace() {
 
       {/* ─── SETTINGS OVERLAY ─── */}
       {settingsOpen && <ProviderSettings onClose={() => setSettingsOpen(false)} documentId={documentId} />}
+
+      {/* ─── NEW FILE DIALOG ─── */}
+      <NewDocumentDialog
+        open={newFileDialogOpen}
+        onClose={() => setNewFileDialogOpen(false)}
+        onCreateFile={handleCreateFile}
+      />
     </div>
   )
 }

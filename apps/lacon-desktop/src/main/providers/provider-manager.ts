@@ -25,6 +25,7 @@ import { GeminiAdapter } from './gemini-adapter'
 import { LocalAdapter } from './local-adapter'
 import { OpenAIAdapter } from './openai-adapter'
 import { OpenRouterAdapter } from './openrouter-adapter'
+import { ZaiAdapter } from './zai-adapter'
 
 export class ProviderManager {
   private adapters = new Map<string, ProviderAdapter>()
@@ -289,6 +290,8 @@ export class ProviderManager {
         return new LocalAdapter()
       case 'custom-openai-compatible':
         return new CustomAdapter()
+      case 'zai':
+        return new ZaiAdapter()
       default:
         throw new Error(`Unknown provider type: ${type}`)
     }

@@ -5,6 +5,8 @@ import { AuditManager } from './audit/audit-manager'
 import { getMigrationRunner } from './data/migrations'
 import { getDataStore } from './data/store'
 import { registerAuditHandlers } from './ipc/audit-handlers'
+import { registerDialogHandlers } from './ipc/dialog-handlers'
+import { registerProjectHandlers } from './ipc/project-handlers'
 import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
 import { registerPhase7Handlers } from './ipc/phase7-handlers'
 import { registerPhase12Handlers } from './ipc/phase12-handlers'
@@ -123,6 +125,12 @@ async function initializeApp() {
 
     // Register audit handlers (Phase 9)
     registerAuditHandlers(auditManager)
+
+    // Register dialog handlers (folder picker)
+    registerDialogHandlers()
+
+    // Register project handlers (folder-based documents)
+    registerProjectHandlers()
 
     logger.info('IPC handlers registered')
 

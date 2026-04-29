@@ -22,7 +22,7 @@ import { type IpcResponse, IPC_CHANNELS } from '@/shared/ipc-schema'
 import { getProviderManager } from '../providers/provider-manager'
 import { redactObject } from '../security/log-redaction'
 import { getPricingService } from '../services/pricing-service'
-import { getProjectWorkspaceService } from '../services/project-workspace-service'
+import { getActiveProjectPath, getProjectWorkspaceService } from '../services/project-workspace-service'
 
 /**
  * Generic handler wrapper.
@@ -164,13 +164,15 @@ export function registerPhase7Handlers(): void {
     async (_event, payload: { documentId: string; providerId: string; modelId: string }) => {
       return handlePhase7Ipc(IPC_CHANNELS.PROJECT_SET_MODEL, payload, async () => {
         const workspaceService = getProjectWorkspaceService()
-        const session = workspaceService.getSession(payload.documentId)
+        const projectPath = getActiveProjectPath()
+        if (!projectPath) throw new Error('No project is open')
+        const session = workspaceService.getSession(payload.documentId, projectPath)
         if (session) {
           session.modelConfig = {
             providerId: payload.providerId,
             modelId: payload.modelId,
           }
-          workspaceService.updateSession(payload.documentId, {
+          workspaceService.updateSession(payload.documentId, projectPath, {
             modelConfig: session.modelConfig,
           })
         }
@@ -183,7 +185,11 @@ export function registerPhase7Handlers(): void {
   ipcMain.handle(IPC_CHANNELS.PROJECT_GET_MODEL, async (_event, payload: { documentId: string }) => {
     return handlePhase7Ipc(IPC_CHANNELS.PROJECT_GET_MODEL, payload, async () => {
       const workspaceService = getProjectWorkspaceService()
-      const session = workspaceService.getSession(payload.documentId)
+      const projectPath = getActiveProjectPath()
+      if (!projectPath) {
+        return { success: true, data: { providerId: '', modelId: '' } }
+      }
+      const session = workspaceService.getSession(payload.documentId, projectPath)
       return {
         success: true,
         data: session?.modelConfig || { providerId: '', modelId: '' },

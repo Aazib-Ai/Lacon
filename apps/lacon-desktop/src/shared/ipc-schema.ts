@@ -241,6 +241,20 @@ export const IPC_CHANNELS = {
   // Writer Harness: Update operations (Phase 7)
   UPDATE_CHECK: 'update:check',
   UPDATE_GET_INFO: 'update:getInfo',
+
+  // Dialog operations
+  DIALOG_SELECT_FOLDER: 'dialog:selectFolder',
+  DIALOG_READ_FOLDER_FILES: 'dialog:readFolderFiles',
+
+  // Project operations (folder-based document system)
+  PROJECT_OPEN_FOLDER: 'project:openFolder',
+  PROJECT_LIST_FILES: 'project:listFiles',
+  PROJECT_READ_FILE: 'project:readFile',
+  PROJECT_SAVE_FILE: 'project:saveFile',
+  PROJECT_CREATE_FILE: 'project:createFile',
+  PROJECT_DELETE_FILE: 'project:deleteFile',
+  PROJECT_RENAME_FILE: 'project:renameFile',
+  PROJECT_GET_ACTIVE: 'project:getActive',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

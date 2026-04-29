@@ -41,6 +41,7 @@
     "@tiptap/extension-task-list": "workspace:^",
     "@tiptap/extension-text": "workspace:*",
     "@tiptap/extension-text-align": "workspace:^",
+    "@tiptap/extension-text-style": "workspace:^",
     "@tiptap/extension-underline": "workspace:^",
     "@tiptap/extension-youtube": "workspace:^",
     "@tiptap/html": "workspace:*",

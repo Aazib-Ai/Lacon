@@ -147,11 +147,12 @@ export class SkillService {
   }
 
   /**
-   * Load user/agent skills from a document's .lacon/skills/ directory.
+   * Load user/agent skills from a project's .lacon/skills/ directory.
+   * Skills are project-level (shared across all documents in the project).
    */
-  private loadProjectSkills(documentId: string): WriterSkill[] {
+  private loadProjectSkills(projectPath: string): WriterSkill[] {
     const ws = getProjectWorkspaceService()
-    const skillsPath = ws.getSkillsPath(documentId)
+    const skillsPath = ws.getSkillsPath(projectPath)
 
     if (!existsSync(skillsPath)) return []
 
@@ -177,16 +178,17 @@ export class SkillService {
 
   /**
    * List all available skills (built-in + project-specific).
+   * @param projectPath Path to the project folder (for loading project-level skills)
    */
   listSkills(
-    documentId?: string,
+    projectPath?: string,
     filter?: { source?: SkillSource; tag?: string },
   ): SkillListItem[] {
     this.ensureInitialized()
 
     const allSkills: WriterSkill[] = [
       ...this.builtInSkills.values(),
-      ...(documentId ? this.loadProjectSkills(documentId) : []),
+      ...(projectPath ? this.loadProjectSkills(projectPath) : []),
     ]
 
     let filtered = allSkills
@@ -213,8 +215,9 @@ export class SkillService {
 
   /**
    * Get a single skill by ID.
+   * @param projectPath Path to the project folder (for loading project-level skills)
    */
-  getSkill(skillId: string, documentId?: string): WriterSkill | null {
+  getSkill(skillId: string, projectPath?: string): WriterSkill | null {
     this.ensureInitialized()
 
     // Check built-in first
@@ -222,8 +225,8 @@ export class SkillService {
     if (builtIn) return builtIn
 
     // Check project skills
-    if (documentId) {
-      const projectSkills = this.loadProjectSkills(documentId)
+    if (projectPath) {
+      const projectSkills = this.loadProjectSkills(projectPath)
       return projectSkills.find((s) => s.id === skillId) ?? null
     }
 
@@ -232,9 +235,10 @@ export class SkillService {
 
   /**
    * Create a new user skill and save it to the project's .lacon/skills/.
+   * @param projectPath Path to the project folder
    */
   createSkill(
-    documentId: string,
+    projectPath: string,
     params: {
       name: string
       description: string
@@ -246,7 +250,7 @@ export class SkillService {
     this.ensureInitialized()
 
     const ws = getProjectWorkspaceService()
-    const skillsPath = ws.getSkillsPath(documentId)
+    const skillsPath = ws.getSkillsPath(projectPath)
 
     if (!existsSync(skillsPath)) {
       mkdirSync(skillsPath, { recursive: true })
@@ -292,17 +296,10 @@ export class SkillService {
   }
 
   /**
-   * Deterministic composition of up to 3 skills.
-   *
-   * The composed prompt follows this structure:
-   * 1. Primary skill content (full)
-   * 2. Secondary skill (supplementary rules only)
-   * 3. Tertiary skill (supplementary rules only)
-   *
-   * Skills are merged by priority order — first skill is authoritative,
-   * subsequent skills add constraints without overriding.
+   * Get a composed skill prompt for the given skill IDs.
+   * @param projectPath Path to the project folder (for resolving skills)
    */
-  composeSkills(skillIds: string[], documentId?: string): ComposedSkill {
+  composeSkills(skillIds: string[], projectPath?: string): ComposedSkill {
     this.ensureInitialized()
 
     if (skillIds.length === 0) {
@@ -319,7 +316,7 @@ export class SkillService {
 
     const skills: WriterSkill[] = []
     for (const id of skillIds) {
-      const skill = this.getSkill(id, documentId)
+      const skill = this.getSkill(id, projectPath)
       if (!skill) {
         throw new Error(`Skill not found: ${id}`)
       }
@@ -364,9 +361,10 @@ export class SkillService {
   /**
    * Stub for skill research — will be fully implemented in Phase 5.
    * For now, returns a template skill based on the topic.
+   * @param projectPath Path to the project folder
    */
   async researchAndCreateSkill(
-    documentId: string,
+    projectPath: string,
     topic: string,
   ): Promise<WriterSkill> {
     this.ensureInitialized()
@@ -376,7 +374,7 @@ export class SkillService {
     )
 
     // Create a placeholder skill that the user can refine
-    return this.createSkill(documentId, {
+    return this.createSkill(projectPath, {
       name: `${topic} Writing`,
       description: `AI-researched skill for ${topic} writing (refine after research)`,
       content: [

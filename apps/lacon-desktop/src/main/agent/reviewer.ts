@@ -44,9 +44,9 @@ export class Reviewer {
    * Run a review pass on generated content.
    * Returns flags for issues found in the content.
    *
-   * @param content The full generated document content (text)
+   * @param content The full document content (HTML string from editor.getHTML())
    * @param outline The approved outline (planner authority)
-   * @param paragraphs Array of { id, text } for paragraph-level flagging
+   * @param paragraphs Array of { id, text } — text is plain text extracted from HTML paragraph nodes
    */
   runReview(
     content: string,

@@ -3,9 +3,11 @@
  *
  * - No selection: "Tell AI what to write..." → triggers planning
  * - Text selected: "How should AI change this?" → triggers surgical edit
+ * - Shows error feedback when API calls fail
+ * - Shows elapsed time for long operations
  */
 
-import { ArrowUp, Loader2,Sparkles } from 'lucide-react'
+import { AlertCircle, ArrowUp, Loader2,Sparkles, X } from 'lucide-react'
 import React, { useEffect,useRef, useState } from 'react'
 
 import { cn } from '@/renderer/lib/utils'
@@ -23,7 +25,10 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [hasSelection, setHasSelection] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [elapsed, setElapsed] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Listen for text selection in the editor
   useEffect(() => {
@@ -47,11 +52,45 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Track elapsed time during loading
+  useEffect(() => {
+    if (!isLoading) {
+      setElapsed(0)
+      return
+    }
+    const start = Date.now()
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [isLoading])
+
+  // Auto-dismiss errors after 8 seconds
+  const showError = (message: string) => {
+    setError(message)
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current)
+    }
+    errorTimerRef.current = setTimeout(() => {
+      setError(null)
+      errorTimerRef.current = null
+    }, 8000)
+  }
+
+  const dismissError = () => {
+    setError(null)
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current)
+      errorTimerRef.current = null
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || !documentId || isLoading) {return}
 
     setIsLoading(true)
+    dismissError()
     try {
       if (hasSelection) {
         // Surgical edit mode — for now, just pass as planning instruction
@@ -63,6 +102,8 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
       }
       setInput('')
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
+      showError(message)
       console.error('AI action failed:', err)
     } finally {
       setIsLoading(false)
@@ -87,16 +128,20 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
           'hover:shadow-xl hover:border-border',
           'focus-within:shadow-xl focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-primary/20',
           hasSelection && 'border-accent/40 focus-within:border-accent/60 focus-within:ring-accent/20',
+          error && 'border-red-500/40',
         )}
       >
         {/* Icon */}
         <div
           className={cn(
             'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors',
+            error ? 'bg-red-500/15 text-red-400' :
             hasSelection ? 'bg-accent/15 text-accent' : 'bg-primary/10 text-primary',
           )}
         >
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> :
+           error ? <AlertCircle className="h-4 w-4" /> :
+           <Sparkles className="h-4 w-4" />}
         </div>
 
         {/* Input */}
@@ -112,8 +157,15 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
           data-testid="ai-input"
         />
 
+        {/* Loading elapsed indicator */}
+        {isLoading && elapsed > 3 && (
+          <span className="text-[10px] font-mono text-muted-foreground/60 flex-shrink-0 tabular-nums">
+            {elapsed}s
+          </span>
+        )}
+
         {/* Mode badge */}
-        {hasSelection && (
+        {hasSelection && !isLoading && (
           <span className="text-[10px] font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-full flex-shrink-0">
             Edit Selection
           </span>
@@ -136,12 +188,34 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
         </Button>
       </form>
 
+      {/* Error toast */}
+      {error && (
+        <div className="mt-2 mx-auto max-w-[600px] flex items-start gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 backdrop-blur-md animate-slide-in-up">
+          <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-red-300 leading-relaxed">{error}</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+              Check your provider settings or try again.
+            </p>
+          </div>
+          <button
+            onClick={dismissError}
+            className="flex-shrink-0 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            aria-label="Dismiss error"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Keyboard hint */}
-      <div className="text-center mt-1.5">
-        <span className="text-[10px] text-muted-foreground/40">
-          <kbd className="font-mono">Ctrl+/</kbd> to focus
-        </span>
-      </div>
+      {!error && (
+        <div className="text-center mt-1.5">
+          <span className="text-[10px] text-muted-foreground/40">
+            <kbd className="font-mono">Ctrl+/</kbd> to focus
+          </span>
+        </div>
+      )}
     </div>
   )
 }

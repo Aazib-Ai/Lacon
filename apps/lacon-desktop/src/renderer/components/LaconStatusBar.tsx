@@ -3,7 +3,7 @@
  */
 
 import { Eye,Settings, Zap } from 'lucide-react'
-import React, { useEffect,useState } from 'react'
+import React, { useCallback,useEffect,useRef,useState } from 'react'
 
 import { Badge } from './ui/Badge'
 
@@ -29,22 +29,34 @@ export function LaconStatusBar({
   const [sessionCost, setSessionCost] = useState<number>(0)
   const [modelName, setModelName] = useState<string>('')
 
-  // Load session cost
+  // Load session cost — debounced with in-flight guard
+  const costInFlightRef = useRef(false)
+  const loadCost = useCallback(async () => {
+    if (!documentId || costInFlightRef.current) {return}
+    costInFlightRef.current = true
+    try {
+      const result = await window.electron?.pricing?.getSessionCost(documentId)
+      if (result?.success && result.data) {
+        setSessionCost(result.data.totalCost || 0)
+      }
+    } catch {
+      // Silent — cost display is non-critical
+    } finally {
+      costInFlightRef.current = false
+    }
+  }, [documentId])
+
   useEffect(() => {
     if (!documentId) {return}
-    const loadCost = async () => {
-      try {
-        const result = await window.electron?.pricing?.getSessionCost(documentId)
-        if (result?.success && result.data) {
-          setSessionCost(result.data.totalCost || 0)
-        }
-        // eslint-disable-next-line no-empty
-      } catch {}
-    }
     loadCost()
-    const interval = setInterval(loadCost, 10000) // refresh every 10s
+    const interval = setInterval(() => {
+      // Only poll when the window is visible
+      if (!document.hidden) {
+        loadCost()
+      }
+    }, 30000) // refresh every 30s (was 10s)
     return () => clearInterval(interval)
-  }, [documentId])
+  }, [documentId, loadCost])
 
   // Load project model
   useEffect(() => {

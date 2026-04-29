@@ -29,6 +29,13 @@ export interface WriterLoopState {
   loading: boolean
   /** Last error message */
   error: string | null
+  /** Error metadata for UX feedback */
+  errorMeta: {
+    timestamp: number
+    retryable: boolean
+    action: string
+    retryFn: (() => void) | null
+  } | null
   /** Phase 3: Section generation progress */
   progress: SectionProgress | null
   /** Phase 4: Latest review result */
@@ -44,6 +51,7 @@ const initialState: WriterLoopState = {
   outline: null,
   loading: false,
   error: null,
+  errorMeta: null,
   progress: null,
   review: null,
   reviewPassCount: 0,
@@ -57,7 +65,7 @@ type Action =
   | { type: 'SET_STATE'; session: WriterSession | null; outline: WriterOutline | null }
   | { type: 'SET_SESSION'; session: WriterSession }
   | { type: 'SET_OUTLINE'; outline: WriterOutline | null }
-  | { type: 'SET_ERROR'; error: string }
+  | { type: 'SET_ERROR'; error: string; retryable?: boolean; action?: string; retryFn?: (() => void) | null }
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_PROGRESS'; progress: SectionProgress }
   | { type: 'SET_REVIEW'; review: ReviewResult | null; passCount: number; canAutoPass: boolean }
@@ -65,19 +73,29 @@ type Action =
 function reducer(state: WriterLoopState, action: Action): WriterLoopState {
   switch (action.type) {
     case 'START_LOADING':
-      return { ...state, loading: true, error: null }
+      return { ...state, loading: true, error: null, errorMeta: null }
     case 'SET_STATE':
-      return { ...state, session: action.session, outline: action.outline, loading: false, error: null }
+      return { ...state, session: action.session, outline: action.outline, loading: false, error: null, errorMeta: null }
     case 'SET_SESSION':
-      return { ...state, session: action.session, loading: false, error: null }
+      return { ...state, session: action.session, loading: false, error: null, errorMeta: null }
     case 'SET_OUTLINE':
-      return { ...state, outline: action.outline, loading: false, error: null }
+      return { ...state, outline: action.outline, loading: false, error: null, errorMeta: null }
     case 'SET_ERROR':
-      return { ...state, error: action.error, loading: false }
+      return {
+        ...state,
+        error: action.error,
+        loading: false,
+        errorMeta: {
+          timestamp: Date.now(),
+          retryable: action.retryable ?? true,
+          action: action.action ?? 'unknown',
+          retryFn: action.retryFn ?? null,
+        },
+      }
     case 'CLEAR_ERROR':
-      return { ...state, error: null }
+      return { ...state, error: null, errorMeta: null }
     case 'SET_PROGRESS':
-      return { ...state, progress: action.progress, loading: false, error: null }
+      return { ...state, progress: action.progress, loading: false, error: null, errorMeta: null }
     case 'SET_REVIEW':
       return {
         ...state,
@@ -86,6 +104,7 @@ function reducer(state: WriterLoopState, action: Action): WriterLoopState {
         canAutoPass: action.canAutoPass,
         loading: false,
         error: null,
+        errorMeta: null,
       }
     default:
       return state
@@ -112,6 +131,24 @@ export function useWriterLoop(documentId: string | undefined) {
       throw new Error('writerLoop API not available')
     }
     return window.electron.writerLoop
+  }
+
+  /** Wrap a promise with a timeout to prevent indefinite loading states */
+  const withTimeout = <T>(promise: Promise<T>, timeoutMs = 60000, label = 'Operation'): Promise<T> => {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s. Check your API key and provider settings.`))
+      }, timeoutMs)
+      promise
+        .then(result => {
+          clearTimeout(timer)
+          resolve(result)
+        })
+        .catch(err => {
+          clearTimeout(timer)
+          reject(err)
+        })
+    })
   }
 
   const handleResponse = useCallback((response: any, onSuccess?: (data: any) => void) => {
@@ -159,15 +196,26 @@ export function useWriterLoop(documentId: string | undefined) {
         return
       }
       dispatch({ type: 'START_LOADING' })
+      const retryFn = () => startPlanning(instruction, composedSkillPrompt, researchContext)
       try {
-        const res = await writerLoop().startPlanning(documentId, instruction, composedSkillPrompt, researchContext)
+        const res = await withTimeout(
+          writerLoop().startPlanning(documentId, instruction, composedSkillPrompt, researchContext),
+          60000,
+          'Outline generation',
+        )
         handleResponse(res, outline => {
           dispatch({ type: 'SET_OUTLINE', outline })
         })
         // Refresh session
         await fetchState()
       } catch (err: any) {
-        dispatch({ type: 'SET_ERROR', error: err.message })
+        dispatch({
+          type: 'SET_ERROR',
+          error: err.message || 'Planning failed. Please try again.',
+          retryable: true,
+          action: 'planning',
+          retryFn,
+        })
       }
     },
     [documentId, handleResponse, fetchState],
@@ -376,8 +424,13 @@ export function useWriterLoop(documentId: string | undefined) {
         return
       }
       dispatch({ type: 'START_LOADING' })
+      const retryFn = () => generateSection(sectionId)
       try {
-        const res = await writerLoop().generateSection(documentId, sectionId)
+        const res = await withTimeout(
+          writerLoop().generateSection(documentId, sectionId),
+          90000,
+          'Section generation',
+        )
         handleResponse(res)
         // Refresh progress
         const progressRes = await writerLoop().getProgress(documentId)
@@ -385,7 +438,13 @@ export function useWriterLoop(documentId: string | undefined) {
           dispatch({ type: 'SET_PROGRESS', progress })
         })
       } catch (err: any) {
-        dispatch({ type: 'SET_ERROR', error: err.message })
+        dispatch({
+          type: 'SET_ERROR',
+          error: err.message || 'Generation failed. Please try again.',
+          retryable: true,
+          action: 'generating',
+          retryFn,
+        })
       }
     },
     [documentId, handleResponse],
@@ -396,13 +455,24 @@ export function useWriterLoop(documentId: string | undefined) {
       return
     }
     dispatch({ type: 'START_LOADING' })
+    const retryFn = () => generateAll()
     try {
-      const res = await writerLoop().generateAll(documentId)
+      const res = await withTimeout(
+        writerLoop().generateAll(documentId),
+        180000, // 3 minutes for full generation
+        'Full document generation',
+      )
       handleResponse(res, progress => {
         dispatch({ type: 'SET_PROGRESS', progress })
       })
     } catch (err: any) {
-      dispatch({ type: 'SET_ERROR', error: err.message })
+      dispatch({
+        type: 'SET_ERROR',
+        error: err.message || 'Generation failed. Please try again.',
+        retryable: true,
+        action: 'generating',
+        retryFn,
+      })
     }
   }, [documentId, handleResponse])
 
@@ -457,8 +527,13 @@ export function useWriterLoop(documentId: string | undefined) {
         return
       }
       dispatch({ type: 'START_LOADING' })
+      const retryFn = () => runReview(documentContent)
       try {
-        const res = await writerLoop().runReview(documentId, documentContent)
+        const res = await withTimeout(
+          writerLoop().runReview(documentId, documentContent),
+          90000,
+          'Review',
+        )
         handleResponse(res)
         // Refresh review state
         const reviewRes = await writerLoop().getReview(documentId)
@@ -472,7 +547,13 @@ export function useWriterLoop(documentId: string | undefined) {
         })
         await fetchState()
       } catch (err: any) {
-        dispatch({ type: 'SET_ERROR', error: err.message })
+        dispatch({
+          type: 'SET_ERROR',
+          error: err.message || 'Review failed. Please try again.',
+          retryable: true,
+          action: 'reviewing',
+          retryFn,
+        })
       }
     },
     [documentId, handleResponse, fetchState],
@@ -527,15 +608,31 @@ export function useWriterLoop(documentId: string | undefined) {
       }
       dispatch({ type: 'START_LOADING' })
       try {
-        const res = await writerLoop().surgicalEdit(documentId, paragraphId, instruction, fullDocumentContent)
+        const res = await withTimeout(
+          writerLoop().surgicalEdit(documentId, paragraphId, instruction, fullDocumentContent),
+          60000,
+          'Surgical edit',
+        )
         if (res?.success) {
           dispatch({ type: 'CLEAR_ERROR' })
           return res.data
         }
-        dispatch({ type: 'SET_ERROR', error: res?.error?.message || 'Surgical edit failed' })
+        dispatch({
+          type: 'SET_ERROR',
+          error: res?.error?.message || 'Surgical edit failed',
+          retryable: true,
+          action: 'surgical-edit',
+          retryFn: () => surgicalEdit(paragraphId, instruction, fullDocumentContent),
+        })
         return null
       } catch (err: any) {
-        dispatch({ type: 'SET_ERROR', error: err.message })
+        dispatch({
+          type: 'SET_ERROR',
+          error: err.message || 'Surgical edit failed. Please try again.',
+          retryable: true,
+          action: 'surgical-edit',
+          retryFn: () => surgicalEdit(paragraphId, instruction, fullDocumentContent),
+        })
         return null
       }
     },

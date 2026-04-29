@@ -8,7 +8,7 @@ export function ModernEditorDemo() {
 
   return (
     <div className="w-full h-screen">
-      <ModernEditor onChange={handleChange} />
+      <ModernEditor onChangeHTML={handleChange} />
     </div>
   )
 }

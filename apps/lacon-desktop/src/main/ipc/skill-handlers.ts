@@ -23,8 +23,15 @@ import type {
 } from '@/shared/writer-types'
 
 import { getSkillService } from '../services/skill-service'
-import { getProjectWorkspaceService } from '../services/project-workspace-service'
+import { getActiveProjectPath, getProjectWorkspaceService } from '../services/project-workspace-service'
 import { redactObject } from '../security/log-redaction'
+
+/** Resolve active project path or throw */
+function requireProjectPath(): string {
+  const p = getActiveProjectPath()
+  if (!p) throw new Error('No project is open')
+  return p
+}
 
 /**
  * Generic handler wrapper matching the pattern in handlers.ts
@@ -65,7 +72,8 @@ export function registerSkillHandlers(): void {
     IPC_CHANNELS.SKILL_LIST,
     async (_event, payload: SkillListRequest & { documentId?: string }) => {
       return handleSkillIpc(IPC_CHANNELS.SKILL_LIST, payload, async () => {
-        const skills = skillService.listSkills(payload?.documentId, {
+        const projectPath = getActiveProjectPath() || undefined
+        const skills = skillService.listSkills(projectPath, {
           source: payload?.source,
           tag: payload?.tag,
         })
@@ -79,7 +87,8 @@ export function registerSkillHandlers(): void {
     IPC_CHANNELS.SKILL_GET,
     async (_event, payload: SkillGetRequest & { documentId?: string }) => {
       return handleSkillIpc(IPC_CHANNELS.SKILL_GET, payload, async () => {
-        const skill = skillService.getSkill(payload.id, payload.documentId)
+        const projectPath = getActiveProjectPath() || undefined
+        const skill = skillService.getSkill(payload.id, projectPath)
         if (!skill) {
           return {
             success: false,
@@ -102,16 +111,8 @@ export function registerSkillHandlers(): void {
       payload: SkillCreateRequest & { documentId: string },
     ) => {
       return handleSkillIpc(IPC_CHANNELS.SKILL_CREATE, payload, async () => {
-        if (!payload.documentId) {
-          return {
-            success: false,
-            error: {
-              code: 'MISSING_DOCUMENT_ID',
-              message: 'documentId is required to create a skill',
-            },
-          }
-        }
-        const skill = skillService.createSkill(payload.documentId, {
+        const projectPath = requireProjectPath()
+        const skill = skillService.createSkill(projectPath, {
           name: payload.name,
           description: payload.description,
           content: payload.content,
@@ -131,9 +132,10 @@ export function registerSkillHandlers(): void {
       payload: SkillComposeRequest & { documentId?: string },
     ) => {
       return handleSkillIpc(IPC_CHANNELS.SKILL_COMPOSE, payload, async () => {
+        const projectPath = getActiveProjectPath() || undefined
         const composed = skillService.composeSkills(
           payload.skillIds,
-          payload.documentId,
+          projectPath,
         )
         return { success: true, data: composed }
       })
@@ -151,17 +153,9 @@ export function registerSkillHandlers(): void {
         IPC_CHANNELS.SKILL_RESEARCH,
         payload,
         async () => {
-          if (!payload.documentId) {
-            return {
-              success: false,
-              error: {
-                code: 'MISSING_DOCUMENT_ID',
-                message: 'documentId is required to research a skill',
-              },
-            }
-          }
+          const projectPath = requireProjectPath()
           const skill = await skillService.researchAndCreateSkill(
-            payload.documentId,
+            projectPath,
             payload.topic,
           )
           return { success: true, data: skill }
@@ -179,7 +173,8 @@ export function registerSkillHandlers(): void {
         payload,
         async () => {
           const ws = getProjectWorkspaceService()
-          const workspace = ws.ensureWorkspace(payload.documentId)
+          const projectPath = requireProjectPath()
+          const workspace = ws.ensureWorkspace(payload.documentId, projectPath)
           return { success: true, data: workspace }
         },
       )
@@ -195,7 +190,8 @@ export function registerSkillHandlers(): void {
         payload,
         async () => {
           const ws = getProjectWorkspaceService()
-          const session = ws.getSession(payload.documentId)
+          const projectPath = requireProjectPath()
+          const session = ws.getSession(payload.documentId, projectPath)
           return { success: true, data: session }
         },
       )

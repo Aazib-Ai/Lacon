@@ -215,6 +215,9 @@ importers:
       '@tiptap/extension-text-align':
         specifier: workspace:^
         version: link:../../packages/extension-text-align
+      '@tiptap/extension-text-style':
+        specifier: workspace:^
+        version: link:../../packages/extension-text-style
       '@tiptap/extension-underline':
         specifier: workspace:^
         version: link:../../packages/extension-underline

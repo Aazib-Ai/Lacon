@@ -21,7 +21,14 @@ import type {
   ResearchMode,
   ResearchSource,
 } from '../../shared/writer-types'
-import { getProjectWorkspaceService } from './project-workspace-service'
+import { getActiveProjectPath, getProjectWorkspaceService } from './project-workspace-service'
+
+/** Resolve project path or throw if no project is open */
+function requireProjectPath(): string {
+  const p = getActiveProjectPath()
+  if (!p) throw new Error('No project is open')
+  return p
+}
 
 /**
  * Default empty research log.
@@ -43,7 +50,7 @@ export class ResearchLogService {
    * Get the full research log for a document.
    */
   getLog(documentId: string): ResearchLog {
-    const paths = getProjectWorkspaceService().getResearchPath(documentId)
+    const paths = getProjectWorkspaceService().getResearchPath(documentId, requireProjectPath())
     try {
       const raw = readFileSync(paths.json, 'utf-8')
       const parsed = JSON.parse(raw)
@@ -260,7 +267,7 @@ export class ResearchLogService {
    * Persist the research log to .lacon/research.json.
    */
   private persistLog(documentId: string, log: ResearchLog): void {
-    const paths = getProjectWorkspaceService().getResearchPath(documentId)
+    const paths = getProjectWorkspaceService().getResearchPath(documentId, requireProjectPath())
     writeFileSync(paths.json, JSON.stringify(log, null, 2), 'utf-8')
   }
 
@@ -268,7 +275,7 @@ export class ResearchLogService {
    * Export the research log as human-readable markdown to .lacon/research.md.
    */
   private exportToMarkdown(documentId: string, log: ResearchLog): void {
-    const paths = getProjectWorkspaceService().getResearchPath(documentId)
+    const paths = getProjectWorkspaceService().getResearchPath(documentId, requireProjectPath())
 
     const lines: string[] = [
       '# Research Log',

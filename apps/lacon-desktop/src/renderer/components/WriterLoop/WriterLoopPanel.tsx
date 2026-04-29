@@ -63,6 +63,7 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
         stage={loop.stage}
         loading={loop.loading}
         error={loop.error}
+        errorMeta={loop.errorMeta}
         onUpdateSection={loop.updateSection}
         onAddSection={loop.addSection}
         onRemoveSection={loop.removeSection}
@@ -71,6 +72,10 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
         onApprove={handleApprove}
         onRegenerate={handleRegenerate}
         onReset={handleReset}
+        onClearError={() => {
+          // Dispatch clear error via reset flow — the hook exposes error clearing through fetchState
+          loop.fetchState()
+        }}
       />
     </div>
   )

@@ -353,6 +353,27 @@ const updateAPI = {
   getInfo: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_INFO),
 }
 
+// Dialog API
+const dialogAPI = {
+  selectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_FOLDER),
+  readFolderFiles: (folderPath: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DIALOG_READ_FOLDER_FILES, { folderPath }),
+}
+
+// Project API (Folder-based document system)
+const projectAPI = {
+  openFolder: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_OPEN_FOLDER),
+  listFiles: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_LIST_FILES),
+  readFile: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_READ_FILE, { filePath }),
+  saveFile: (filePath: string, content: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_FILE, { filePath, content }),
+  createFile: (fileName: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CREATE_FILE, { fileName }),
+  deleteFile: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_DELETE_FILE, { filePath }),
+  renameFile: (oldPath: string, newName: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RENAME_FILE, { oldPath, newName }),
+  getActive: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_GET_ACTIVE),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -372,8 +393,11 @@ contextBridge.exposeInMainWorld('electron', {
   ux: uxAPI,
   pricing: pricingAPI,
   update: updateAPI,
+  dialog: dialogAPI,
+  project: projectAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))
   },
 })
+

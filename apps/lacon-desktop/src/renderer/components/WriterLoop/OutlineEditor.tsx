@@ -23,6 +23,12 @@ interface OutlineEditorProps {
   stage: WriterLoopStage
   loading: boolean
   error: string | null
+  errorMeta?: {
+    timestamp: number
+    retryable: boolean
+    action: string
+    retryFn: (() => void) | null
+  } | null
   onUpdateSection: (sectionId: string, updates: Partial<OutlineSection>) => void
   onAddSection: (section?: Partial<OutlineSection>) => void
   onRemoveSection: (sectionId: string) => void
@@ -31,6 +37,85 @@ interface OutlineEditorProps {
   onApprove: () => void
   onRegenerate: (instruction: string) => void
   onReset: () => void
+  onClearError?: () => void
+}
+
+// ─────────────────────────── Error Banner ───────────────────────────
+
+function ErrorBanner({
+  error,
+  errorMeta,
+  onDismiss,
+}: {
+  error: string
+  errorMeta?: OutlineEditorProps['errorMeta']
+  onDismiss?: () => void
+}) {
+  const actionLabel = errorMeta?.action
+    ? errorMeta.action.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : 'Action'
+
+  return (
+    <div className="outline-editor__error-banner" role="alert" id="outline-editor-error">
+      <div className="outline-editor__error-icon">⚠️</div>
+      <div className="outline-editor__error-body">
+        <div className="outline-editor__error-title">{actionLabel} Failed</div>
+        <div className="outline-editor__error-message">{error}</div>
+        <div className="outline-editor__error-hint">
+          💡 Check that your AI provider is configured and your API key is valid in Settings.
+        </div>
+        <div className="outline-editor__error-actions">
+          {errorMeta?.retryable && errorMeta?.retryFn && (
+            <button
+              className="outline-editor__btn outline-editor__btn--primary outline-editor__btn--sm"
+              onClick={errorMeta.retryFn}
+            >
+              🔄 Retry
+            </button>
+          )}
+          {onDismiss && (
+            <button
+              className="outline-editor__btn outline-editor__btn--ghost outline-editor__btn--sm"
+              onClick={onDismiss}
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────── Loading Indicator ───────────────────────────
+
+function LoadingIndicator({ label }: { label: string }) {
+  const [elapsed, setElapsed] = useState(0)
+
+  React.useEffect(() => {
+    const start = Date.now()
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  return (
+    <div className="outline-editor outline-editor--loading" id="outline-editor-loading">
+      <div className="outline-editor__spinner" />
+      <p className="outline-editor__loading-label">{label}</p>
+      {elapsed > 3 && (
+        <p className="outline-editor__loading-elapsed">
+          {elapsed}s elapsed…{elapsed > 15 ? ' This is taking longer than usual.' : ''}
+        </p>
+      )}
+      {elapsed > 30 && (
+        <p className="outline-editor__loading-hint">
+          💡 If this takes too long, check your provider connection in Settings.
+        </p>
+      )}
+    </div>
+  )
 }
 
 // ─────────────────────────── Main Component ───────────────────────────
@@ -40,6 +125,7 @@ export function OutlineEditor({
   stage,
   loading,
   error,
+  errorMeta,
   onUpdateSection,
   onAddSection,
   onRemoveSection,
@@ -48,9 +134,42 @@ export function OutlineEditor({
   onApprove,
   onRegenerate,
   onReset,
+  onClearError,
 }: OutlineEditorProps) {
   const [editingInstruction, setEditingInstruction] = useState('')
   const isEditable = stage === 'awaiting-outline-approval'
+
+  // ── Error State (standalone — no outline present) ──
+  if (!outline && error && !loading) {
+    return (
+      <div className="outline-editor outline-editor--error" id="outline-editor-error-state">
+        <ErrorBanner error={error} errorMeta={errorMeta} onDismiss={onClearError} />
+        <div className="outline-editor__instruction-input" style={{ marginTop: '16px' }}>
+          <textarea
+            id="outline-instruction-input"
+            className="outline-editor__textarea"
+            placeholder="Describe what you want to write…"
+            value={editingInstruction}
+            onChange={e => setEditingInstruction(e.target.value)}
+            rows={3}
+          />
+          <button
+            id="outline-generate-btn"
+            className="outline-editor__btn outline-editor__btn--primary"
+            disabled={!editingInstruction.trim() || loading}
+            onClick={() => {
+              if (editingInstruction.trim()) {
+                onRegenerate(editingInstruction.trim())
+                setEditingInstruction('')
+              }
+            }}
+          >
+            ✨ Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // ── Empty State ──
   if (!outline && stage === 'idle') {
@@ -90,12 +209,7 @@ export function OutlineEditor({
 
   // ── Loading State ──
   if (loading && !outline) {
-    return (
-      <div className="outline-editor outline-editor--loading" id="outline-editor-loading">
-        <div className="outline-editor__spinner" />
-        <p>Generating outline…</p>
-      </div>
-    )
+    return <LoadingIndicator label="Generating outline…" />
   }
 
   if (!outline) {return null}
@@ -119,9 +233,7 @@ export function OutlineEditor({
 
       {/* ── Error ── */}
       {error && (
-        <div className="outline-editor__error" role="alert" id="outline-editor-error">
-          ⚠️ {error}
-        </div>
+        <ErrorBanner error={error} errorMeta={errorMeta} onDismiss={onClearError} />
       )}
 
       {/* ── Sections List ── */}

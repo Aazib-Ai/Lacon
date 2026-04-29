@@ -15,7 +15,14 @@ import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from
 import { join } from 'path'
 
 import type { RestoreResult, SnapshotListItem, SnapshotTrigger, VersionSnapshot } from '../../shared/writer-types'
-import { getProjectWorkspaceService } from './project-workspace-service'
+import { getActiveProjectPath, getProjectWorkspaceService } from './project-workspace-service'
+
+/** Resolve project path or throw if no project is open */
+function requireProjectPath(): string {
+  const p = getActiveProjectPath()
+  if (!p) throw new Error('No project is open')
+  return p
+}
 
 export class VersionService {
   /**
@@ -23,7 +30,7 @@ export class VersionService {
    * Sorted by creation date (newest first).
    */
   listSnapshots(documentId: string): SnapshotListItem[] {
-    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId)
+    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId, requireProjectPath())
 
     if (!existsSync(snapshotsDir)) {
       return []
@@ -64,7 +71,7 @@ export class VersionService {
    * Get the full content of a snapshot.
    */
   getSnapshot(documentId: string, snapshotId: string): VersionSnapshot | null {
-    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId)
+    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId, requireProjectPath())
     const snapshotPath = join(snapshotsDir, `${snapshotId}.json`)
 
     if (!existsSync(snapshotPath)) {
@@ -120,7 +127,7 @@ export class VersionService {
    * Add or update a milestone label on a snapshot.
    */
   addMilestoneLabel(documentId: string, snapshotId: string, label: string): VersionSnapshot {
-    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId)
+    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId, requireProjectPath())
     const snapshotPath = join(snapshotsDir, `${snapshotId}.json`)
 
     if (!existsSync(snapshotPath)) {
@@ -145,7 +152,7 @@ export class VersionService {
    * Delete a snapshot.
    */
   deleteSnapshot(documentId: string, snapshotId: string): void {
-    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId)
+    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId, requireProjectPath())
     const snapshotPath = join(snapshotsDir, `${snapshotId}.json`)
 
     if (!existsSync(snapshotPath)) {
@@ -172,7 +179,7 @@ export class VersionService {
    * Create a new snapshot (used internally for safety snapshots).
    */
   private createSnapshot(documentId: string, trigger: SnapshotTrigger, content: any, label?: string): VersionSnapshot {
-    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId)
+    const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId, requireProjectPath())
 
     const snapshot: VersionSnapshot = {
       id: randomUUID(),

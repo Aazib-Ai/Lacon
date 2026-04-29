@@ -511,17 +511,20 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showKey, setShowKey] = useState(false)
+  const [useCodingPlan, setUseCodingPlan] = useState(false)
 
   const providerTypes: Array<{ value: ProviderType; label: string }> = [
     { value: 'openai', label: 'OpenAI' },
     { value: 'anthropic', label: 'Anthropic' },
     { value: 'gemini', label: 'Google Gemini' },
     { value: 'openrouter', label: 'OpenRouter' },
+    { value: 'zai', label: 'Z.AI (GLM Coding Plan)' },
     { value: 'local', label: 'Local Model' },
     { value: 'custom-openai-compatible', label: 'Custom Endpoint' },
   ]
 
   const isLocal = providerType === 'local'
+  const isZai = providerType === 'zai'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -530,6 +533,14 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
 
     try {
       const providerId = `${providerType}-${Date.now()}`
+
+      // Determine base URL for Z.AI based on coding plan toggle
+      let resolvedBaseUrl = baseUrl || undefined
+      if (isZai) {
+        resolvedBaseUrl = useCodingPlan
+          ? 'https://api.z.ai/api/coding/paas/v4'
+          : 'https://api.z.ai/api/paas/v4'
+      }
 
       // Create API key in keystore (encrypted via OS keychain)
       const keyId = await window.electron.provider.createKey(providerId, providerType, `${name} API Key`, apiKey)
@@ -540,7 +551,7 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
         type: providerType,
         name: name || providerType,
         apiKeyId: keyId,
-        baseUrl: baseUrl || undefined,
+        baseUrl: resolvedBaseUrl,
         defaultModel: defaultModel || undefined,
         enabled: true,
         createdAt: Date.now(),
@@ -572,6 +583,40 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
                 Studio) and makes no guarantees about output quality, speed, or compatibility. Ensure your local server
                 is running before adding.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Z.AI Coding Plan Notice */}
+        {isZai && (
+          <div className="zai-plan-notice form-disclaimer">
+            <span className="disclaimer-icon">🚀</span>
+            <div>
+              <strong>Z.AI — GLM Coding Plan</strong>
+              <p>
+                Monthly access to GLM-5.1 and other world-class models from just $18/month.
+                Get your API key from the{' '}
+                <a href="https://z.ai/manage-apikey/apikey-list" target="_blank" rel="noopener noreferrer">Z.AI Open Platform</a>.
+              </p>
+
+              <label className="coding-plan-toggle">
+                <input
+                  type="checkbox"
+                  checked={useCodingPlan}
+                  onChange={e => setUseCodingPlan(e.target.checked)}
+                />
+                <span>Use GLM Coding Plan endpoint</span>
+              </label>
+              {useCodingPlan && (
+                <p className="coding-plan-endpoint-hint">
+                  Coding endpoint: <code>api.z.ai/api/coding/paas/v4</code>
+                </p>
+              )}
+              {!useCodingPlan && (
+                <p className="coding-plan-endpoint-hint">
+                  General endpoint: <code>api.z.ai/api/paas/v4</code>
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -615,7 +660,7 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={e => setApiKey(e.target.value)}
-                placeholder={isLocal ? 'Optional for local models' : 'sk-...'}
+                placeholder={isLocal ? 'Optional for local models' : isZai ? 'Your Z.AI API Key' : 'sk-...'}
                 required={!isLocal}
               />
               <button
@@ -643,6 +688,8 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
             </div>
           )}
 
+          {/* Z.AI doesn't need manual base-url — it's auto-selected via the coding plan toggle */}
+
           <div className="form-group">
             <label htmlFor="default-model">Default Model (optional)</label>
             <input
@@ -650,7 +697,7 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
               type="text"
               value={defaultModel}
               onChange={e => setDefaultModel(e.target.value)}
-              placeholder={isLocal ? 'llama3.1' : 'gpt-4o'}
+              placeholder={isLocal ? 'llama3.1' : isZai ? 'glm-5.1' : 'gpt-4o'}
             />
           </div>
 

@@ -90,6 +90,18 @@
   @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
 }
 
+/* Remove focus ring from the editor itself — it's a document, not a button */
+.ProseMirror:focus-visible,
+.ProseMirror:focus,
+.ProseMirror-focused,
+.paginated-document:focus-within,
+.paginated-document *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
 *:focus:not(:focus-visible) {
   outline: none;
 }
@@ -183,46 +195,268 @@
 .ProseMirror mark[data-color="#fdba74"] { background-color: #fdba74; }
 .ProseMirror mark:not([data-color]) { background-color: #fef08a; }
 
+/* ─── Paginated Editor — Canvas & Page Styles ─── */
+
+/**
+ * The outer scrollable canvas — the grey area behind the white pages.
+ * Matches Google Docs' grey workspace background.
+ */
+.paginated-canvas {
+  background: #e8eaed;
+}
+
+.dark .paginated-canvas {
+  background: hsl(224 30% 10%);
+}
+
+/**
+ * The centered column that holds the scaled document.
+ */
+.paginated-document-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 24px;
+  padding-bottom: 24px;
+  min-height: 100%;
+}
+
+/**
+ * The main document — a white paper-like container.
+ * Width is set inline (816px = 8.5in at 96dpi).
+ */
+.paginated-document {
+  position: relative;
+  background: #ffffff;
+  border-radius: 2px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 200ms ease;
+}
+
+.paginated-document:hover {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.dark .paginated-document {
+  background: hsl(224 40% 9%);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.dark .paginated-document:hover {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/**
+ * The editor content area — continuous flow with page-matching padding.
+ * Padding is set inline to match the page margin constants.
+ */
+.paginated-editor-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Page Break Overlay ─── */
+
+/**
+ * A visual separator rendered on top of the editor content at each
+ * page boundary. Creates the illusion of separate pages.
+ */
+.page-break-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Shift up by half the total overlay height so the break is centered on the content boundary */
+  transform: translateY(-50%);
+  /* Overlay height = bottom-margin(96px) + gap(40px) + top-margin(96px) = 232px, but we use individual parts */
+}
+
+/**
+ * Bottom shadow — simulates the bottom edge of the current page.
+ * This is a thin gradient that fades from white to the canvas grey.
+ */
+.page-break-bottom-shadow {
+  width: 100%;
+  height: 96px; /* 1 inch bottom margin */
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 1) 20%,
+    rgba(255, 255, 255, 1) 100%
+  );
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .page-break-bottom-shadow {
+  background: linear-gradient(
+    to bottom,
+    rgba(12, 17, 28, 0) 0%,
+    rgba(12, 17, 28, 1) 20%,
+    rgba(12, 17, 28, 1) 100%
+  );
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/**
+ * The visible gap between pages — shows the grey canvas.
+ */
+.page-break-gap {
+  width: calc(100% + 20px); /* Slightly wider than the page to bleed into the canvas */
+  height: 40px;
+  background: #e8eaed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.dark .page-break-gap {
+  background: hsl(224 30% 10%);
+}
+
+/**
+ * Page number label shown in the gap between pages.
+ */
+.page-number-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #80868b;
+  letter-spacing: 0.02em;
+  user-select: none;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.dark .page-number-label {
+  color: hsl(218 11% 55%);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/**
+ * Top shadow — simulates the top edge of the next page.
+ */
+.page-break-top-shadow {
+  width: 100%;
+  height: 96px; /* 1 inch top margin */
+  background: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 1) 20%,
+    rgba(255, 255, 255, 1) 100%
+  );
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.dark .page-break-top-shadow {
+  background: linear-gradient(
+    to top,
+    rgba(12, 17, 28, 0) 0%,
+    rgba(12, 17, 28, 1) 20%,
+    rgba(12, 17, 28, 1) 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Page Footer Indicator ─── */
+
+.page-footer-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.page-number-bottom {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  color: #9aa0a6;
+  letter-spacing: 0.03em;
+  user-select: none;
+}
+
+.dark .page-number-bottom {
+  color: hsl(218 11% 45%);
+}
+
+/* ─── ProseMirror Editor Styles ─── */
+
 .ProseMirror {
-  outline: none;
-  min-height: 800px;
+  outline: none !important;
+  min-height: 768px; /* Roughly 8in — first page content area */
+  cursor: text;
+}
+
+.ProseMirror:focus {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .prose { position: relative; }
 
 .ProseMirror p {
-  margin: 1rem 0;
+  margin: 0.75rem 0;
   line-height: 1.8;
   color: hsl(var(--foreground));
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 11pt;
 }
 
 .ProseMirror h1 {
-  font-size: 2.25rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 2rem;
   font-weight: 700;
-  margin: 2rem 0 1rem;
+  margin: 1.75rem 0 0.75rem;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
 .ProseMirror h2 {
-  font-size: 1.75rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.5rem;
   font-weight: 600;
-  margin: 1.75rem 0 0.875rem;
+  margin: 1.5rem 0 0.625rem;
   line-height: 1.3;
   letter-spacing: -0.01em;
 }
 
 .ProseMirror h3 {
-  font-size: 1.375rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.25rem;
   font-weight: 600;
-  margin: 1.5rem 0 0.75rem;
+  margin: 1.25rem 0 0.5rem;
   line-height: 1.4;
 }
 
 .ProseMirror h4 {
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 1.125rem;
   font-weight: 600;
-  margin: 1.25rem 0 0.625rem;
+  margin: 1rem 0 0.5rem;
   line-height: 1.5;
 }
 
@@ -343,3 +577,54 @@
 [data-zen="true"] .lacon-statusbar > *:not(.zen-exit-hint) {
   display: none;
 }
+
+/* ─── Sidebar Resize Handle ─── */
+.sidebar-resize-handle {
+  position: relative;
+  flex-shrink: 0;
+  background: transparent;
+  z-index: 10;
+}
+
+.sidebar-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 12px;
+  left: -4px;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:active {
+  background: hsl(var(--primary) / 0.04);
+}
+
+[data-zen="true"] .sidebar-resize-handle {
+  display: none;
+}
+
+/* ─── Right Panel Resize Handle ─── */
+.right-panel-resize-handle {
+  position: relative;
+  flex-shrink: 0;
+  background: transparent;
+  z-index: 10;
+}
+
+.right-panel-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 12px;
+  left: -4px;
+}
+
+.right-panel-resize-handle:hover,
+.right-panel-resize-handle:active {
+  background: hsl(var(--primary) / 0.04);
+}
+
+[data-zen="true"] .right-panel-resize-handle {
+  display: none;
+}
+

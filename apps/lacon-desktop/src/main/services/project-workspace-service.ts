@@ -1,21 +1,43 @@
 /**
- * Project Workspace Service — Phase 1
+ * Project Workspace Service — Portable Folder System
  *
- * Manages the .lacon/ folder structure for each document.
- * Responsible for:
- * - Creating workspace directories per document
- * - Reading/writing session.json
- * - Providing paths for skills, snapshots, research
+ * Manages the .lacon/ folder structure INSIDE the user's project folder.
+ * All AI context (sessions, outlines, research, reviews, snapshots, skills)
+ * lives alongside the user's documents so the whole folder is portable.
+ *
+ * Folder layout:
+ *   <project>/
+ *   ├── chapter-1.lacon
+ *   └── .lacon/
+ *       ├── config.json
+ *       ├── skills/
+ *       └── documents/
+ *           └── chapter-1/
+ *               ├── session.json
+ *               ├── outline.json
+ *               ├── research.json
+ *               ├── reviews/
+ *               └── snapshots/
  */
 
-import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { basename, extname, join } from 'path'
 
 import type { ProjectWorkspace, WriterSession } from '../../shared/writer-types'
 
 /**
- * Default session state for a new project.
+ * Extract a clean folder name from a document filename.
+ * "chapter-1.lacon" → "chapter-1"
+ * "My Story.md" → "My Story"
+ */
+function docNameFromFile(documentId: string): string {
+  // If it looks like a path, use just the basename
+  const base = basename(documentId)
+  return base.replace(/\.[^.]+$/, '')  // strip extension
+}
+
+/**
+ * Default session state for a new document.
  */
 function createDefaultSession(documentId: string): WriterSession {
   return {
@@ -33,30 +55,18 @@ function createDefaultSession(documentId: string): WriterSession {
 }
 
 export class ProjectWorkspaceService {
-  private workspacesRoot: string
-
-  constructor() {
-    const userDataPath = app.getPath('userData')
-    this.workspacesRoot = join(userDataPath, 'workspaces')
-
-    if (!existsSync(this.workspacesRoot)) {
-      mkdirSync(this.workspacesRoot, { recursive: true })
-    }
-  }
-
   /**
-   * Ensure the .lacon/ folder structure exists for a document.
-   * Creates it if it doesn't exist.
+   * Ensure the per-document workspace exists inside .lacon/documents/<docName>/.
+   * Requires the project folder path as context.
    */
-  ensureWorkspace(documentId: string): ProjectWorkspace {
-    const rootPath = join(this.workspacesRoot, documentId)
-    const laconPath = join(rootPath, '.lacon')
+  ensureWorkspace(documentId: string, projectPath: string): ProjectWorkspace {
+    const docName = docNameFromFile(documentId)
+    const laconPath = join(projectPath, '.lacon', 'documents', docName)
 
     // Create directory structure
     const dirs = [
-      rootPath,
       laconPath,
-      join(laconPath, 'skills'),
+      join(laconPath, 'reviews'),
       join(laconPath, 'snapshots'),
     ]
 
@@ -83,14 +93,8 @@ export class ProjectWorkspaceService {
       )
     }
 
-    // Initialize research.md if missing
-    const researchMdPath = join(laconPath, 'research.md')
-    if (!existsSync(researchMdPath)) {
-      writeFileSync(researchMdPath, '# Research Log\n\nNo research entries yet.\n', 'utf-8')
-    }
-
     return {
-      rootPath,
+      rootPath: projectPath,
       laconPath,
       documentId,
       createdAt: new Date().toISOString(),
@@ -100,23 +104,24 @@ export class ProjectWorkspaceService {
   /**
    * Get the workspace for a document (creates if missing).
    */
-  getWorkspace(documentId: string): ProjectWorkspace {
-    return this.ensureWorkspace(documentId)
+  getWorkspace(documentId: string, projectPath: string): ProjectWorkspace {
+    return this.ensureWorkspace(documentId, projectPath)
   }
 
   /**
    * Check if a workspace exists for a document.
    */
-  hasWorkspace(documentId: string): boolean {
-    const rootPath = join(this.workspacesRoot, documentId)
-    return existsSync(join(rootPath, '.lacon'))
+  hasWorkspace(documentId: string, projectPath: string): boolean {
+    const docName = docNameFromFile(documentId)
+    const laconPath = join(projectPath, '.lacon', 'documents', docName)
+    return existsSync(laconPath)
   }
 
   /**
    * Read the session state for a document.
    */
-  getSession(documentId: string): WriterSession {
-    const workspace = this.ensureWorkspace(documentId)
+  getSession(documentId: string, projectPath: string): WriterSession {
+    const workspace = this.ensureWorkspace(documentId, projectPath)
     const sessionPath = join(workspace.laconPath, 'session.json')
 
     try {
@@ -132,15 +137,15 @@ export class ProjectWorkspaceService {
   /**
    * Update the session state for a document.
    */
-  updateSession(documentId: string, updates: Partial<WriterSession>): WriterSession {
-    const current = this.getSession(documentId)
+  updateSession(documentId: string, projectPath: string, updates: Partial<WriterSession>): WriterSession {
+    const current = this.getSession(documentId, projectPath)
     const updated: WriterSession = {
       ...current,
       ...updates,
       lastActivityAt: new Date().toISOString(),
     }
 
-    const workspace = this.ensureWorkspace(documentId)
+    const workspace = this.ensureWorkspace(documentId, projectPath)
     const sessionPath = join(workspace.laconPath, 'session.json')
     writeFileSync(sessionPath, JSON.stringify(updated, null, 2), 'utf-8')
 
@@ -148,30 +153,50 @@ export class ProjectWorkspaceService {
   }
 
   /**
-   * Get the path to the user/agent skills directory for a document.
+   * Get the path to the project-level skills directory.
+   * Skills are shared across all documents in the project.
    */
-  getSkillsPath(documentId: string): string {
-    const workspace = this.ensureWorkspace(documentId)
-    return join(workspace.laconPath, 'skills')
+  getSkillsPath(projectPath: string): string {
+    const skillsDir = join(projectPath, '.lacon', 'skills')
+    if (!existsSync(skillsDir)) {
+      mkdirSync(skillsDir, { recursive: true })
+    }
+    return skillsDir
   }
 
   /**
    * Get the path to the snapshots directory for a document.
    */
-  getSnapshotsPath(documentId: string): string {
-    const workspace = this.ensureWorkspace(documentId)
+  getSnapshotsPath(documentId: string, projectPath: string): string {
+    const workspace = this.ensureWorkspace(documentId, projectPath)
     return join(workspace.laconPath, 'snapshots')
   }
 
   /**
    * Get the path to the research log for a document.
    */
-  getResearchPath(documentId: string): { json: string; md: string } {
-    const workspace = this.ensureWorkspace(documentId)
+  getResearchPath(documentId: string, projectPath: string): { json: string; md: string } {
+    const workspace = this.ensureWorkspace(documentId, projectPath)
     return {
       json: join(workspace.laconPath, 'research.json'),
       md: join(workspace.laconPath, 'research.md'),
     }
+  }
+
+  /**
+   * Get the path to the reviews directory for a document.
+   */
+  getReviewsPath(documentId: string, projectPath: string): string {
+    const workspace = this.ensureWorkspace(documentId, projectPath)
+    return join(workspace.laconPath, 'reviews')
+  }
+
+  /**
+   * Get the path to the outline file for a document.
+   */
+  getOutlinePath(documentId: string, projectPath: string): string {
+    const workspace = this.ensureWorkspace(documentId, projectPath)
+    return join(workspace.laconPath, 'outline.json')
   }
 }
 
@@ -183,4 +208,23 @@ export function getProjectWorkspaceService(): ProjectWorkspaceService {
     instance = new ProjectWorkspaceService()
   }
   return instance
+}
+
+/**
+ * Read the active project path from the persisted settings.
+ * This allows services that don't have the project path in scope
+ * to resolve it automatically.
+ */
+export function getActiveProjectPath(): string | null {
+  try {
+    const { app } = require('electron')
+    const { readFileSync } = require('fs')
+    const { join } = require('path')
+    const settingsPath = join(app.getPath('userData'), 'lacon-project-settings.json')
+    const data = readFileSync(settingsPath, 'utf-8')
+    const settings = JSON.parse(data)
+    return settings.activeProjectPath || null
+  } catch {
+    return null
+  }
 }

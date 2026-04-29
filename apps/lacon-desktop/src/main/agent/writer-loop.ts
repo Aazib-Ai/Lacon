@@ -30,7 +30,8 @@ import type {
   WriterOutline,
   WriterSession,
 } from '../../shared/writer-types'
-import { getProjectWorkspaceService } from '../services/project-workspace-service'
+import { getProviderManager } from '../providers/provider-manager'
+import { getActiveProjectPath, getProjectWorkspaceService } from '../services/project-workspace-service'
 
 // ─────────────────────────── Transition Map ───────────────────────────
 
@@ -72,20 +73,183 @@ export type WriterLoopListener = (event: WriterLoopEvent) => void
 
 // ─────────────────────────── Planner Module ───────────────────────────
 
+
+
 /**
- * Generate a structured outline from a user instruction + composed skill prompt + research context.
- *
- * In Phase 2 this is a deterministic template generator.
- * Phase 3+ will delegate to an LLM via the provider layer.
+ * Build the system prompt for outline generation.
  */
-export function generateOutline(
+function buildOutlineSystemPrompt(composedSkillPrompt: string): string {
+  const skillContext = composedSkillPrompt
+    ? `\n\nThe writer has configured the following writing style/skill guidance. Use this to shape the outline structure, tone, and section focus:\n\n${composedSkillPrompt}`
+    : ''
+
+  return `You are an expert writing planner. The user will describe a topic or piece they want to write.
+Your job is to analyze what they want to write about and produce a comprehensive, well-structured outline that covers all the relevant aspects, arguments, and supporting points for their topic.
+
+Think deeply about:
+- What are the key themes and subtopics related to this subject?
+- What logical structure would make this piece most compelling?
+- What supporting evidence, examples, or arguments should each section cover?
+- What is the right scope and depth for each section?
+
+Respond ONLY with valid JSON matching this exact schema (no markdown fences, no extra text):
+
+{
+  "title": "A compelling title for the piece",
+  "sections": [
+    {
+      "title": "Section title",
+      "keyPoints": ["Key point 1", "Key point 2", "Key point 3"],
+      "subsections": [
+        {
+          "title": "Subsection title",
+          "keyPoints": ["Sub key point 1"],
+          "estimatedWords": 150
+        }
+      ],
+      "estimatedWords": 400
+    }
+  ]
+}
+
+Rules:
+- Create between 3 and 8 sections depending on scope
+- Each section should have 2-5 key points that describe what to cover
+- Subsections are optional — only include them when a section is complex enough to warrant subdivision
+- estimatedWords should reflect the relative depth of each section (100-800 range)
+- Key points should be specific and actionable, not generic (e.g., "Analyze the impact of X on Y" not "Write about the topic")
+- The outline should feel like it was crafted by a subject-matter expert who understands the topic deeply${skillContext}`
+}
+
+/**
+ * Build the user message for outline generation.
+ */
+function buildOutlineUserMessage(instruction: string, researchContext?: ResearchContext): string {
+  let message = `I want to write about: ${instruction}`
+
+  if (researchContext && researchContext.entries.length > 0) {
+    message += '\n\nResearch context available:'
+    if (researchContext.summary) {
+      message += `\nSummary: ${researchContext.summary}`
+    }
+    for (const entry of researchContext.entries.slice(0, 5)) {
+      message += `\n- ${entry.query}: ${entry.excerpts.slice(0, 2).join('; ')}`
+    }
+  }
+
+  return message
+}
+
+/**
+ * Parse the LLM's JSON response into a WriterOutline.
+ * Validates and assigns UUIDs to each section/subsection.
+ */
+function parseOutlineResponse(raw: string, instruction: string): WriterOutline | null {
+  try {
+    // Strip markdown fences if present
+    let cleaned = raw.trim()
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim()
+    }
+
+    const parsed = JSON.parse(cleaned)
+
+    if (!parsed.title || !Array.isArray(parsed.sections) || parsed.sections.length === 0) {
+      return null
+    }
+
+    const sections: OutlineSection[] = parsed.sections.map((s: any) => ({
+      id: randomUUID(),
+      title: String(s.title || 'Untitled Section'),
+      keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints.map(String) : [],
+      subsections: Array.isArray(s.subsections)
+        ? s.subsections.map((ss: any) => ({
+            id: randomUUID(),
+            title: String(ss.title || 'Untitled Subsection'),
+            keyPoints: Array.isArray(ss.keyPoints) ? ss.keyPoints.map(String) : [],
+            estimatedWords: typeof ss.estimatedWords === 'number' ? ss.estimatedWords : 150,
+          }))
+        : [],
+      estimatedWords: typeof s.estimatedWords === 'number' ? s.estimatedWords : 300,
+    }))
+
+    const totalEstimatedWords = sections.reduce((sum, s) => sum + s.estimatedWords, 0)
+
+    return {
+      title: String(parsed.title),
+      sections,
+      totalEstimatedWords,
+      createdAt: new Date().toISOString(),
+    }
+  } catch (err) {
+    console.error('[Planner] Failed to parse LLM outline response:', err)
+    return null
+  }
+}
+
+/**
+ * Generate a structured outline by calling the configured LLM provider.
+ * Falls back to a deterministic template if no provider is available or the LLM call fails.
+ */
+export async function generateOutline(
   instruction: string,
   composedSkillPrompt: string,
   researchContext?: ResearchContext,
-): WriterOutline {
-  // Parse a loose instruction into sections.
-  // The instruction itself becomes the title; we derive sections from keywords or fall back to a sensible default.
+): Promise<WriterOutline> {
+  // Try LLM-powered outline generation
+  try {
+    const pm = getProviderManager()
+    const providers = pm.listProviders()
+    const enabledProvider = providers.find(p => p.enabled)
 
+    if (enabledProvider) {
+      const modelId = enabledProvider.defaultModel || 'gpt-4o-mini'
+
+      console.log(`[Planner] Generating outline via LLM (provider: ${enabledProvider.id}, model: ${modelId})`)
+
+      const response = await pm.chatCompletion(
+        enabledProvider.id,
+        {
+          model: modelId,
+          messages: [
+            { role: 'system', content: buildOutlineSystemPrompt(composedSkillPrompt) },
+            { role: 'user', content: buildOutlineUserMessage(instruction, researchContext) },
+          ],
+          temperature: 0.7,
+          maxTokens: 4000,
+        },
+        'outline-generation',
+      )
+
+      const content = response.choices?.[0]?.message?.content
+      if (content) {
+        const outline = parseOutlineResponse(content, instruction)
+        if (outline) {
+          console.log(`[Planner] LLM outline generated: ${outline.sections.length} sections, ~${outline.totalEstimatedWords} words`)
+          return outline
+        }
+        console.warn('[Planner] LLM returned unparseable outline, falling back to deterministic')
+      }
+    } else {
+      console.log('[Planner] No enabled provider found, using deterministic outline')
+    }
+  } catch (err) {
+    console.warn('[Planner] LLM outline generation failed, falling back to deterministic:', err)
+  }
+
+  // Fallback: deterministic template
+  return generateOutlineFallback(instruction, composedSkillPrompt, researchContext)
+}
+
+/**
+ * Deterministic fallback outline generator (original Phase 2 logic).
+ * Used when no LLM provider is configured or the LLM call fails.
+ */
+function generateOutlineFallback(
+  instruction: string,
+  _composedSkillPrompt: string,
+  researchContext?: ResearchContext,
+): WriterOutline {
   const title = instruction.length > 120 ? `${instruction.slice(0, 117)}...` : instruction
 
   // Simple heuristic: split on numbered lines, bullet points, or semi-colons
@@ -190,7 +354,9 @@ export class WriterLoop {
 
   getSession(): WriterSession {
     const ws = getProjectWorkspaceService()
-    return ws.getSession(this.documentId)
+    const projectPath = getActiveProjectPath()
+    if (!projectPath) throw new Error('No project is open')
+    return ws.getSession(this.documentId, projectPath)
   }
 
   getOutline(): WriterOutline | null {
@@ -200,7 +366,7 @@ export class WriterLoop {
 
     // Try loading from persisted session
     const ws = getProjectWorkspaceService()
-    const workspace = ws.ensureWorkspace(this.documentId)
+    const workspace = ws.ensureWorkspace(this.documentId, getActiveProjectPath()!)
     const outlinePath = join(workspace.laconPath, 'outline.json')
     if (existsSync(outlinePath)) {
       try {
@@ -240,14 +406,14 @@ export class WriterLoop {
   // ── Planning ──
 
   /**
-   * Start the planning stage: generate an outline from the instruction.
+   * Start the planning stage: generate an outline from the instruction via LLM.
    */
-  startPlanning(instruction: string, composedSkillPrompt: string, researchContext?: ResearchContext): WriterOutline {
+  async startPlanning(instruction: string, composedSkillPrompt: string, researchContext?: ResearchContext): Promise<WriterOutline> {
     // Transition to planning
     this.transition('planning')
 
-    // Generate outline
-    const outline = generateOutline(instruction, composedSkillPrompt, researchContext)
+    // Generate outline (now async — calls LLM)
+    const outline = await generateOutline(instruction, composedSkillPrompt, researchContext)
     this.currentOutline = outline
 
     // Persist outline
@@ -474,17 +640,24 @@ export class WriterLoop {
     }
 
     // Simulated generation (Phase 3 deterministic template; LLM integration in production)
-    const keyPointsText = section.keyPoints.map((kp, i) => `${i + 1}. ${kp}`).join('\n')
+    // Output is HTML — matches the .lacon file format and can be injected directly into TipTap
+    const keyPointsHtml = section.keyPoints.map((kp, i) => `<li>${kp}</li>`).join('\n')
+    const subsectionsHtml = section.subsections
+      .map(ss => {
+        const ssPoints = ss.keyPoints.map(kp => `<p>${kp}.</p>`).join('\n')
+        return `<h3>${ss.title}</h3>\n${ssPoints}`
+      })
+      .join('\n')
     const generatedContent = [
-      `## ${section.title}\n`,
-      section.subsections.map(ss => `### ${ss.title}\n\n${ss.keyPoints.map(kp => `${kp}.`).join(' ')}\n`).join('\n'),
-      `\n${keyPointsText}\n`,
-      `\nThis section covers approximately ${section.estimatedWords} words on the topic of "${section.title}".`,
-      neighborContext ? `\n\n[Context: ${neighborContext}]` : '',
-    ].join('')
+      `<h2>${section.title}</h2>`,
+      subsectionsHtml,
+      `<ol>\n${keyPointsHtml}\n</ol>`,
+      `<p>This section covers approximately ${section.estimatedWords} words on the topic of "${section.title}".</p>`,
+      neighborContext ? `<p><em>Context: ${neighborContext}</em></p>` : '',
+    ].filter(Boolean).join('\n')
 
     // Simulated token usage
-    const inputTokens = Math.ceil((contextSummary.length + neighborContext.length + keyPointsText.length) / 4)
+    const inputTokens = Math.ceil((contextSummary.length + neighborContext.length + keyPointsHtml.length) / 4)
     const outputTokens = Math.ceil(generatedContent.length / 4)
     const tokenUsage: TokenUsage = {
       inputTokens,
@@ -569,7 +742,9 @@ export class WriterLoop {
 
   createSnapshot(trigger: DocumentSnapshot['trigger'], content?: any): DocumentSnapshot {
     const ws = getProjectWorkspaceService()
-    const snapshotsDir = ws.getSnapshotsPath(this.documentId)
+    const projectPath = getActiveProjectPath()
+    if (!projectPath) throw new Error('No project is open')
+    const snapshotsDir = ws.getSnapshotsPath(this.documentId, projectPath)
 
     const snapshot: DocumentSnapshot = {
       id: randomUUID(),
@@ -590,7 +765,7 @@ export class WriterLoop {
 
   private persistOutline(outline: WriterOutline): void {
     const ws = getProjectWorkspaceService()
-    const workspace = ws.ensureWorkspace(this.documentId)
+    const workspace = ws.ensureWorkspace(this.documentId, getActiveProjectPath()!)
     const outlinePath = join(workspace.laconPath, 'outline.json')
     writeFileSync(outlinePath, JSON.stringify(outline, null, 2), 'utf-8')
   }

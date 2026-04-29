@@ -22,6 +22,12 @@ body {
   outline-offset: 2px;
 }
 
+/* Remove focus ring from the editor — it's a document, not a button */
+.ProseMirror:focus-visible,
+.ProseMirror:focus {
+  outline: none !important;
+}
+
 /* Remove focus outline for mouse users */
 *:focus:not(:focus-visible) {
   outline: none;
@@ -161,8 +167,8 @@ body {
 }
 
 .editor-content {
-  border: 1px solid #ddd;
-  border-radius: 0 0 4px 4px;
+  border: none;
+  border-radius: 0;
   padding: 1rem;
   min-height: 400px;
   background: white;
@@ -174,8 +180,9 @@ body {
 }
 
 .ProseMirror {
-  outline: none;
-  min-height: 400px;
+  outline: none !important;
+  min-height: 768px;
+  cursor: text;
 }
 
 .ProseMirror p {
@@ -496,15 +503,25 @@ hr {
 .provider-settings {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0;
   width: 600px;
   height: 100vh;
   background: var(--color-surfacePrimary, #ffffff);
-  border-left: 1px solid var(--color-borderSubtle, #e0e0e0);
+  border-right: 1px solid var(--color-borderSubtle, #e0e0e0);
   display: flex;
   flex-direction: column;
   z-index: 1000;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  animation: slideInFromLeft 0.25s ease-out;
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .provider-settings-header {

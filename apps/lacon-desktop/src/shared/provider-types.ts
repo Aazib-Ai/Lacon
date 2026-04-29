@@ -3,7 +3,7 @@
  * Defines the common interface contract for all AI model providers
  */
 
-export type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'local' | 'custom-openai-compatible'
+export type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'local' | 'custom-openai-compatible' | 'zai'
 
 export interface ProviderConfig {
   id: string

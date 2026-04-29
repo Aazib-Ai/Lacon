@@ -181,6 +181,102 @@
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
+/* ── Error Banner (rich) ── */
+
+.outline-editor__error-banner {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  animation: outline-expand 0.25s ease-out;
+}
+
+.outline-editor__error-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.outline-editor__error-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.outline-editor__error-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f87171;
+}
+
+.outline-editor__error-message {
+  font-size: 0.8rem;
+  color: #fca5a5;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.outline-editor__error-hint {
+  font-size: 0.75rem;
+  color: var(--color-textSecondary, #a1a1aa);
+  line-height: 1.4;
+}
+
+.outline-editor__error-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+/* ── Loading state enhancements ── */
+
+.outline-editor__loading-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text, #e4e4e7);
+  margin: 0;
+}
+
+.outline-editor__loading-elapsed {
+  font-size: 0.75rem;
+  color: var(--color-textSecondary, #a1a1aa);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.outline-editor__loading-hint {
+  font-size: 0.75rem;
+  color: #fbbf24;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+/* ── Error state container ── */
+
+.outline-editor--error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  text-align: center;
+  gap: 0.75rem;
+}
+
+/* ── Small button variant ── */
+
+.outline-editor__btn--sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  border-radius: 6px;
+}
+
 /* ─── Sections List ─── */
 
 .outline-editor__sections {

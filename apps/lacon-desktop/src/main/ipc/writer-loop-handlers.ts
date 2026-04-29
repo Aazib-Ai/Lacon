@@ -28,7 +28,7 @@ import type { OutlineSection, OutlineSubsection, WriterOutline } from '@/shared/
 import { getReviewer } from '../agent/reviewer'
 import { getWriterLoop } from '../agent/writer-loop'
 import { redactObject } from '../security/log-redaction'
-import { getProjectWorkspaceService } from '../services/project-workspace-service'
+import { getActiveProjectPath, getProjectWorkspaceService } from '../services/project-workspace-service'
 
 /**
  * Generic handler wrapper (same pattern as skill-handlers.ts)
@@ -86,7 +86,7 @@ export function registerWriterLoopHandlers(): void {
     ) => {
       return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_START_PLANNING, payload, async () => {
         const loop = getWriterLoop(payload.documentId)
-        const outline = loop.startPlanning(
+        const outline = await loop.startPlanning(
           payload.instruction,
           payload.composedSkillPrompt || '',
           payload.researchContext,
@@ -267,7 +267,9 @@ export function registerWriterLoopHandlers(): void {
     async (_event, payload: { documentId: string; updates: any }) => {
       return handleWriterIpc(IPC_CHANNELS.WORKSPACE_UPDATE_SESSION, payload, async () => {
         const ws = getProjectWorkspaceService()
-        const session = ws.updateSession(payload.documentId, payload.updates)
+        const projectPath = getActiveProjectPath()
+        if (!projectPath) throw new Error('No project is open')
+        const session = ws.updateSession(payload.documentId, projectPath, payload.updates)
         return { success: true, data: session }
       })
     },

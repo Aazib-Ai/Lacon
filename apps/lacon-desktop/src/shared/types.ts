@@ -253,6 +253,18 @@ export interface UpdateAPI {
   getInfo: () => Promise<any>
 }
 
+// Project API (Folder-based document system)
+export interface ProjectAPI {
+  openFolder: () => Promise<any>
+  listFiles: () => Promise<any>
+  readFile: (filePath: string) => Promise<any>
+  saveFile: (filePath: string, content: string) => Promise<any>
+  createFile: (fileName: string) => Promise<any>
+  deleteFile: (filePath: string) => Promise<any>
+  renameFile: (oldPath: string, newName: string) => Promise<any>
+  getActive: () => Promise<any>
+}
+
 // Extend Window interface to include our API
 declare global {
   interface Window {
@@ -275,6 +287,7 @@ declare global {
       ux: UxAPI
       pricing: PricingAPI
       update: UpdateAPI
+      project: ProjectAPI
       invoke: (channel: string, ...args: any[]) => Promise<any>
       onAgentStream: (callback: (chunk: any) => void) => void
     }

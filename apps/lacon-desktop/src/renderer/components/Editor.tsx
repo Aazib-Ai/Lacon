@@ -101,6 +101,15 @@ interface EditorToolbarProps {
   editor: TiptapEditor | null
 }
 
+/**
+ * Prevent mousedown from stealing focus from the Tiptap editor.
+ * This is critical — without this, toolbar buttons move browser focus
+ * away from the editor, and the Tiptap commands silently fail.
+ */
+const preventFocusLoss = (e: React.MouseEvent) => {
+  e.preventDefault()
+}
+
 function EditorToolbar({ editor }: EditorToolbarProps) {
   const [, forceUpdate] = React.useReducer(x => x + 1, 0)
   const [showTableMenu, setShowTableMenu] = useState(false)
@@ -151,9 +160,10 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
   }
 
   return (
-    <div className="editor-toolbar">
+    <div className="editor-toolbar" onMouseDown={preventFocusLoss}>
       {/* Basic formatting */}
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleBold().run()}
         className={editor.isActive('bold') ? 'is-active' : ''}
         title="Bold (Ctrl+B)"
@@ -161,6 +171,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         B
       </button>
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleItalic().run()}
         className={editor.isActive('italic') ? 'is-active' : ''}
         title="Italic (Ctrl+I)"
@@ -168,6 +179,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         I
       </button>
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleStrike().run()}
         className={editor.isActive('strike') ? 'is-active' : ''}
         title="Strikethrough"
@@ -178,6 +190,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
 
       {/* Headings */}
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleHeading({ level: 1 }).run()}
         className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
         title="Heading 1"
@@ -185,6 +198,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         H1
       </button>
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleHeading({ level: 2 }).run()}
         className={editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}
         title="Heading 2"
@@ -192,6 +206,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         H2
       </button>
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleHeading({ level: 3 }).run()}
         className={editor.isActive('heading', { level: 3 }) ? 'is-active' : ''}
         title="Heading 3"
@@ -202,6 +217,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
 
       {/* Lists */}
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleBulletList().run()}
         className={editor.isActive('bulletList') ? 'is-active' : ''}
         title="Bullet List"
@@ -209,6 +225,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         •
       </button>
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).toggleOrderedList().run()}
         className={editor.isActive('orderedList') ? 'is-active' : ''}
         title="Numbered List"
@@ -219,6 +236,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
 
       {/* Links */}
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => {
           const url = window.prompt('Enter URL:')
           if (url) {
@@ -231,6 +249,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         Link
       </button>
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).unsetLink().run()}
         disabled={!editor.isActive('link')}
         title="Remove Link"
@@ -242,6 +261,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
       {/* Tables */}
       <div className="toolbar-dropdown">
         <button
+          onMouseDown={preventFocusLoss}
           onClick={() => setShowTableMenu(!showTableMenu)}
           className={editor.isActive('table') ? 'is-active' : ''}
           title="Table"
@@ -249,24 +269,24 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
           Table
         </button>
         {showTableMenu && (
-          <div className="toolbar-dropdown-menu">
-            <button onClick={insertTable}>Insert Table (3x3)</button>
+          <div className="toolbar-dropdown-menu" onMouseDown={preventFocusLoss}>
+            <button onMouseDown={preventFocusLoss} onClick={insertTable}>Insert Table (3x3)</button>
             {editor.isActive('table') && (
               <>
-                <button onClick={() => (editor.chain().focus() as any).addColumnBefore().run()}>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).addColumnBefore().run()}>
                   Add Column Before
                 </button>
-                <button onClick={() => (editor.chain().focus() as any).addColumnAfter().run()}>Add Column After</button>
-                <button onClick={() => (editor.chain().focus() as any).deleteColumn().run()}>Delete Column</button>
-                <button onClick={() => (editor.chain().focus() as any).addRowBefore().run()}>Add Row Before</button>
-                <button onClick={() => (editor.chain().focus() as any).addRowAfter().run()}>Add Row After</button>
-                <button onClick={() => (editor.chain().focus() as any).deleteRow().run()}>Delete Row</button>
-                <button onClick={() => (editor.chain().focus() as any).mergeCells().run()}>Merge Cells</button>
-                <button onClick={() => (editor.chain().focus() as any).splitCell().run()}>Split Cell</button>
-                <button onClick={() => (editor.chain().focus() as any).toggleHeaderRow().run()}>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).addColumnAfter().run()}>Add Column After</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).deleteColumn().run()}>Delete Column</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).addRowBefore().run()}>Add Row Before</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).addRowAfter().run()}>Add Row After</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).deleteRow().run()}>Delete Row</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).mergeCells().run()}>Merge Cells</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).splitCell().run()}>Split Cell</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).toggleHeaderRow().run()}>
                   Toggle Header Row
                 </button>
-                <button onClick={() => (editor.chain().focus() as any).deleteTable().run()}>Delete Table</button>
+                <button onMouseDown={preventFocusLoss} onClick={() => (editor.chain().focus() as any).deleteTable().run()}>Delete Table</button>
               </>
             )}
           </div>
@@ -275,13 +295,13 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
 
       {/* Media */}
       <div className="toolbar-dropdown">
-        <button onClick={() => setShowMediaMenu(!showMediaMenu)} title="Insert Media">
+        <button onMouseDown={preventFocusLoss} onClick={() => setShowMediaMenu(!showMediaMenu)} title="Insert Media">
           Media
         </button>
         {showMediaMenu && (
-          <div className="toolbar-dropdown-menu">
-            <button onClick={insertImage}>Insert Image</button>
-            <button onClick={insertYouTube}>Insert YouTube Video</button>
+          <div className="toolbar-dropdown-menu" onMouseDown={preventFocusLoss}>
+            <button onMouseDown={preventFocusLoss} onClick={insertImage}>Insert Image</button>
+            <button onMouseDown={preventFocusLoss} onClick={insertYouTube}>Insert YouTube Video</button>
           </div>
         )}
       </div>
@@ -289,6 +309,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
 
       {/* Undo/Redo */}
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).undo().run()}
         disabled={!(editor.can() as any).undo()}
         title="Undo (Ctrl+Z)"
@@ -296,6 +317,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
         ↶
       </button>
       <button
+        onMouseDown={preventFocusLoss}
         onClick={() => (editor.chain().focus() as any).redo().run()}
         disabled={!(editor.can() as any).redo()}
         title="Redo (Ctrl+Y)"
@@ -305,7 +327,7 @@ function EditorToolbar({ editor }: EditorToolbarProps) {
       <div className="toolbar-separator" />
 
       {/* Metrics */}
-      <button onClick={() => setShowMetrics(!showMetrics)} title="Content Metrics">
+      <button onMouseDown={preventFocusLoss} onClick={() => setShowMetrics(!showMetrics)} title="Content Metrics">
         📊 Stats
       </button>
       {showMetrics && (
