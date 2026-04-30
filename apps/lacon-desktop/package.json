@@ -26,6 +26,7 @@
     "dist:all": "electron-builder --win --mac --linux"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@tiptap/core": "workspace:*",
     "@tiptap/extension-document": "workspace:*",
     "@tiptap/extension-highlight": "workspace:^",
@@ -49,6 +50,7 @@
     "@tiptap/react": "workspace:*",
     "@tiptap/starter-kit": "workspace:*",
     "@tiptap/suggestion": "workspace:^",
+    "docx": "^9.6.1",
     "dompurify": "^3.2.2",
     "electron-updater": "^6.3.9",
     "tippy.js": "^6.3.7",

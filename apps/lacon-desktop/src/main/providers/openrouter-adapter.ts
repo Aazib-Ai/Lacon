@@ -1,52 +1,208 @@
 /**
  * OpenRouter provider adapter for Phase 7
- * OpenRouter uses OpenAI-compatible API
+ * OpenRouter uses OpenAI-compatible API — fetches live model catalog
  */
 
 import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
   ModelInfo,
+  OpenRouterModelInfo,
   ProviderHealth,
   ProviderType,
   StreamChunk,
 } from '../../shared/provider-types'
 import { BaseProviderAdapter } from './base-adapter'
 
+/** Cached model list with TTL */
+interface ModelCache {
+  models: OpenRouterModelInfo[]
+  fetchedAt: number
+}
+
+const MODEL_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
 export class OpenRouterAdapter extends BaseProviderAdapter {
   readonly type: ProviderType = 'openrouter'
   readonly name = 'OpenRouter'
 
   private baseUrl = 'https://openrouter.ai/api/v1'
+  private static modelCache: ModelCache | null = null
 
-  async getAvailableModels(): Promise<ModelInfo[]> {
-    // OpenRouter provides access to many models
+  /**
+   * Fetch models from the live OpenRouter /models API
+   */
+  async fetchOpenRouterModels(): Promise<OpenRouterModelInfo[]> {
+    // Return cached if still valid
+    if (
+      OpenRouterAdapter.modelCache &&
+      Date.now() - OpenRouterAdapter.modelCache.fetchedAt < MODEL_CACHE_TTL_MS
+    ) {
+      return OpenRouterAdapter.modelCache.models
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/models`, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      })
+
+      if (!response.ok) {
+        console.error(`OpenRouter /models failed: ${response.status}`)
+        return this.getFallbackModels()
+      }
+
+      const data = await response.json()
+      const models: OpenRouterModelInfo[] = (data.data || []).map((m: any) =>
+        this.mapApiModel(m),
+      )
+
+      // Sort by name
+      models.sort((a, b) => a.name.localeCompare(b.name))
+
+      OpenRouterAdapter.modelCache = { models, fetchedAt: Date.now() }
+      return models
+    } catch (error) {
+      console.error('Failed to fetch OpenRouter models:', error)
+      return this.getFallbackModels()
+    }
+  }
+
+  /**
+   * Map a raw OpenRouter API model object to our typed interface
+   */
+  private mapApiModel(m: any): OpenRouterModelInfo {
+    const promptPrice = parseFloat(m.pricing?.prompt || '0') * 1_000_000
+    const completionPrice = parseFloat(m.pricing?.completion || '0') * 1_000_000
+    const isFree = promptPrice === 0 && completionPrice === 0
+    const modelId: string = m.id || ''
+
+    return {
+      id: modelId,
+      name: m.name || modelId,
+      provider: 'openrouter',
+      contextWindow: m.context_length || 4096,
+      supportsStreaming: true,
+      supportsTools: m.supported_parameters?.includes('tools') ?? true,
+      supportsVision: m.supported_parameters?.includes('images') ?? false,
+      costPer1kInput: promptPrice / 1000,
+      costPer1kOutput: completionPrice / 1000,
+      description: m.description || '',
+      architecture: m.architecture?.modality || '',
+      topProvider: m.top_provider?.max_completion_tokens ? `max ${m.top_provider.max_completion_tokens} out` : undefined,
+      pricing: {
+        promptPer1M: Math.round(promptPrice * 100) / 100,
+        completionPer1M: Math.round(completionPrice * 100) / 100,
+        currency: 'USD',
+      },
+      isFree,
+      maxOutput: m.top_provider?.max_completion_tokens || m.max_completion_tokens || undefined,
+      categories: this.categorizeModel(modelId, isFree),
+    }
+  }
+
+  /**
+   * Assign categories based on model ID patterns
+   */
+  private categorizeModel(modelId: string, isFree: boolean): OpenRouterModelInfo['categories'] {
+    const cats: OpenRouterModelInfo['categories'] = ['all']
+    const id = modelId.toLowerCase()
+
+    if (isFree) cats.push('free')
+
+    if (id.includes('gpt') || id.startsWith('openai/')) cats.push('gpt')
+    else if (id.includes('claude') || id.startsWith('anthropic/')) cats.push('claude')
+    else if (id.includes('gemini') || id.startsWith('google/')) cats.push('gemini')
+
+    // Popular models — curated list
+    const popularPrefixes = [
+      'openai/gpt-4o', 'openai/gpt-5', 'openai/o',
+      'anthropic/claude-sonnet', 'anthropic/claude-opus',
+      'google/gemini-2', 'google/gemini-pro',
+      'meta-llama/llama-4', 'meta-llama/llama-3',
+      'deepseek/deepseek',
+      'mistralai/mistral-large', 'mistralai/mistral-medium',
+    ]
+    if (popularPrefixes.some(p => id.startsWith(p))) cats.push('popular')
+
+    // Open source
+    const openSourcePatterns = ['llama', 'mistral', 'mixtral', 'qwen', 'deepseek', 'gemma', 'phi', 'yi', 'command-r']
+    if (openSourcePatterns.some(p => id.includes(p))) cats.push('open-source')
+
+    return cats
+  }
+
+  /**
+   * Fallback models if the API is unreachable
+   */
+  private getFallbackModels(): OpenRouterModelInfo[] {
     return [
       {
-        id: 'anthropic/claude-3-opus',
-        name: 'Claude 3 Opus (via OpenRouter)',
+        id: 'anthropic/claude-sonnet-4',
+        name: 'Claude Sonnet 4',
         provider: 'openrouter',
         contextWindow: 200000,
         supportsStreaming: true,
         supportsTools: true,
+        supportsVision: true,
+        pricing: { promptPer1M: 3, completionPer1M: 15, currency: 'USD' },
+        isFree: false,
+        categories: ['all', 'popular', 'claude'],
       },
       {
-        id: 'openai/gpt-4-turbo',
-        name: 'GPT-4 Turbo (via OpenRouter)',
+        id: 'openai/gpt-4o',
+        name: 'GPT-4o',
         provider: 'openrouter',
         contextWindow: 128000,
         supportsStreaming: true,
         supportsTools: true,
+        supportsVision: true,
+        pricing: { promptPer1M: 2.5, completionPer1M: 10, currency: 'USD' },
+        isFree: false,
+        categories: ['all', 'popular', 'gpt'],
       },
       {
-        id: 'google/gemini-pro',
-        name: 'Gemini Pro (via OpenRouter)',
+        id: 'google/gemini-2.5-pro',
+        name: 'Gemini 2.5 Pro',
         provider: 'openrouter',
-        contextWindow: 32768,
+        contextWindow: 1048576,
         supportsStreaming: true,
         supportsTools: true,
+        supportsVision: true,
+        pricing: { promptPer1M: 1.25, completionPer1M: 10, currency: 'USD' },
+        isFree: false,
+        categories: ['all', 'popular', 'gemini'],
+      },
+      {
+        id: 'meta-llama/llama-4-maverick',
+        name: 'Llama 4 Maverick',
+        provider: 'openrouter',
+        contextWindow: 128000,
+        supportsStreaming: true,
+        supportsTools: true,
+        supportsVision: false,
+        pricing: { promptPer1M: 0, completionPer1M: 0, currency: 'USD' },
+        isFree: true,
+        categories: ['all', 'popular', 'free', 'open-source'],
+      },
+      {
+        id: 'deepseek/deepseek-r1',
+        name: 'DeepSeek R1',
+        provider: 'openrouter',
+        contextWindow: 64000,
+        supportsStreaming: true,
+        supportsTools: true,
+        supportsVision: false,
+        pricing: { promptPer1M: 0.55, completionPer1M: 2.19, currency: 'USD' },
+        isFree: false,
+        categories: ['all', 'popular', 'open-source'],
       },
     ]
+  }
+
+  async getAvailableModels(): Promise<ModelInfo[]> {
+    return this.fetchOpenRouterModels()
   }
 
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
@@ -231,3 +387,4 @@ export class OpenRouterAdapter extends BaseProviderAdapter {
     }
   }
 }
+

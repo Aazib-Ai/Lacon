@@ -17,14 +17,18 @@ import {
   PanelRightOpen,
   PenLine,
   Search,
+  ShieldCheck,
+  Sparkles,
   Sun,
 } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/renderer/lib/utils'
 
+import { useAIDetection } from '../hooks/useAIDetection'
 import { useProject } from '../hooks/useProject'
 import { useWriterLoop } from '../hooks/useWriterLoop'
+import { AIDetectionPanel } from './AIDetectionPanel'
 import { FloatingAIBar } from './FloatingAIBar'
 import { LaconSidebar } from './LaconSidebar'
 import { LaconStatusBar } from './LaconStatusBar'
@@ -33,6 +37,7 @@ import type { ModernEditorHandle } from './ModernEditor'
 import { NewDocumentDialog } from './NewDocumentDialog'
 import { OnboardingBanner } from './OnboardingBanner'
 import { ProviderSettings } from './ProviderSettings'
+import { SkillsLibraryPanel } from './SkillsLibraryPanel'
 import { Badge } from './ui/Badge'
 import { Button } from './ui/Button'
 import { ScrollArea } from './ui/ScrollArea'
@@ -111,6 +116,7 @@ export function LaconWorkspace() {
 
   // Writer harness hooks
   const writerLoop = useWriterLoop(documentId)
+  const aiDetection = useAIDetection()
 
   // Editor ref for accessing getMarkdown/getHTML
   const editorRef = useRef<ModernEditorHandle>(null)
@@ -126,6 +132,9 @@ export function LaconWorkspace() {
     if (zenMode) {
       setSidebarOpen(false)
       setRightPanelOpen(false)
+    } else {
+      setSidebarOpen(true)
+      setRightPanelOpen(true)
     }
   }, [zenMode])
 
@@ -183,7 +192,17 @@ export function LaconWorkspace() {
       }
       if (e.ctrlKey && e.altKey && e.key === '4') {
         e.preventDefault()
+        setActiveTab('detect')
+        setRightPanelOpen(true)
+      }
+      if (e.ctrlKey && e.altKey && e.key === '5') {
+        e.preventDefault()
         setActiveTab('history')
+        setRightPanelOpen(true)
+      }
+      if (e.ctrlKey && e.altKey && e.key === '6') {
+        e.preventDefault()
+        setActiveTab('skills')
         setRightPanelOpen(true)
       }
       // Ctrl+,: Settings
@@ -193,7 +212,16 @@ export function LaconWorkspace() {
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    // Listen for custom event from WriterLoopPanel skills button
+    const handleOpenSkills = () => {
+      setActiveTab('skills')
+      setRightPanelOpen(true)
+    }
+    window.addEventListener('lacon:open-skills-tab', handleOpenSkills)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('lacon:open-skills-tab', handleOpenSkills)
+    }
   }, [zenMode, saveActiveFile, project])
 
   // Handle editor content changes — editor emits HTML directly now
@@ -204,6 +232,31 @@ export function LaconWorkspace() {
     },
     [activeFilePath, updateProjectContent],
   )
+
+  // ── Auto-write generated content to editor when generation completes ──
+  const contentWrittenRef = useRef(false)
+
+  useEffect(() => {
+    const progress = writerLoop.progress
+    if (!progress || progress.status !== 'complete' || !progress.results?.length) {
+      // Reset the write guard when not in complete state
+      if (progress?.status !== 'complete') {
+        contentWrittenRef.current = false
+      }
+      return
+    }
+
+    // Only write once per generation cycle
+    if (contentWrittenRef.current) return
+    contentWrittenRef.current = true
+
+    // Collect all section HTML and write to editor
+    const allContent = progress.results.map((r: any) => r.content).join('\n\n')
+    if (allContent && editorRef.current) {
+      console.log(`[LaconWorkspace] Writing ${progress.results.length} sections to editor`)
+      editorRef.current.setHTML(allContent)
+    }
+  }, [writerLoop.progress])
 
   const handleCreateFile = useCallback(
     async (fileName: string) => {
@@ -316,14 +369,16 @@ export function LaconWorkspace() {
         <aside
           className={cn(
             'lacon-sidebar flex-shrink-0 bg-card overflow-hidden relative',
-            sidebarOpen
+            (sidebarOpen || settingsOpen)
               ? 'border-r border-border'
               : 'w-0 border-r-0',
           )}
-          style={sidebarOpen ? { width: `${sidebarWidth}px`, transition: isResizingRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)' } : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }}
+          style={(sidebarOpen || settingsOpen) ? { width: `${settingsOpen ? Math.max(sidebarWidth, 340) : sidebarWidth}px`, transition: isResizingRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)' } : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }}
           data-testid="lacon-sidebar"
         >
-          {sidebarOpen && (
+          {settingsOpen ? (
+            <ProviderSettings onClose={() => setSettingsOpen(false)} documentId={documentId} />
+          ) : sidebarOpen ? (
             <LaconSidebar
               project={project}
               files={files}
@@ -331,6 +386,10 @@ export function LaconWorkspace() {
               isDirty={isDirty}
               writerStage={writerLoop.stage}
               activeSkillCount={writerLoop.session?.activeSkillIds?.length || 0}
+              onOpenSkillsTab={() => {
+                setActiveTab('skills')
+                setRightPanelOpen(true)
+              }}
               onOpenProject={openProject}
               onOpenFile={openFile}
               onNewFile={() => setNewFileDialogOpen(true)}
@@ -338,7 +397,7 @@ export function LaconWorkspace() {
               onRenameFile={renameFile}
               onOpenSettings={() => setSettingsOpen(true)}
             />
-          )}
+          ) : null}
         </aside>
 
         {/* ─── SIDEBAR RESIZE HANDLE ─── */}
@@ -510,7 +569,7 @@ export function LaconWorkspace() {
               <div className="flex-shrink-0 border-b border-border bg-card">
                 {/* Tab Navigation */}
                 <div className="px-1 pt-1">
-                  <TabsList className="w-full grid grid-cols-4 h-9 bg-secondary/50 rounded-lg p-0.5">
+                  <TabsList className="w-full grid grid-cols-6 h-9 bg-secondary/50 rounded-lg p-0.5">
                     <TabsTrigger value="writer" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
                       <PenLine className="h-3.5 w-3.5" />
                       Writer
@@ -534,9 +593,33 @@ export function LaconWorkspace() {
                         </Badge>
                       )}
                     </TabsTrigger>
+                    <TabsTrigger value="detect" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Detect
+                      {aiDetection.report && aiDetection.report.overallScore > 50 && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-1 -right-1 h-4 min-w-4 text-[10px] p-0 flex items-center justify-center"
+                        >
+                          {aiDetection.report.overallScore}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
                     <TabsTrigger value="history" className="text-[11px] font-medium gap-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
                       <History className="h-3.5 w-3.5" />
                       History
+                    </TabsTrigger>
+                    <TabsTrigger value="skills" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Skills
+                      {(writerLoop.session?.activeSkillIds?.length || 0) > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="absolute -top-1 -right-1 h-4 min-w-4 text-[10px] p-0 flex items-center justify-center bg-amber-500/20 text-amber-500"
+                        >
+                          {writerLoop.session?.activeSkillIds?.length}
+                        </Badge>
+                      )}
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -548,7 +631,9 @@ export function LaconWorkspace() {
                     {activeTab === 'writer' && 'Planner · Generator · Reviewer'}
                     {activeTab === 'research' && 'Sources · Citations · Notes'}
                     {activeTab === 'review' && 'Flags · Suggestions · Diff'}
+                    {activeTab === 'detect' && 'AI Score · Humanize · ML Verify'}
                     {activeTab === 'history' && 'Snapshots · Versions · Timeline'}
+                    {activeTab === 'skills' && 'Library · Compose · Rules'}
                   </span>
                 </div>
               </div>
@@ -567,8 +652,19 @@ export function LaconWorkspace() {
                   <ReviewPanel documentId={documentId} />
                 </TabsContent>
 
+                <TabsContent value="detect" className="mt-0 p-0 h-full">
+                  <AIDetectionPanel
+                    documentId={documentId}
+                    getEditorText={() => editorRef.current?.getHTML?.() || ''}
+                  />
+                </TabsContent>
+
                 <TabsContent value="history" className="mt-0 p-0">
                   <VersionHistory documentId={documentId} />
+                </TabsContent>
+
+                <TabsContent value="skills" className="mt-0 p-0 h-full">
+                  <SkillsLibraryPanel documentId={documentId} />
                 </TabsContent>
               </ScrollArea>
             </Tabs>
@@ -582,13 +678,16 @@ export function LaconWorkspace() {
         wordCount={0}
         writerStage={writerLoop.stage}
         activeSkills={writerLoop.session?.activeSkillIds || []}
+        onOpenSkillsTab={() => {
+          setActiveTab('skills')
+          setRightPanelOpen(true)
+        }}
         zenMode={zenMode}
         onZenToggle={() => setZenMode(!zenMode)}
         onSettingsOpen={() => setSettingsOpen(true)}
       />
 
-      {/* ─── SETTINGS OVERLAY ─── */}
-      {settingsOpen && <ProviderSettings onClose={() => setSettingsOpen(false)} documentId={documentId} />}
+      {/* Settings is now rendered inside the sidebar — see LEFT SIDEBAR section */}
 
       {/* ─── NEW FILE DIALOG ─── */}
       <NewDocumentDialog

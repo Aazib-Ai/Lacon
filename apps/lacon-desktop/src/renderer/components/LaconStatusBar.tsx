@@ -15,6 +15,7 @@ interface LaconStatusBarProps {
   zenMode: boolean
   onZenToggle: () => void
   onSettingsOpen: () => void
+  onOpenSkillsTab?: () => void
 }
 
 export function LaconStatusBar({
@@ -25,6 +26,7 @@ export function LaconStatusBar({
   zenMode,
   onZenToggle,
   onSettingsOpen,
+  onOpenSkillsTab,
 }: LaconStatusBarProps) {
   const [sessionCost, setSessionCost] = useState<number>(0)
   const [modelName, setModelName] = useState<string>('')
@@ -128,9 +130,13 @@ export function LaconStatusBar({
           </Badge>
         )}
         {activeSkills.length > 0 && (
-          <span className="text-muted-foreground/60">
-            {activeSkills.length} skill{activeSkills.length !== 1 ? 's' : ''}
-          </span>
+          <button
+            onClick={onOpenSkillsTab}
+            className="text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer"
+            title={`${activeSkills.length} skill${activeSkills.length !== 1 ? 's' : ''} active — click to manage`}
+          >
+            ✨ {activeSkills.length} skill{activeSkills.length !== 1 ? 's' : ''}
+          </button>
         )}
       </div>
 

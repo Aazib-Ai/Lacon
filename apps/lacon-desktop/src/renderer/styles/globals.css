@@ -202,7 +202,7 @@
  * Matches Google Docs' grey workspace background.
  */
 .paginated-canvas {
-  background: #e8eaed;
+  background: #f0f1f3;
 }
 
 .dark .paginated-canvas {
@@ -216,44 +216,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 24px;
+  padding-top: 12px;
   padding-bottom: 24px;
   min-height: 100%;
 }
 
 /**
  * The main document — a white paper-like container.
- * Width is set inline (816px = 8.5in at 96dpi).
+ * Width and minHeight are set inline.
  */
 .paginated-document {
   position: relative;
-  background: #ffffff;
-  border-radius: 2px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.12),
-    0 4px 12px rgba(0, 0, 0, 0.06);
-  transition: box-shadow 200ms ease;
-}
-
-.paginated-document:hover {
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.14),
-    0 8px 24px rgba(0, 0, 0, 0.08);
-}
-
-.dark .paginated-document {
-  background: hsl(224 40% 9%);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.4),
-    0 4px 12px rgba(0, 0, 0, 0.25),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-.dark .paginated-document:hover {
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.5),
-    0 8px 24px rgba(0, 0, 0, 0.35),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  background: transparent;
 }
 
 /**
@@ -263,13 +237,34 @@
 .paginated-editor-content {
   position: relative;
   z-index: 1;
+  background: #ffffff;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.dark .paginated-editor-content {
+  background: hsl(224 40% 9%);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 /* ─── Page Break Overlay ─── */
 
 /**
  * A visual separator rendered on top of the editor content at each
- * page boundary. Creates the illusion of separate pages.
+ * page boundary. Creates the illusion of separate pages, like Google Docs.
+ *
+ * Structure (top to bottom):
+ *   - Bottom margin of ending page (solid white)
+ *   - Bottom edge shadow
+ *   - Canvas gap (grey background)
+ *   - Top edge shadow
+ *   - Top margin of starting page (solid white)
  */
 .page-break-overlay {
   position: absolute;
@@ -280,49 +275,34 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Shift up by half the total overlay height so the break is centered on the content boundary */
+  /* Centre on the content boundary */
   transform: translateY(-50%);
-  /* Overlay height = bottom-margin(96px) + gap(40px) + top-margin(96px) = 232px, but we use individual parts */
 }
 
 /**
- * Bottom shadow — simulates the bottom edge of the current page.
- * This is a thin gradient that fades from white to the canvas grey.
+ * Bottom margin — solid white zone covering the bottom margin of the
+ * ending page, with a subtle drop shadow on the bottom edge.
  */
 .page-break-bottom-shadow {
   width: 100%;
   height: 96px; /* 1 inch bottom margin */
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 1) 20%,
-    rgba(255, 255, 255, 1) 100%
-  );
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 
 .dark .page-break-bottom-shadow {
-  background: linear-gradient(
-    to bottom,
-    rgba(12, 17, 28, 0) 0%,
-    rgba(12, 17, 28, 1) 20%,
-    rgba(12, 17, 28, 1) 100%
-  );
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: hsl(224 40% 9%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /**
  * The visible gap between pages — shows the grey canvas.
+ * Clean, minimal — no page numbers, just like Google Docs.
  */
 .page-break-gap {
-  width: calc(100% + 20px); /* Slightly wider than the page to bleed into the canvas */
-  height: 40px;
-  background: #e8eaed;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: calc(100% + 40px); /* Wider than the page so the gap bleeds into canvas */
+  height: 10px;
+  background: #f0f1f3;
   position: relative;
 }
 
@@ -331,83 +311,26 @@
 }
 
 /**
- * Page number label shown in the gap between pages.
- */
-.page-number-label {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  color: #80868b;
-  letter-spacing: 0.02em;
-  user-select: none;
-  padding: 2px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(4px);
-}
-
-.dark .page-number-label {
-  color: hsl(218 11% 55%);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/**
- * Top shadow — simulates the top edge of the next page.
+ * Top margin — solid white zone covering the top margin of the
+ * starting page, with a subtle shadow on the top edge.
  */
 .page-break-top-shadow {
   width: 100%;
   height: 96px; /* 1 inch top margin */
-  background: linear-gradient(
-    to top,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 1) 20%,
-    rgba(255, 255, 255, 1) 100%
-  );
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.04);
+  background: #ffffff;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .dark .page-break-top-shadow {
-  background: linear-gradient(
-    to top,
-    rgba(12, 17, 28, 0) 0%,
-    rgba(12, 17, 28, 1) 20%,
-    rgba(12, 17, 28, 1) 100%
-  );
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.2);
-}
-
-/* ─── Page Footer Indicator ─── */
-
-.page-footer-indicator {
-  position: absolute;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.page-number-bottom {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 10px;
-  font-weight: 400;
-  color: #9aa0a6;
-  letter-spacing: 0.03em;
-  user-select: none;
-}
-
-.dark .page-number-bottom {
-  color: hsl(218 11% 45%);
+  background: hsl(224 40% 9%);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* ─── ProseMirror Editor Styles ─── */
 
 .ProseMirror {
   outline: none !important;
-  min-height: 768px; /* Roughly 8in — first page content area */
+  min-height: 100%; /* Height controlled dynamically by JS to fill the viewport */
   cursor: text;
 }
 
@@ -628,3 +551,106 @@
   display: none;
 }
 
+/* ─── Mention Styles ─── */
+.editor-mention {
+  @apply bg-muted rounded px-1.5 py-0.5;
+}
+
+.editor-mention:hover {
+  @apply bg-muted-foreground/20;
+}
+
+/* Mention list dropdown */
+.mention-list {
+  @apply bg-popover border border-border rounded-lg shadow-lg overflow-hidden;
+}
+
+.mention-list-empty {
+  @apply px-3 py-2 text-muted-foreground text-sm;
+}
+
+.mention-list-item {
+  @apply flex items-center justify-between px-3 py-2 cursor-pointer;
+}
+
+.mention-list-item:hover,
+.mention-list-item.is-selected {
+  @apply bg-muted;
+}
+
+.mention-list-item-label {
+  @apply font-medium;
+}
+
+.mention-list-item-type {
+  @apply text-xs text-muted-foreground uppercase;
+}
+
+/* ─── Ghost Text Suggestions ─── */
+.ghost-text-suggestion {
+  @apply text-muted-foreground/60 italic pointer-events-none select-none;
+  animation: ghostFadeIn 0.3s ease-in;
+}
+
+@keyframes ghostFadeIn {
+  from { opacity: 0; }
+  to { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost-text-suggestion {
+    animation: none;
+  }
+}
+
+/* ─── Paragraph Identity Highlights ─── */
+[data-paragraph-id] {
+  position: relative;
+}
+
+[data-paragraph-id]:hover::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  @apply bg-primary/30 rounded-sm;
+}
+
+/* ── AI Detection Styles ── */
+
+/* Gauge ring animation */
+@keyframes gaugeAppear {
+  from { stroke-dashoffset: 283; }
+  to { stroke-dashoffset: var(--gauge-offset); }
+}
+
+.ai-gauge-ring {
+  animation: gaugeAppear 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Editor paragraph flagging */
+[data-ai-flagged="true"] {
+  position: relative;
+  background: hsl(var(--destructive) / 0.04);
+  border-radius: 4px;
+  transition: background 300ms ease;
+}
+
+[data-ai-flagged="true"]::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--destructive));
+  opacity: 0.6;
+}
+
+[data-ai-flagged="true"]:hover {
+  background: hsl(var(--destructive) / 0.08);
+}

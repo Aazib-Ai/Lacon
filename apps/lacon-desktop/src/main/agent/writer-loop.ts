@@ -395,7 +395,9 @@ export class WriterLoop {
     }
 
     const ws = getProjectWorkspaceService()
-    const updated = ws.updateSession(this.documentId, { stage: nextStage })
+    const projectPath = getActiveProjectPath()
+    if (!projectPath) throw new Error('No project is open')
+    const updated = ws.updateSession(this.documentId, projectPath, { stage: nextStage })
 
     this.emit('stage-changed', { from: current, to: nextStage })
     this.emit('session-updated', updated)
@@ -550,7 +552,18 @@ export class WriterLoop {
     this.emit('outline-approved', outline)
 
     // Transition to generating
-    return this.transition('generating')
+    const session = this.transition('generating')
+
+    // Fire-and-forget: auto-start content generation
+    this.generateAll().catch(err => {
+      console.error('[WriterLoop] Auto-generation failed:', err)
+      this.emit('error', {
+        message: `Generation failed: ${err?.message || 'Unknown error'}`,
+        fatal: true,
+      })
+    })
+
+    return session
   }
 
   // ── Session Management ──
@@ -565,7 +578,9 @@ export class WriterLoop {
     modelConfig?: { providerId: string; modelId: string }
   }): WriterSession {
     const ws = getProjectWorkspaceService()
-    const updated = ws.updateSession(this.documentId, updates)
+    const projectPath = getActiveProjectPath()
+    if (!projectPath) throw new Error('No project is open')
+    const updated = ws.updateSession(this.documentId, projectPath, updates)
     this.emit('session-updated', updated)
     return updated
   }
@@ -601,11 +616,63 @@ export class WriterLoop {
 
   // ── Phase 3: Generation ──
 
+  /** Whether a generation run is active */
+  private generationAborted = false
+  /** Guard: prevent multiple concurrent generateAll calls */
+  private generationRunning = false
+
   /**
-   * Generate content for a single section.
-   * Uses composed skill prompt, section spec, neighboring paragraphs, and rolling summary.
+   * Build the system prompt for section content generation.
    */
-  generateSection(sectionId: string): GenerationResult {
+  private buildSectionSystemPrompt(outline: WriterOutline, section: OutlineSection, neighborContext: string, contextSummary: string): string {
+    return `You are an expert writer producing a section of a longer document.
+
+Document title: "${outline.title}"
+Current section: "${section.title}"
+Target length: approximately ${section.estimatedWords} words.
+
+${neighborContext ? `Context from neighboring sections:\n${neighborContext}\n` : ''}
+${contextSummary ? `Summary of what has been written so far:\n${contextSummary}\n` : ''}
+
+Key points to cover in this section:
+${section.keyPoints.map((kp, i) => `${i + 1}. ${kp}`).join('\n')}
+
+${section.subsections.length > 0 ? `Subsections to include:\n${section.subsections.map(ss => `- ${ss.title} (~${ss.estimatedWords} words): ${ss.keyPoints.join('; ')}`).join('\n')}\n` : ''}
+
+Rules:
+- Write in clean, professional prose. Do NOT use markdown.
+- Output raw HTML suitable for a rich text editor (use <h2>, <h3>, <p>, <ul>, <ol>, <li>, <em>, <strong> tags).
+- Start with <h2>${section.title}</h2> as the section heading.
+- Write approximately ${section.estimatedWords} words.
+- Be specific, detailed, and engaging. Avoid filler text.
+- Output ONLY the HTML content. No explanations, no markdown fences.`
+  }
+
+  /**
+   * Generate a deterministic fallback for a section (used when LLM is unavailable).
+   */
+  private generateSectionFallback(section: OutlineSection, neighborContext: string): string {
+    const keyPointsHtml = section.keyPoints.map(kp => `<li>${kp}</li>`).join('\n')
+    const subsectionsHtml = section.subsections
+      .map(ss => {
+        const ssPoints = ss.keyPoints.map(kp => `<p>${kp}.</p>`).join('\n')
+        return `<h3>${ss.title}</h3>\n${ssPoints}`
+      })
+      .join('\n')
+    return [
+      `<h2>${section.title}</h2>`,
+      subsectionsHtml,
+      `<ol>\n${keyPointsHtml}\n</ol>`,
+      `<p>This section covers approximately ${section.estimatedWords} words on the topic of "${section.title}".</p>`,
+      neighborContext ? `<p><em>Context: ${neighborContext}</em></p>` : '',
+    ].filter(Boolean).join('\n')
+  }
+
+  /**
+   * Generate content for a single section via LLM (async).
+   * Falls back to a deterministic template if the LLM call fails.
+   */
+  async generateSection(sectionId: string): Promise<GenerationResult> {
     const stage = this.getStage()
     if (stage !== 'generating') {
       throw new Error(`Cannot generate in stage: ${stage}`)
@@ -636,67 +703,125 @@ export class WriterLoop {
     let contextSummary = this.rollingSummary.summary
     if (contextSummary.length > MAX_CONTEXT_CHARS) {
       contextSummary = contextSummary.slice(-MAX_CONTEXT_CHARS)
-      contextSummary = `...${  contextSummary.slice(contextSummary.indexOf(' ') + 1)}`
+      contextSummary = `...${contextSummary.slice(contextSummary.indexOf(' ') + 1)}`
     }
 
-    // Simulated generation (Phase 3 deterministic template; LLM integration in production)
-    // Output is HTML — matches the .lacon file format and can be injected directly into TipTap
-    const keyPointsHtml = section.keyPoints.map((kp, i) => `<li>${kp}</li>`).join('\n')
-    const subsectionsHtml = section.subsections
-      .map(ss => {
-        const ssPoints = ss.keyPoints.map(kp => `<p>${kp}.</p>`).join('\n')
-        return `<h3>${ss.title}</h3>\n${ssPoints}`
-      })
-      .join('\n')
-    const generatedContent = [
-      `<h2>${section.title}</h2>`,
-      subsectionsHtml,
-      `<ol>\n${keyPointsHtml}\n</ol>`,
-      `<p>This section covers approximately ${section.estimatedWords} words on the topic of "${section.title}".</p>`,
-      neighborContext ? `<p><em>Context: ${neighborContext}</em></p>` : '',
-    ].filter(Boolean).join('\n')
+    // Update progress: mark this section as in-progress
+    this.sectionProgress.currentSectionId = sectionId
+    this.sectionProgress.currentSectionTitle = section.title
+    this.sectionProgress.status = 'generating'
+    this.emit('generation-progress', { ...this.sectionProgress })
 
-    // Simulated token usage
-    const inputTokens = Math.ceil((contextSummary.length + neighborContext.length + keyPointsHtml.length) / 4)
-    const outputTokens = Math.ceil(generatedContent.length / 4)
-    const tokenUsage: TokenUsage = {
-      inputTokens,
-      outputTokens,
-      model: 'simulated',
-      estimatedCost: inputTokens * 0.000003 + outputTokens * 0.000015,
+    let generatedContent: string
+    let tokenUsage: TokenUsage
+    let usedLLM = false
+
+    // Attempt LLM generation
+    try {
+      const pm = getProviderManager()
+      const providers = pm.listProviders()
+      const enabledProvider = providers.find(p => p.enabled)
+
+      if (enabledProvider) {
+        const modelId = enabledProvider.defaultModel || 'gpt-4o-mini'
+        const systemPrompt = this.buildSectionSystemPrompt(outline, section, neighborContext, contextSummary)
+
+        console.log(`[Generator] Writing section "${section.title}" via LLM (provider: ${enabledProvider.id}, model: ${modelId})`)
+
+        const response = await pm.chatCompletion(
+          enabledProvider.id,
+          {
+            model: modelId,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Write the "${section.title}" section now. Output only the HTML content.` },
+            ],
+            temperature: 0.75,
+            maxTokens: Math.max(1000, section.estimatedWords * 3),
+          },
+          'section-generation',
+        )
+
+        const content = response.choices?.[0]?.message?.content
+        if (content && content.trim().length > 20) {
+          generatedContent = content.trim()
+          // Strip markdown fences if present
+          if (generatedContent.startsWith('```')) {
+            generatedContent = generatedContent.replace(/^```(?:html)?\s*/, '').replace(/```\s*$/, '').trim()
+          }
+          tokenUsage = {
+            inputTokens: response.usage?.promptTokens || 0,
+            outputTokens: response.usage?.completionTokens || 0,
+            model: modelId,
+            estimatedCost: (response.usage?.promptTokens || 0) * 0.000003 + (response.usage?.completionTokens || 0) * 0.000015,
+          }
+          usedLLM = true
+          console.log(`[Generator] Section "${section.title}" complete (${tokenUsage.outputTokens} tokens)`)
+        } else {
+          console.warn(`[Generator] LLM returned empty/short content for "${section.title}", using fallback`)
+          throw new Error('LLM returned empty content')
+        }
+      } else {
+        console.log(`[Generator] No enabled provider, using fallback for "${section.title}"`)
+        throw new Error('No provider available')
+      }
+    } catch (err: any) {
+      console.warn(`[Generator] LLM failed for "${section.title}", using deterministic fallback:`, err?.message || err)
+      // Fallback to deterministic template
+      generatedContent = this.generateSectionFallback(section, neighborContext)
+      const inputTokens = Math.ceil((contextSummary.length + neighborContext.length) / 4)
+      const outputTokens = Math.ceil(generatedContent.length / 4)
+      tokenUsage = {
+        inputTokens,
+        outputTokens,
+        model: 'fallback',
+        estimatedCost: 0,
+      }
+      // Emit a non-fatal error so the UI can show a warning
+      this.emit('error', {
+        message: `Section "${section.title}" used fallback content: ${err?.message || 'LLM unavailable'}`,
+        fatal: false,
+        sectionId,
+      })
     }
 
     const result: GenerationResult = {
       sectionId,
-      content: generatedContent,
-      tokenUsage,
+      content: generatedContent!,
+      tokenUsage: tokenUsage!,
       generatedAt: new Date().toISOString(),
     }
 
     // Update rolling summary
-    this.rollingSummary.summary += `\n[${section.title}]: ${section.keyPoints.join('; ')}`
+    if (usedLLM) {
+      // Summarize what was written for context in subsequent sections
+      const plainText = generatedContent!.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      this.rollingSummary.summary += `\n[${section.title}]: ${plainText.slice(0, 300)}`
+    } else {
+      this.rollingSummary.summary += `\n[${section.title}]: ${section.keyPoints.join('; ')}`
+    }
     this.rollingSummary.lastUpdated = new Date().toISOString()
     this.rollingSummary.sectionsCovered.push(sectionId)
 
     // Update progress
     this.sectionProgress.results.push(result)
     this.sectionProgress.completedSections += 1
-    this.sectionProgress.currentSectionId = sectionId
-    this.sectionProgress.currentSectionTitle = section.title
 
-    this.emit('generation-progress', this.sectionProgress)
+    this.emit('generation-progress', { ...this.sectionProgress })
     return result
   }
 
   /**
-   * Generate all sections sequentially.
+   * Generate all sections sequentially (async, with per-section progress).
    */
-  generateAll(): SectionProgress {
+  async generateAll(): Promise<SectionProgress> {
     const outline = this.getOutline()
     if (!outline) {
       throw new Error('No outline available')
     }
 
+    this.generationAborted = false
+    this.generationRunning = true
     this.sectionProgress = {
       totalSections: outline.sections.length,
       completedSections: 0,
@@ -706,11 +831,54 @@ export class WriterLoop {
       status: 'generating',
     }
 
+    this.emit('generation-progress', { ...this.sectionProgress })
+    console.log(`[Generator] Starting generation of ${outline.sections.length} sections`)
+
     for (const section of outline.sections) {
-      this.generateSection(section.id)
+      if (this.generationAborted) {
+        console.log(`[Generator] Generation aborted by user after ${this.sectionProgress.completedSections}/${outline.sections.length} sections`)
+
+        this.generationRunning = false
+        this.sectionProgress.status = 'complete'
+        this.sectionProgress.currentSectionId = null
+        this.sectionProgress.currentSectionTitle = null
+
+        // Snapshot whatever we have so far
+        if (this.sectionProgress.results.length > 0) {
+          const generatedContent = this.sectionProgress.results.map(r => r.content).join('\n\n')
+          const snapshot = this.createSnapshot('after-generation', generatedContent)
+          this.emit('snapshot-created', snapshot)
+        }
+
+        this.emit('generation-complete', this.sectionProgress)
+
+        // Transition out of generating
+        try {
+          this.transition('reviewing')
+        } catch {
+          try { this.transition('idle') } catch { /* already idle */ }
+        }
+
+        return this.sectionProgress
+      }
+
+      try {
+        await this.generateSection(section.id)
+      } catch (err: any) {
+        console.error(`[Generator] Fatal error on section "${section.title}":`, err)
+        this.emit('error', {
+          message: `Generation failed on "${section.title}": ${err?.message || 'Unknown error'}`,
+          fatal: true,
+          sectionId: section.id,
+        })
+        // Continue to next section rather than aborting entirely
+      }
     }
 
+    this.generationRunning = false
     this.sectionProgress.status = 'complete'
+    this.sectionProgress.currentSectionId = null
+    this.sectionProgress.currentSectionTitle = null
 
     // Auto-snapshot after generation
     const generatedContent = this.sectionProgress.results.map(r => r.content).join('\n\n')
@@ -718,11 +886,50 @@ export class WriterLoop {
     this.emit('snapshot-created', snapshot)
     this.emit('generation-complete', this.sectionProgress)
 
+    console.log(`[Generator] Generation complete: ${this.sectionProgress.completedSections}/${this.sectionProgress.totalSections} sections`)
+
+    // Auto-transition to complete (or reviewing if we add that later)
+    try {
+      this.transition('reviewing')
+    } catch {
+      // If transition fails, try complete
+      try {
+        this.transition('idle')
+      } catch { /* already idle */ }
+    }
+
     return this.sectionProgress
   }
 
-  /** Get current generation progress. */
+  /**
+   * Abort an in-progress generation run.
+   * Returns current progress with all completed section results.
+   */
+  abortGeneration(): SectionProgress {
+    this.generationAborted = true
+    console.log('[Generator] Abort requested')
+    return { ...this.sectionProgress }
+  }
+
+  /** Get current generation progress. Auto-recovers stuck generating state. */
   getProgress(): SectionProgress {
+    // Auto-recovery: if session says 'generating' but progress is idle, auto-kick generation
+    const stage = this.getStage()
+    const outline = this.getOutline()
+    if (
+      stage === 'generating' &&
+      this.sectionProgress.status === 'idle' &&
+      !this.generationRunning &&
+      outline &&
+      outline.sections.length > 0
+    ) {
+      console.log('[Generator] Auto-recovery: session is generating but progress is idle — kickstarting generateAll()')
+      // Fire-and-forget
+      this.generateAll().catch(err => {
+        console.error('[Generator] Auto-recovery generateAll failed:', err)
+      })
+    }
+
     return { ...this.sectionProgress }
   }
 

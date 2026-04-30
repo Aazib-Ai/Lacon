@@ -28,7 +28,9 @@ import {
   CheckSquare,
   ChevronDown,
   Download,
+  FileCode,
   FileText,
+  FileType,
   Heading,
   Highlighter,
   Italic,
@@ -43,6 +45,13 @@ import {
 import React, { useCallback } from 'react'
 
 import { cn } from '@/renderer/lib/utils'
+import {
+  exportAsPDF,
+  exportAsHTML,
+  exportAsDOCX,
+  exportAsMarkdown,
+  exportAsText,
+} from '@/renderer/utils/exportEngine'
 
 import {
   DropdownMenu,
@@ -132,75 +141,7 @@ function getCurrentFontSize(editor: TiptapEditor): number {
   return DEFAULT_FONT_SIZE
 }
 
-// ────────────────────────────────────────────────────────────────────
-// Export helpers
-// ────────────────────────────────────────────────────────────────────
-
-function exportHTML(editor: TiptapEditor) {
-  const html = editor.getHTML()
-  const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Exported Document</title>
-  <style>
-    body { font-family: 'Georgia', serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.7; color: #1a1a1a; }
-    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
-    h2 { font-size: 1.5rem; margin-top: 2rem; }
-    h3 { font-size: 1.25rem; margin-top: 1.5rem; }
-    p { margin: 1rem 0; }
-    ul, ol { padding-left: 1.5rem; }
-    blockquote { border-left: 3px solid #ccc; padding-left: 1rem; color: #555; margin: 1rem 0; }
-    code { background: #f4f4f4; padding: 0.15em 0.3em; border-radius: 3px; font-size: 0.9em; }
-    pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
-    mark { background-color: #fef08a; padding: 0.1em 0.2em; }
-  </style>
-</head>
-<body>
-${html}
-</body>
-</html>`
-  const blob = new Blob([fullHtml], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'document.html'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function exportPDF(editor: TiptapEditor) {
-  const html = editor.getHTML()
-  const printWindow = window.open('', '_blank')
-  if (!printWindow) return
-  printWindow.document.write(`<!DOCTYPE html>
-<html><head><title>Print</title>
-<style>
-  body { font-family: 'Georgia', serif; max-width: 700px; margin: 2rem auto; line-height: 1.7; color: #1a1a1a; }
-  h1 { font-size: 2rem; } h2 { font-size: 1.5rem; } h3 { font-size: 1.25rem; }
-  p { margin: 0.8rem 0; } ul, ol { padding-left: 1.5rem; }
-  blockquote { border-left: 3px solid #ccc; padding-left: 1rem; color: #555; }
-  code { background: #f4f4f4; padding: 0.15em 0.3em; border-radius: 3px; }
-  mark { background-color: #fef08a; }
-  @media print { body { margin: 0; } }
-</style></head><body>${html}</body></html>`)
-  printWindow.document.close()
-  printWindow.focus()
-  setTimeout(() => { printWindow.print(); printWindow.close() }, 300)
-}
-
-function exportMarkdown(editor: TiptapEditor) {
-  const md = (editor as any).getMarkdown?.()
-  if (!md) return
-  const blob = new Blob([md], { type: 'text/markdown' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'document.md'
-  a.click()
-  URL.revokeObjectURL(url)
-}
+// Export helpers are in @/renderer/utils/exportEngine
 
 // ────────────────────────────────────────────────────────────────────
 // Highlight colors
@@ -384,17 +325,26 @@ export function EditorToolbar({ editor, zoom, onZoomChange }: EditorToolbarProps
               </TooltipContent>
             </Tooltip>
             <DropdownMenuContent onMouseDown={preventFocusLoss} align="start">
-              <DropdownMenuItem onSelect={() => exportPDF(editor)}>
+              <DropdownMenuItem onSelect={() => exportAsPDF(editor)}>
                 <FileText className="h-4 w-4 mr-2" />
                 Export as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => exportHTML(editor)}>
-                <FileText className="h-4 w-4 mr-2" />
+              <DropdownMenuItem onSelect={() => exportAsDOCX(editor)}>
+                <FileType className="h-4 w-4 mr-2" />
+                Export as Word (.docx)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => exportAsHTML(editor)}>
+                <FileCode className="h-4 w-4 mr-2" />
                 Export as HTML
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => exportMarkdown(editor)}>
+              <DropdownMenuItem onSelect={() => exportAsMarkdown(editor)}>
                 <FileText className="h-4 w-4 mr-2" />
                 Export as Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => exportAsText(editor)}>
+                <Type className="h-4 w-4 mr-2" />
+                Export as Plain Text
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

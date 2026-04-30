@@ -52,6 +52,7 @@ export const IPC_CHANNELS = {
   // Provider operations (Phase 7)
   PROVIDER_REGISTER: 'provider:register',
   PROVIDER_UNREGISTER: 'provider:unregister',
+  PROVIDER_DELETE: 'provider:delete',
   PROVIDER_LIST: 'provider:list',
   PROVIDER_GET_MODELS: 'provider:getModels',
   PROVIDER_CHECK_HEALTH: 'provider:checkHealth',
@@ -59,6 +60,7 @@ export const IPC_CHANNELS = {
   PROVIDER_SET_FALLBACK: 'provider:setFallback',
   PROVIDER_GET_USAGE: 'provider:getUsage',
   PROVIDER_GET_USAGE_SUMMARY: 'provider:getUsageSummary',
+  PROVIDER_FETCH_OPENROUTER_MODELS: 'provider:fetchOpenRouterModels',
   PROVIDER_CHAT_COMPLETION: 'provider:chatCompletion',
   PROVIDER_STREAM_START: 'provider:streamStart',
   PROVIDER_STREAM_CHUNK: 'provider:streamChunk',
@@ -187,6 +189,7 @@ export const IPC_CHANNELS = {
   // Writer Harness: Generator operations (Phase 3)
   WRITER_LOOP_GENERATE_SECTION: 'writerLoop:generateSection',
   WRITER_LOOP_GENERATE_ALL: 'writerLoop:generateAll',
+  WRITER_LOOP_ABORT_GENERATION: 'writerLoop:abortGeneration',
   WRITER_LOOP_GET_PROGRESS: 'writerLoop:getProgress',
   WRITER_LOOP_ACCEPT_GENERATION: 'writerLoop:acceptGeneration',
   WRITER_LOOP_REJECT_GENERATION: 'writerLoop:rejectGeneration',
@@ -255,6 +258,12 @@ export const IPC_CHANNELS = {
   PROJECT_DELETE_FILE: 'project:deleteFile',
   PROJECT_RENAME_FILE: 'project:renameFile',
   PROJECT_GET_ACTIVE: 'project:getActive',
+
+  // AI Detection operations
+  DETECT_HEURISTIC: 'detect:heuristic',
+  DETECT_LLM_ANALYZE: 'detect:llmAnalyze',
+  DETECT_LLM_HUMANIZE: 'detect:llmHumanize',
+  DETECT_FULL_PIPELINE: 'detect:fullPipeline',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

@@ -40,6 +40,7 @@ interface LaconSidebarProps {
   onDeleteFile: (filePath: string) => void
   onRenameFile: (oldPath: string, newName: string) => void
   onOpenSettings: () => void
+  onOpenSkillsTab?: () => void
 }
 
 function formatFileSize(bytes: number): string {
@@ -93,6 +94,7 @@ export function LaconSidebar({
   onDeleteFile,
   onRenameFile,
   onOpenSettings,
+  onOpenSkillsTab,
 }: LaconSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [contextMenuFile, setContextMenuFile] = useState<string | null>(null)
@@ -398,8 +400,12 @@ export function LaconSidebar({
             </span>
           </div>
           {activeSkillCount > 0 && (
-            <div className="flex items-center gap-1 mt-1.5">
-              <Badge variant="secondary" className="text-[10px] h-5 gap-1">
+            <div
+              className="flex items-center gap-1 mt-1.5 cursor-pointer"
+              onClick={onOpenSkillsTab}
+              title="Open Skills Library"
+            >
+              <Badge variant="secondary" className="text-[10px] h-5 gap-1 hover:bg-secondary/80 transition-colors">
                 <Sparkles className="h-3 w-3" />
                 {activeSkillCount} skill{activeSkillCount !== 1 ? 's' : ''} active
               </Badge>

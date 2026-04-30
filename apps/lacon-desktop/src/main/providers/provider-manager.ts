@@ -1,7 +1,12 @@
 /**
  * Provider manager for Phase 7
- * Orchestrates all provider adapters with retry, fallback, and usage tracking
+ * Orchestrates all provider adapters with retry, fallback, and usage tracking.
+ * Provider configs are persisted to disk so they survive app restarts.
  */
+
+import { app } from 'electron'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
 
 import type {
   ChatCompletionRequest,
@@ -32,6 +37,7 @@ export class ProviderManager {
   private configs = new Map<string, ProviderConfig>()
   private circuitBreakers = new Map<string, CircuitBreakerState>()
   private usageRecords: UsageRecord[] = []
+  private configStorePath: string
 
   private defaultRetryPolicy: RetryPolicy = {
     maxRetries: 3,
@@ -43,10 +49,67 @@ export class ProviderManager {
 
   private fallbackChains = new Map<string, FallbackChain>()
 
+  constructor() {
+    const userDataPath = app.getPath('userData')
+    const configDir = join(userDataPath, 'providers')
+    if (!existsSync(configDir)) {
+      mkdirSync(configDir, { recursive: true })
+    }
+    this.configStorePath = join(configDir, 'providers.json')
+  }
+
+  // ── Persistence ──
+
+  /**
+   * Save all provider configs to disk.
+   */
+  private persistConfigs(): void {
+    try {
+      const data = Array.from(this.configs.values())
+      writeFileSync(this.configStorePath, JSON.stringify(data, null, 2), 'utf-8')
+    } catch (error) {
+      console.error('[ProviderManager] Failed to persist configs:', error)
+    }
+  }
+
+  /**
+   * Load persisted provider configs from disk.
+   */
+  private loadPersistedConfigs(): ProviderConfig[] {
+    try {
+      if (existsSync(this.configStorePath)) {
+        const raw = readFileSync(this.configStorePath, 'utf-8')
+        return JSON.parse(raw)
+      }
+    } catch (error) {
+      console.error('[ProviderManager] Failed to load persisted configs:', error)
+    }
+    return []
+  }
+
+  /**
+   * Restore providers from persisted configs on app startup.
+   * Silently skips providers whose API keys are missing.
+   */
+  async restoreProviders(): Promise<void> {
+    const saved = this.loadPersistedConfigs()
+    if (saved.length === 0) return
+
+    console.log(`[ProviderManager] Restoring ${saved.length} persisted provider(s)...`)
+    for (const config of saved) {
+      try {
+        await this.registerProvider(config, true /* skipPersist — already on disk */)
+        console.log(`[ProviderManager] Restored provider: ${config.name} (${config.id})`)
+      } catch (error) {
+        console.warn(`[ProviderManager] Could not restore provider ${config.id}:`, error)
+      }
+    }
+  }
+
   /**
    * Register a provider with its configuration
    */
-  async registerProvider(config: ProviderConfig): Promise<void> {
+  async registerProvider(config: ProviderConfig, skipPersist = false): Promise<void> {
     if (!config.apiKeyId) {
       throw new Error('Provider requires API key')
     }
@@ -64,6 +127,10 @@ export class ProviderManager {
     this.adapters.set(config.id, adapter)
     this.configs.set(config.id, config)
     this.initializeCircuitBreaker(config.id)
+
+    if (!skipPersist) {
+      this.persistConfigs()
+    }
   }
 
   /**
@@ -74,6 +141,40 @@ export class ProviderManager {
     this.configs.delete(providerId)
     this.circuitBreakers.delete(providerId)
     this.fallbackChains.delete(providerId)
+    this.persistConfigs()
+  }
+
+  /**
+   * Fully delete a provider: remove the adapter, config, AND its API key from the keystore.
+   */
+  async deleteProvider(providerId: string): Promise<boolean> {
+    const config = this.configs.get(providerId)
+    if (!config) {
+      return false
+    }
+
+    // Remove the API key from the encrypted keystore
+    if (config.apiKeyId) {
+      try {
+        const keyStore = getKeyStore()
+        await keyStore.deleteKey(config.apiKeyId)
+        console.log(`[ProviderManager] Deleted API key: ${config.apiKeyId}`)
+      } catch (error) {
+        console.warn(`[ProviderManager] Failed to delete API key ${config.apiKeyId}:`, error)
+      }
+    }
+
+    // Remove from in-memory state
+    this.adapters.delete(providerId)
+    this.configs.delete(providerId)
+    this.circuitBreakers.delete(providerId)
+    this.fallbackChains.delete(providerId)
+
+    // Remove from disk
+    this.persistConfigs()
+
+    console.log(`[ProviderManager] Provider deleted: ${providerId}`)
+    return true
   }
 
   /**

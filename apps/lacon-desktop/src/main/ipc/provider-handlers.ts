@@ -5,7 +5,8 @@
 import { BrowserWindow, ipcMain } from 'electron'
 
 import { IPC_CHANNELS } from '../../shared/ipc-schema'
-import type { ChatCompletionRequest, ProviderConfig, StreamChunk } from '../../shared/provider-types'
+import type { ChatCompletionRequest, StreamChunk } from '../../shared/provider-types'
+import { OpenRouterAdapter } from '../providers/openrouter-adapter'
 import { getProviderManager } from '../providers/provider-manager'
 import { getKeyStore } from '../security/keystore'
 
@@ -17,9 +18,14 @@ export function registerProviderHandlers(): void {
     await providerManager.registerProvider(config)
   })
 
-  // Unregister a provider
+  // Unregister a provider (keeps API key in keystore)
   ipcMain.handle(IPC_CHANNELS.PROVIDER_UNREGISTER, async (_, providerId: string): Promise<void> => {
     providerManager.unregisterProvider(providerId)
+  })
+
+  // Delete a provider AND its API key from the keystore
+  ipcMain.handle(IPC_CHANNELS.PROVIDER_DELETE, async (_, providerId: string): Promise<boolean> => {
+    return providerManager.deleteProvider(providerId)
   })
 
   // List all providers
@@ -108,4 +114,48 @@ export function registerProviderHandlers(): void {
       return keyId
     },
   )
+
+  // Fetch OpenRouter models dynamically from the API
+  ipcMain.handle(
+    IPC_CHANNELS.PROVIDER_FETCH_OPENROUTER_MODELS,
+    async (_, providerId?: string): Promise<any> => {
+      try {
+        // If a providerId is given, use its registered adapter
+        if (providerId) {
+          const adapter = providerManager.getProvider(providerId)
+          if (adapter && adapter instanceof OpenRouterAdapter) {
+            const models = await adapter.fetchOpenRouterModels()
+            return { success: true, data: models }
+          }
+        }
+
+        // Otherwise try to find any registered OpenRouter provider
+        const providers = providerManager.listProviders()
+        const orProvider = providers.find(p => p.type === 'openrouter')
+        if (orProvider) {
+          const adapter = providerManager.getProvider(orProvider.id)
+          if (adapter && adapter instanceof OpenRouterAdapter) {
+            const models = await adapter.fetchOpenRouterModels()
+            return { success: true, data: models }
+          }
+        }
+
+        // No registered provider — use a temporary adapter with no key
+        // (OpenRouter /models is publicly accessible)
+        const tempAdapter = new OpenRouterAdapter()
+        await tempAdapter.initialize(
+          { id: 'temp', type: 'openrouter', name: 'temp', enabled: true, createdAt: 0, updatedAt: 0 },
+          'anon',
+        )
+        const models = await tempAdapter.fetchOpenRouterModels()
+        return { success: true, data: models }
+      } catch (error) {
+        return {
+          success: false,
+          error: { code: 'OPENROUTER_MODELS_ERROR', message: error instanceof Error ? error.message : String(error) },
+        }
+      }
+    },
+  )
 }
+

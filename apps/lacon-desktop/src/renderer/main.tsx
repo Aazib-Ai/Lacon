@@ -1,6 +1,4 @@
 import './styles/globals.css'
-import './index.css'
-import './phase-9.css'
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'

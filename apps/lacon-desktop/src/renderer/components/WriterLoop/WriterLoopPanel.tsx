@@ -1,19 +1,14 @@
 /**
- * WriterLoopPanel — Phase 2
+ * WriterLoopPanel — Session Config + Outline Editor Container
  *
  * Container component that wires the useWriterLoop hook to the OutlineEditor.
- * Integrates with the existing AppShell/AssistantPanel layout.
- *
- * Shows:
- * - Session config bar (word target, automation level, stage)
- * - OutlineEditor for outline CRUD + approval
+ * Shows session config bar (word target, automation level, stage) + OutlineEditor.
  */
-
-import './WriterLoopPanel.css'
 
 import React, { useCallback } from 'react'
 
 import type { AutomationLevel } from '../../../shared/writer-types'
+import { cn } from '../../lib/utils'
 import { useWriterLoop } from '../../hooks/useWriterLoop'
 import { OutlineEditor } from './OutlineEditor'
 
@@ -41,14 +36,14 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
 
   if (!documentId) {
     return (
-      <div className="writer-loop-panel writer-loop-panel--empty" id="writer-loop-panel">
-        <p className="writer-loop-panel__placeholder">Open a document to start writing.</p>
+      <div className="flex flex-col items-center justify-center min-h-[200px] h-full" id="writer-loop-panel">
+        <p className="text-sm text-muted-foreground">Open a document to start writing.</p>
       </div>
     )
   }
 
   return (
-    <div className="writer-loop-panel" id="writer-loop-panel">
+    <div className="flex flex-col h-full overflow-y-auto" id="writer-loop-panel">
       {/* ── Session Config Bar ── */}
       <SessionConfigBar
         session={loop.session}
@@ -64,6 +59,7 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
         loading={loop.loading}
         error={loop.error}
         errorMeta={loop.errorMeta}
+        progress={loop.progress}
         onUpdateSection={loop.updateSection}
         onAddSection={loop.addSection}
         onRemoveSection={loop.removeSection}
@@ -72,8 +68,8 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
         onApprove={handleApprove}
         onRegenerate={handleRegenerate}
         onReset={handleReset}
+        onAbort={loop.abortGeneration}
         onClearError={() => {
-          // Dispatch clear error via reset flow — the hook exposes error clearing through fetchState
           loop.fetchState()
         }}
       />
@@ -90,27 +86,37 @@ interface SessionConfigBarProps {
   onReset: () => void
 }
 
+const stageColorMap: Record<string, string> = {
+  idle: 'text-muted-foreground',
+  generating: 'text-success',
+  'awaiting-outline-approval': 'text-warning',
+  reviewing: 'text-primary',
+}
+
 function SessionConfigBar({ session, onUpdateConfig, onPause: _onPause, onReset: _onReset }: SessionConfigBarProps) {
   if (!session) {return null}
 
   const automationOptions: AutomationLevel[] = ['auto', 'supervised', 'manual']
 
   return (
-    <div className="session-config-bar" id="session-config-bar">
+    <div
+      className="flex items-center gap-3 px-3 py-2 bg-secondary border-b border-border text-xs flex-wrap"
+      id="session-config-bar"
+    >
       {/* Stage indicator */}
-      <div className="session-config-bar__item">
-        <span className="session-config-bar__label">Stage</span>
-        <span className="session-config-bar__value" data-stage={session.stage}>
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground font-medium uppercase tracking-wider text-[0.625rem]">Stage</span>
+        <span className={cn('font-semibold', stageColorMap[session.stage] || 'text-foreground')}>
           {formatStage(session.stage)}
         </span>
       </div>
 
       {/* Automation level */}
-      <div className="session-config-bar__item">
-        <span className="session-config-bar__label">Mode</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground font-medium uppercase tracking-wider text-[0.625rem]">Mode</span>
         <select
           id="session-automation-select"
-          className="session-config-bar__select"
+          className="px-1.5 py-0.5 rounded-sm border border-border bg-background text-foreground text-xs font-inherit cursor-pointer transition-colors focus:outline-none focus:border-primary"
           value={session.automationLevel}
           onChange={e => onUpdateConfig({ automationLevel: e.target.value })}
         >
@@ -123,25 +129,39 @@ function SessionConfigBar({ session, onUpdateConfig, onPause: _onPause, onReset:
       </div>
 
       {/* Word target */}
-      <div className="session-config-bar__item">
-        <span className="session-config-bar__label">Target</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground font-medium uppercase tracking-wider text-[0.625rem]">Target</span>
         <input
           id="session-word-target"
           type="number"
-          className="session-config-bar__number-input"
+          className="w-14 px-1.5 py-0.5 rounded-sm border border-border bg-background text-foreground text-xs font-inherit transition-colors focus:outline-none focus:border-primary"
           value={session.wordTarget}
           min={0}
           step={100}
           onChange={e => onUpdateConfig({ wordTarget: Math.max(0, Number(e.target.value)) })}
           placeholder="No target"
         />
-        <span className="session-config-bar__unit">words</span>
+        <span className="text-muted-foreground text-[0.65rem]">words</span>
       </div>
 
-      {/* Skills count */}
-      <div className="session-config-bar__item">
-        <span className="session-config-bar__label">Skills</span>
-        <span className="session-config-bar__value">{session.activeSkillIds?.length || 0}</span>
+      {/* Skills count — clickable to open Skills tab */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground font-medium uppercase tracking-wider text-[0.625rem]">Skills</span>
+        <button
+          onClick={() => {
+            // Dispatch a custom event that LaconWorkspace listens for
+            window.dispatchEvent(new CustomEvent('lacon:open-skills-tab'))
+          }}
+          className={cn(
+            'font-semibold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer',
+            (session.activeSkillIds?.length || 0) > 0
+              ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20'
+              : 'text-foreground hover:bg-secondary',
+          )}
+          title="Open Skills Library"
+        >
+          ✨ {session.activeSkillIds?.length || 0}
+        </button>
       </div>
     </div>
   )

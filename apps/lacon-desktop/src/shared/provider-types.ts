@@ -28,6 +28,26 @@ export interface ModelInfo {
   costPer1kOutput?: number
 }
 
+/**
+ * OpenRouter-specific model information from the /models API
+ */
+export type OpenRouterModelCategory = 'popular' | 'free' | 'gpt' | 'claude' | 'gemini' | 'open-source' | 'all'
+
+export interface OpenRouterModelInfo extends ModelInfo {
+  description?: string
+  architecture?: string
+  topProvider?: string
+  pricing: {
+    promptPer1M: number
+    completionPer1M: number
+    currency: string
+  }
+  isFree: boolean
+  supportsVision: boolean
+  maxOutput?: number
+  categories: OpenRouterModelCategory[]
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string

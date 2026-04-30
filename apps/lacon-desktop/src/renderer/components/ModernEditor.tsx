@@ -14,15 +14,13 @@ import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, us
 import { EditorToolbar } from './EditorToolbar'
 
 // ────────────────────────────────────────────────────────────────────
-// Page dimensions — US Letter at 96 DPI
+// Page dimensions
 // ────────────────────────────────────────────────────────────────────
 
-/** Page geometry constants (US Letter, 96 dpi) */
+/** Page geometry constants */
 const PAGE = {
-  /** Full page width in px (8.5 in) */
+  /** Full page width in px (8.5 in at 96 dpi) */
   WIDTH: 816,
-  /** Full page height in px (11 in) */
-  HEIGHT: 1056,
   /** Top margin in px (1 in) */
   MARGIN_TOP: 96,
   /** Bottom margin in px (1 in) */
@@ -31,10 +29,14 @@ const PAGE = {
   MARGIN_LEFT: 115,
   /** Right margin in px (1.2 in) */
   MARGIN_RIGHT: 115,
-  /** Usable content height per page (11in - 1in top - 1in bottom = 9in) */
-  CONTENT_HEIGHT: 864,
   /** Gap between visual pages in px */
-  GAP: 40,
+  GAP: 10,
+  /** Minimum content height — the page is at least this tall */
+  MIN_CONTENT_HEIGHT: 864,
+  /** Container padding (top) used around the document */
+  CONTAINER_PAD_TOP: 12,
+  /** Container padding (bottom) used around the document */
+  CONTAINER_PAD_BOTTOM: 24,
 } as const
 
 // ────────────────────────────────────────────────────────────────────
@@ -76,10 +78,46 @@ function looksLikeMarkdown(content: string): boolean {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// usePageBreaks — track content height → compute page count
+// useCanvasHeight — measure the visible canvas area
 // ────────────────────────────────────────────────────────────────────
 
-function usePageBreaks(editorElement: HTMLElement | null) {
+/**
+ * Tracks the height of the scrollable canvas so the page can be
+ * sized to fill the entire viewport. Returns the usable content
+ * height per page (viewport minus margins and padding).
+ */
+function useCanvasHeight(canvasRef: React.RefObject<HTMLDivElement | null>) {
+  const [contentHeight, setContentHeight] = useState(PAGE.MIN_CONTENT_HEIGHT)
+
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+
+    const measure = () => {
+      const canvasH = el.clientHeight
+      // The page content height = canvas height minus:
+      //   - container top + bottom padding
+      //   - page top + bottom margins (which are part of the page chrome)
+      const available = canvasH - PAGE.CONTAINER_PAD_TOP - PAGE.CONTAINER_PAD_BOTTOM
+                        - PAGE.MARGIN_TOP - PAGE.MARGIN_BOTTOM
+      setContentHeight(Math.max(PAGE.MIN_CONTENT_HEIGHT, available))
+    }
+
+    measure()
+
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [canvasRef])
+
+  return contentHeight
+}
+
+// ────────────────────────────────────────────────────────────────────
+// usePageCount — track content height → compute page count
+// ────────────────────────────────────────────────────────────────────
+
+function usePageCount(editorElement: HTMLElement | null, contentHeight: number) {
   const [pageCount, setPageCount] = useState(1)
 
   useEffect(() => {
@@ -87,7 +125,7 @@ function usePageBreaks(editorElement: HTMLElement | null) {
 
     const measure = () => {
       const height = editorElement.scrollHeight
-      setPageCount(Math.max(1, Math.ceil(height / PAGE.CONTENT_HEIGHT)))
+      setPageCount(Math.max(1, Math.ceil(height / contentHeight)))
     }
 
     // Initial measurement
@@ -114,42 +152,47 @@ function usePageBreaks(editorElement: HTMLElement | null) {
       observer.disconnect()
       mutationObserver.disconnect()
     }
-  }, [editorElement])
+  }, [editorElement, contentHeight])
 
   return { pageCount }
 }
 
 // ────────────────────────────────────────────────────────────────────
-// PageBreakOverlay — visual separator between pages
+// PageBreakOverlay — visual separator between pages (Google Docs style)
 // ────────────────────────────────────────────────────────────────────
 
 interface PageBreakOverlayProps {
-  /** Which page this break comes after (1-indexed, so break after page 1 = 1) */
+  /** Which page this break comes after (1-indexed) */
   afterPage: number
-  /** Total number of pages */
-  totalPages: number
+  /** Content height per page (dynamic) */
+  contentHeight: number
 }
 
-function PageBreakOverlay({ afterPage, totalPages }: PageBreakOverlayProps) {
-  const topPosition = afterPage * PAGE.CONTENT_HEIGHT
+/**
+ * Renders the gap between two pages. This overlay sits on top of the
+ * continuous editor content at the boundary where one page ends and
+ * the next begins. It masks the content with the canvas background
+ * and paints drop-shadows on the edges to create the illusion of two
+ * distinct paper sheets separated by a gap.
+ */
+function PageBreakOverlay({ afterPage, contentHeight }: PageBreakOverlayProps) {
+  const contentBoundary = afterPage * contentHeight
 
   return (
     <div
       className="page-break-overlay"
-      style={{ top: `${topPosition}px` }}
+      style={{
+        top: `${contentBoundary}px`,
+      }}
       aria-hidden="true"
     >
-      {/* Bottom shadow of the current page */}
+      {/* Bottom margin of the ending page — white band with bottom shadow */}
       <div className="page-break-bottom-shadow" />
 
-      {/* The gap between pages — grey canvas peek */}
-      <div className="page-break-gap">
-        <span className="page-number-label">
-          {afterPage} / {totalPages}
-        </span>
-      </div>
+      {/* The canvas gap between pages */}
+      <div className="page-break-gap" />
 
-      {/* Top shadow of the next page */}
+      {/* Top margin of the starting page — white band with top shadow */}
       <div className="page-break-top-shadow" />
     </div>
   )
@@ -166,6 +209,10 @@ export interface ModernEditorHandle {
   getHTML: () => string
   /** Get the current editor content as Tiptap JSON */
   getJSON: () => any
+  /** Set the editor content from an HTML string */
+  setHTML: (html: string) => void
+  /** Append HTML content at the end of the editor */
+  appendHTML: (html: string) => void
 }
 
 interface ModernEditorProps {
@@ -181,6 +228,10 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
   const [zoom, setZoom] = useState(100)
   const proseMirrorRef = useRef<HTMLElement | null>(null)
   const editorWrapperRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+
+  // ── Dynamic page height: fill the viewport ──
+  const contentHeight = useCanvasHeight(canvasRef)
 
   // Determine if content is Markdown (legacy) and include the Markdown extension for parsing
   const isMarkdownContent = useMemo(() => looksLikeMarkdown(content || ''), [content])
@@ -218,18 +269,30 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
     getMarkdown: () => editor?.getMarkdown?.() || '',
     getHTML: () => editor?.getHTML?.() || '',
     getJSON: () => editor?.getJSON?.() || { type: 'doc', content: [] },
+    setHTML: (html: string) => {
+      if (editor) {
+        editor.commands.setContent(html)
+      }
+    },
+    appendHTML: (html: string) => {
+      if (editor) {
+        editor.commands.insertContentAt(editor.state.doc.content.size - 1, html)
+      }
+    },
   }), [editor])
 
   const handleZoomChange = useCallback((newZoom: number) => {
     setZoom(newZoom)
   }, [])
 
-  // Page break tracking
-  const { pageCount } = usePageBreaks(proseMirrorRef.current)
+  // Page count tracking (uses dynamic contentHeight)
+  const { pageCount } = usePageCount(proseMirrorRef.current, contentHeight)
 
-  // Calculate the total height needed for the editor container to accommodate
-  // all pages plus the page break gap overlays
-  const totalEditorHeight = pageCount * PAGE.CONTENT_HEIGHT
+  // Total continuous content height across all pages
+  const totalContentHeight = pageCount * contentHeight
+  // Each page break overlay adds (MARGIN_BOTTOM + GAP + MARGIN_TOP) of visual height
+  const totalOverlayHeight = (pageCount - 1) * (PAGE.MARGIN_BOTTOM + PAGE.GAP + PAGE.MARGIN_TOP)
+  const totalDocumentHeight = totalContentHeight + PAGE.MARGIN_TOP + PAGE.MARGIN_BOTTOM + totalOverlayHeight
 
   if (!editor) {
     return null
@@ -241,7 +304,7 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
       <EditorToolbar editor={editor} zoom={zoom} onZoomChange={handleZoomChange} />
 
       {/* Main Editor Area — Paginated Document Canvas */}
-      <div className="paginated-canvas flex-1 overflow-y-auto">
+      <div ref={canvasRef} className="paginated-canvas flex-1 overflow-y-auto">
         <div
           className="paginated-document-container"
           style={{
@@ -249,19 +312,21 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
             transformOrigin: 'top center',
           }}
         >
-          {/* The document page area — white background with page-like appearance */}
+          {/* The document — a single continuous white page.
+              Page breaks are painted on top as overlays. */}
           <div
             ref={editorWrapperRef}
             className="paginated-document"
             style={{
               width: `${PAGE.WIDTH}px`,
+              minHeight: `${totalDocumentHeight}px`,
             }}
           >
-            {/* Editor content — continuous, but padded per-page via CSS */}
+            {/* Editor content — continuous flow */}
             <div
               className="paginated-editor-content"
               style={{
-                minHeight: `${totalEditorHeight}px`,
+                minHeight: `${totalContentHeight}px`,
                 paddingLeft: `${PAGE.MARGIN_LEFT}px`,
                 paddingRight: `${PAGE.MARGIN_RIGHT}px`,
                 paddingTop: `${PAGE.MARGIN_TOP}px`,
@@ -271,26 +336,14 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
               <EditorContent editor={editor} className="prose prose-lg max-w-none" />
             </div>
 
-            {/* Page break overlays — rendered on top of the editor at fixed intervals */}
+            {/* Page break overlays — visual separators between pages */}
             {pageCount > 1 && Array.from({ length: pageCount - 1 }, (_, i) => (
               <PageBreakOverlay
                 key={i + 1}
                 afterPage={i + 1}
-                totalPages={pageCount}
+                contentHeight={contentHeight}
               />
             ))}
-
-            {/* Page footer on the last page */}
-            <div
-              className="page-footer-indicator"
-              style={{
-                top: `${totalEditorHeight + PAGE.MARGIN_TOP - 30}px`,
-              }}
-            >
-              <span className="page-number-bottom">
-                {pageCount} {pageCount === 1 ? 'page' : 'pages'}
-              </span>
-            </div>
           </div>
 
           {/* Bottom spacer so the last page has room to scroll */}

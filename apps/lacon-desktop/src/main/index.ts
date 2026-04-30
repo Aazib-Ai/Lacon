@@ -5,12 +5,14 @@ import { AuditManager } from './audit/audit-manager'
 import { getMigrationRunner } from './data/migrations'
 import { getDataStore } from './data/store'
 import { registerAuditHandlers } from './ipc/audit-handlers'
+import { registerDetectionHandlers } from './ipc/detection-handlers'
 import { registerDialogHandlers } from './ipc/dialog-handlers'
 import { registerProjectHandlers } from './ipc/project-handlers'
 import { registerAgentIpcHandlers, registerIpcHandlers } from './ipc/handlers'
 import { registerPhase7Handlers } from './ipc/phase7-handlers'
 import { registerPhase12Handlers } from './ipc/phase12-handlers'
 import { registerProviderHandlers } from './ipc/provider-handlers'
+import { getProviderManager } from './providers/provider-manager'
 import { registerReleaseHandlers } from './ipc/release-handlers'
 import { registerResearchHandlers } from './ipc/research-handlers'
 import { registerSkillHandlers } from './ipc/skill-handlers'
@@ -46,6 +48,11 @@ async function initializeApp() {
     const dataStore = getDataStore()
     await dataStore.initialize()
     logger.info('Data store initialized')
+
+    // Restore persisted providers (requires key store to be ready)
+    const providerManager = getProviderManager()
+    await providerManager.restoreProviders()
+    logger.info('Provider manager initialized')
 
     // Initialize release operations (Phase 11)
     const releaseOperations = getReleaseOperationsService()
@@ -131,6 +138,9 @@ async function initializeApp() {
 
     // Register project handlers (folder-based documents)
     registerProjectHandlers()
+
+    // Register AI detection handlers
+    registerDetectionHandlers()
 
     logger.info('IPC handlers registered')
 

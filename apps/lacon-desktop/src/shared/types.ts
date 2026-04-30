@@ -36,6 +36,7 @@ export interface ProviderAPI {
   onStreamChunk: (callback: (streamId: string, chunk: any) => void) => void
   onStreamComplete: (callback: (streamId: string, usage: any) => void) => void
   onStreamError: (callback: (streamId: string, error: string) => void) => void
+  fetchOpenRouterModels: (providerId?: string) => Promise<any>
 }
 
 // Tool API (Phase 8)
@@ -174,6 +175,7 @@ export interface WriterLoopAPI {
   // Phase 3: Generator
   generateSection: (documentId: string, sectionId: string) => Promise<any>
   generateAll: (documentId: string) => Promise<any>
+  abortGeneration: (documentId: string) => Promise<any>
   getProgress: (documentId: string) => Promise<any>
   acceptGeneration: (documentId: string, sectionId: string) => Promise<any>
   rejectGeneration: (documentId: string, sectionId: string) => Promise<any>

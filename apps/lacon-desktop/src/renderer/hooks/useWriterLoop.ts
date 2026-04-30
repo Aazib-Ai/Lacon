@@ -177,6 +177,16 @@ export function useWriterLoop(documentId: string | undefined) {
       const res = await writerLoop().getState(documentId)
       handleResponse(res, data => {
         dispatch({ type: 'SET_STATE', session: data.session, outline: data.outline })
+
+        // Also fetch progress if we're in a stage that has generation data
+        const stage = data.session?.stage
+        if (stage === 'generating' || stage === 'reviewing') {
+          writerLoop().getProgress(documentId).then(progressRes => {
+            if (progressRes?.success && mountedRef.current) {
+              dispatch({ type: 'SET_PROGRESS', progress: progressRes.data })
+            }
+          }).catch(() => { /* ignore */ })
+        }
       })
     } catch (err: any) {
       dispatch({ type: 'SET_ERROR', error: err.message })
@@ -187,6 +197,18 @@ export function useWriterLoop(documentId: string | undefined) {
   useEffect(() => {
     fetchState()
   }, [fetchState])
+
+  // Listen for generation-stopped events (fired by any hook instance after abort)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.documentId === documentId) {
+        fetchState()
+      }
+    }
+    window.addEventListener('lacon:generation-stopped', handler)
+    return () => window.removeEventListener('lacon:generation-stopped', handler)
+  }, [documentId, fetchState])
 
   // ── Planning ──
 
@@ -338,11 +360,13 @@ export function useWriterLoop(documentId: string | undefined) {
         handleResponse(res, session => {
           dispatch({ type: 'SET_SESSION', session })
         })
+        // Refresh state — generation starts automatically on the backend
+        await fetchState()
       } catch (err: any) {
         dispatch({ type: 'SET_ERROR', error: err.message })
       }
     },
-    [documentId, handleResponse],
+    [documentId, handleResponse, fetchState],
   )
 
   // ── Config ──
@@ -476,6 +500,38 @@ export function useWriterLoop(documentId: string | undefined) {
     }
   }, [documentId, handleResponse])
 
+  // Guard: prevent multiple concurrent generateAll triggers
+  const generationTriggeredRef = useRef(false)
+
+  /** Abort in-progress generation — returns any completed results */
+  const abortGeneration = useCallback(async (): Promise<SectionProgress | null> => {
+    if (!documentId) {
+      return null
+    }
+    try {
+      const res = await writerLoop().abortGeneration(documentId)
+      generationTriggeredRef.current = false
+
+      // Wait a moment for the backend generateAll loop to finalize
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Refresh state (stage will have transitioned out of generating)
+      await fetchState()
+
+      // Notify all hook instances (e.g. LaconWorkspace) to refresh
+      window.dispatchEvent(new CustomEvent('lacon:generation-stopped', { detail: { documentId } }))
+
+      if (res?.success && res.data) {
+        dispatch({ type: 'SET_PROGRESS', progress: res.data })
+        return res.data
+      }
+      return null
+    } catch (err: any) {
+      dispatch({ type: 'SET_ERROR', error: err.message })
+      return null
+    }
+  }, [documentId, fetchState])
+
   const getGenerationProgress = useCallback(async () => {
     if (!documentId) {
       return
@@ -489,6 +545,63 @@ export function useWriterLoop(documentId: string | undefined) {
       dispatch({ type: 'SET_ERROR', error: err.message })
     }
   }, [documentId, handleResponse])
+
+  // ── Auto-poll progress while generating ──
+
+  useEffect(() => {
+    const stage = state.session?.stage
+    if (stage !== 'generating' || !documentId) {
+      generationTriggeredRef.current = false
+      return
+    }
+
+    // Auto-recovery: if we're in 'generating' stage but no generation is active,
+    // trigger generateAll(). This handles process restarts and stuck states.
+    const kickstartIfNeeded = async () => {
+      if (generationTriggeredRef.current) return
+      try {
+        const res = await writerLoop().getProgress(documentId)
+        if (res?.success && mountedRef.current) {
+          dispatch({ type: 'SET_PROGRESS', progress: res.data })
+
+          // If progress is idle (no generation running), auto-start
+          if (res.data?.status === 'idle' || (!res.data?.status && res.data?.completedSections === 0)) {
+            console.log('[useWriterLoop] Auto-triggering generateAll (recovery)')
+            generationTriggeredRef.current = true
+            writerLoop().generateAll(documentId).catch(() => {
+              // Fire-and-forget — errors handled by progress polling
+            })
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    kickstartIfNeeded()
+
+    const pollInterval = setInterval(async () => {
+      if (!mountedRef.current) return
+      try {
+        const res = await writerLoop().getProgress(documentId)
+        if (res?.success && mountedRef.current) {
+          dispatch({ type: 'SET_PROGRESS', progress: res.data })
+
+          // If generation completed, refresh the full state
+          if (res.data?.status === 'complete') {
+            generationTriggeredRef.current = false
+            await fetchState()
+            // Notify all hook instances so content gets written to editor
+            window.dispatchEvent(new CustomEvent('lacon:generation-stopped', { detail: { documentId } }))
+          }
+        }
+      } catch {
+        // Ignore polling errors silently
+      }
+    }, 2000)
+
+    return () => clearInterval(pollInterval)
+  }, [state.session?.stage, documentId, fetchState])
 
   const acceptGeneration = useCallback(
     async (sectionId: string) => {
@@ -683,6 +796,7 @@ export function useWriterLoop(documentId: string | undefined) {
     getGenerationProgress,
     acceptGeneration,
     rejectGeneration,
+    abortGeneration,
     // Phase 4
     runReview,
     getReviewState,

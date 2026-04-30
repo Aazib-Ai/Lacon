@@ -1,17 +1,24 @@
 /**
- * Provider settings UI for Phase 7
- * Extended with: encrypted key UX, test connection, per-project model selection,
- * local model disclaimer, session cost display, and manual update link.
+ * Provider settings UI — renders inside the left sidebar panel.
+ * Tailwind-only — no external CSS file.
  */
 
+import { ArrowLeft, Check, ChevronDown, Eye, EyeOff, Key, Loader2, Plus, Trash2, Unplug, X, Zap } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
-import type { ProviderConfig, ProviderHealth, ProviderType } from '../../shared/provider-types'
+import type { OpenRouterModelInfo, ProviderConfig, ProviderHealth, ProviderType } from '../../shared/provider-types'
+import { cn } from '../lib/utils'
+import { OpenRouterModelBrowser } from './OpenRouterModelBrowser'
+import { OpenRouterSetupGuide } from './OpenRouterSetupGuide'
 
 interface ProviderSettingsProps {
   onClose: () => void
   documentId?: string
 }
+
+/* ────────────────────────────────────────────── */
+/*  Main Component                                */
+/* ────────────────────────────────────────────── */
 
 export const ProviderSettings: React.FC<ProviderSettingsProps> = ({ onClose, documentId }) => {
   const [providers, setProviders] = useState<ProviderConfig[]>([])
@@ -21,348 +28,144 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({ onClose, doc
   const [testResults, setTestResults] = useState<
     Record<string, { status: string; latencyMs?: number; error?: string }>
   >({})
-  const [sessionCost, setSessionCost] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState<'providers' | 'model' | 'about'>('providers')
   const [projectModel, setProjectModel] = useState<{ providerId: string; modelId: string } | null>(null)
   const [appInfo, setAppInfo] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'providers' | 'model' | 'cost' | 'about'>('providers')
 
   const loadProviders = React.useCallback(async () => {
-    try {
-      const list = await window.electron.provider.list()
-      setProviders(list)
-    } catch (error) {
-      console.error('Failed to load providers:', error)
-    }
+    try { setProviders(await window.electron.provider.list()) } catch (e) { console.error(e) }
   }, [])
 
   const checkHealth = React.useCallback(async () => {
-    try {
-      const health = await window.electron.provider.checkAllHealth()
-      setHealthStatus(health)
-    } catch (error) {
-      console.error('Failed to check health:', error)
-    }
+    try { setHealthStatus(await window.electron.provider.checkAllHealth()) } catch (e) { console.error(e) }
   }, [])
 
-  const loadSessionCost = React.useCallback(async () => {
-    if (!documentId) {return}
-    try {
-      const result = await window.electron.pricing.getSessionCost(documentId)
-      if (result?.success) {
-        setSessionCost(result.data)
-      }
-    } catch (error) {
-      console.error('Failed to load session cost:', error)
-    }
-  }, [documentId])
-
   const loadProjectModel = React.useCallback(async () => {
-    if (!documentId) {return}
-    try {
-      const result = await window.electron.pricing.getProjectModel(documentId)
-      if (result?.success) {
-        setProjectModel(result.data)
-      }
-    } catch (error) {
-      console.error('Failed to load project model:', error)
-    }
+    if (!documentId) return
+    try { const r = await window.electron.pricing.getProjectModel(documentId); if (r?.success) setProjectModel(r.data) } catch (e) { console.error(e) }
   }, [documentId])
 
   const loadAppInfo = React.useCallback(async () => {
-    try {
-      const result = await window.electron.update.getInfo()
-      if (result?.success) {
-        setAppInfo(result.data)
-      }
-    } catch (error) {
-      console.error('Failed to load app info:', error)
-    }
+    try { const r = await window.electron.update.getInfo(); if (r?.success) setAppInfo(r.data) } catch (e) { console.error(e) }
   }, [])
 
-  useEffect(() => {
-    loadProviders()
-    checkHealth()
-    loadSessionCost()
-    loadProjectModel()
-    loadAppInfo()
-  }, [loadProviders, checkHealth, loadSessionCost, loadProjectModel, loadAppInfo])
+  useEffect(() => { loadProviders(); checkHealth(); loadProjectModel(); loadAppInfo() }, [loadProviders, checkHealth, loadProjectModel, loadAppInfo])
 
-  const handleRemoveProvider = async (providerId: string) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Are you sure you want to remove this provider?')) {
-      return
-    }
-
-    try {
-      await window.electron.provider.unregister(providerId)
-      await loadProviders()
-    } catch (error) {
-      console.error('Failed to remove provider:', error)
-      alert('Failed to remove provider')
-    }
+  const handleRemoveProvider = async (id: string) => {
+    if (!confirm('Remove this provider and its API key? This cannot be undone.')) return
+    try { await window.electron.provider.deleteProvider(id); await loadProviders() } catch { alert('Failed to remove') }
   }
 
   const handleTestConnection = async (providerId: string) => {
     setTestingProvider(providerId)
     try {
-      const result = await window.electron.pricing.testConnection(providerId)
-      if (result?.success) {
-        setTestResults(prev => ({
-          ...prev,
-          [providerId]: result.data,
-        }))
-      }
+      const r = await window.electron.pricing.testConnection(providerId)
+      if (r?.success) setTestResults(p => ({ ...p, [providerId]: r.data }))
     } catch (error) {
-      setTestResults(prev => ({
-        ...prev,
-        [providerId]: {
-          status: 'unavailable',
-          error: error instanceof Error ? error.message : 'Connection failed',
-        },
-      }))
-    } finally {
-      setTestingProvider(null)
-    }
+      setTestResults(p => ({ ...p, [providerId]: { status: 'unavailable', error: error instanceof Error ? error.message : 'Failed' } }))
+    } finally { setTestingProvider(null) }
   }
 
   const handleSetProjectModel = async (providerId: string, modelId: string) => {
-    if (!documentId) {return}
-    try {
-      await window.electron.pricing.setProjectModel(documentId, providerId, modelId)
-      setProjectModel({ providerId, modelId })
-    } catch (error) {
-      console.error('Failed to set project model:', error)
-    }
+    if (!documentId) return
+    try { await window.electron.pricing.setProjectModel(documentId, providerId, modelId); setProjectModel({ providerId, modelId }) } catch (e) { console.error(e) }
   }
 
-  const handleCheckUpdates = async () => {
-    try {
-      await window.electron.update.check()
-    } catch (error) {
-      console.error('Failed to check updates:', error)
-    }
-  }
+  const getHealth = (id: string) => healthStatus.find(h => h.providerId === id)
 
-  const getHealthForProvider = (providerId: string): ProviderHealth | undefined => {
-    return healthStatus.find(h => h.providerId === providerId)
-  }
-
-  const formatCost = (costUsd: number): string => {
-    if (costUsd === 0) {return '$0.00'}
-    if (costUsd < 0.001) {return `$${costUsd.toFixed(6)}`}
-    if (costUsd < 0.01) {return `$${costUsd.toFixed(4)}`}
-    return `$${costUsd.toFixed(4)}`
-  }
+  const tabs = [
+    { id: 'providers' as const, label: 'Providers', icon: <Key className="h-3.5 w-3.5" /> },
+    { id: 'model' as const, label: 'Model', icon: <Zap className="h-3.5 w-3.5" /> },
+    { id: 'about' as const, label: 'About', icon: <Unplug className="h-3.5 w-3.5" /> },
+  ]
 
   return (
-    <div className="provider-settings">
-      <div className="provider-settings-header">
-        <h2>Settings</h2>
-        <button onClick={onClose} className="close-button">
-          ×
+    <div className="flex flex-col h-full bg-card text-foreground animate-fade-in" id="provider-settings">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 h-[var(--lacon-header-height)] border-b border-border flex-shrink-0">
+        <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Back to files">
+          <ArrowLeft className="h-4 w-4" />
         </button>
+        <span className="text-sm font-semibold tracking-tight">Settings</span>
       </div>
 
-      {/* ── Tab Navigation ── */}
-      <div className="settings-tabs">
-        <button
-          className={`settings-tab ${activeTab === 'providers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('providers')}
-        >
-          🔑 Providers
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'model' ? 'active' : ''}`}
-          onClick={() => setActiveTab('model')}
-        >
-          🤖 Model
-        </button>
-        <button className={`settings-tab ${activeTab === 'cost' ? 'active' : ''}`} onClick={() => setActiveTab('cost')}>
-          💰 Cost
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'about' ? 'active' : ''}`}
-          onClick={() => setActiveTab('about')}
-        >
-          ℹ️ About
-        </button>
+      {/* Tabs */}
+      <div className="flex gap-0.5 px-2 py-1.5 border-b border-border flex-shrink-0">
+        {tabs.map(t => (
+          <button key={t.id} className={cn('flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-all', activeTab === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted')} onClick={() => { setActiveTab(t.id); setShowAddForm(false) }}>
+            {t.icon}{t.label}
+          </button>
+        ))}
       </div>
 
-      <div className="provider-settings-content">
-        {/* ── Providers Tab ── */}
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
         {activeTab === 'providers' && (
-          <div className="provider-list">
-            <div className="provider-list-header">
-              <h3>Configured Providers</h3>
-              <button onClick={() => setShowAddForm(true)} className="add-button">
-                + Add Provider
-              </button>
-            </div>
-
-            {/* Encrypted Key Notice */}
-            <div className="security-notice">
-              <span className="security-icon">🔐</span>
-              <span>
-                All API keys are encrypted using your operating system's secure storage (Keychain / DPAPI / libsecret).
-                Keys never leave this device.
-              </span>
-            </div>
-
-            {providers.length === 0 ? (
-              <div className="empty-state">
-                <p>No providers configured yet.</p>
-                <p>Add a provider to start using AI features.</p>
-              </div>
-            ) : (
-              <div className="provider-cards">
-                {providers.map(provider => {
-                  const health = getHealthForProvider(provider.id)
-                  const testResult = testResults[provider.id]
-                  const isTesting = testingProvider === provider.id
-                  const isLocal = provider.type === 'local'
-
-                  return (
-                    <div key={provider.id} className="provider-card">
-                      <div className="provider-card-header">
-                        <div className="provider-info">
-                          <h4>{provider.name}</h4>
-                          <span className="provider-type">{provider.type}</span>
-                          {isLocal && <span className="local-badge">LOCAL</span>}
-                        </div>
-                        <div className="provider-actions-row">
-                          <button
-                            onClick={() => handleTestConnection(provider.id)}
-                            className="test-button"
-                            disabled={isTesting}
-                          >
-                            {isTesting ? '⏳ Testing...' : '🔌 Test'}
-                          </button>
-                          <button onClick={() => handleRemoveProvider(provider.id)} className="remove-button">
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="provider-card-body">
-                        <div className="provider-status">
-                          <span className={`status-indicator status-${health?.status || 'unknown'}`} />
-                          <span className="status-text">
-                            {health?.status || 'Unknown'}
-                            {health?.latencyMs && ` (${health.latencyMs}ms)`}
-                          </span>
-                        </div>
-
-                        {provider.defaultModel && (
-                          <div className="provider-model">
-                            <span className="label">Default Model:</span>
-                            <span className="value">{provider.defaultModel}</span>
-                          </div>
-                        )}
-
-                        {/* Encrypted key indicator */}
-                        <div className="provider-key-status">
-                          <span className="label">API Key:</span>
-                          <span className="encrypted-badge">🔐 Encrypted in OS keystore</span>
-                        </div>
-
-                        {/* Test Connection Result */}
-                        {testResult && (
-                          <div className={`test-result test-result-${testResult.status}`}>
-                            <span className="test-label">
-                              {testResult.status === 'healthy' && '✅'}
-                              {testResult.status === 'degraded' && '⚠️'}
-                              {testResult.status !== 'healthy' && testResult.status !== 'degraded' && '❌'} Test:{' '}
-                              {testResult.status}
-                            </span>
-                            {testResult.latencyMs && <span className="test-latency">{testResult.latencyMs}ms</span>}
-                            {testResult.error && <span className="test-error">{testResult.error}</span>}
-                          </div>
-                        )}
-
-                        {/* Local model disclaimer */}
-                        {isLocal && (
-                          <div className="local-disclaimer">
-                            <span className="disclaimer-icon">⚠️</span>
-                            <span>
-                              Local models run entirely on your machine. Performance depends on your hardware. LACON
-                              provides no warranty on output quality for local models. Ensure your local endpoint is
-                              running before using.
-                            </span>
-                          </div>
-                        )}
-
-                        {health?.error && (
-                          <div className="provider-error">
-                            <span className="error-icon">⚠</span>
-                            <span className="error-text">{health.error}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Model Selection Tab ── */}
-        {activeTab === 'model' && (
-          <div className="model-selection">
-            <h3>Per-Project Model Selection</h3>
-            {!documentId ? (
-              <div className="empty-state">
-                <p>Open a document to configure its model.</p>
-              </div>
+          <div className="p-3">
+            {showAddForm ? (
+              <AddProviderForm
+                onSuccess={() => { setShowAddForm(false); loadProviders(); checkHealth() }}
+                onCancel={() => setShowAddForm(false)}
+              />
             ) : (
               <>
-                <p className="model-description">
-                  Each project can use a different AI model. Select a provider and model below. This setting is isolated
-                  to the current project.
-                </p>
+                <button onClick={() => setShowAddForm(true)} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mb-3 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                  <Plus className="h-3.5 w-3.5" /> Add Provider
+                </button>
 
-                {projectModel && (
-                  <div className="current-model">
-                    <span className="label">Current:</span>
-                    <span className="value">
-                      {projectModel.providerId || 'Not set'} / {projectModel.modelId || 'Not set'}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-[11px] text-muted-foreground mb-3">
+                  <Key className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                  <span>API keys are encrypted in your OS keystore. Keys never leave this device.</span>
+                </div>
 
                 {providers.length === 0 ? (
-                  <div className="empty-state">
-                    <p>Configure a provider first in the Providers tab.</p>
+                  <div className="text-center py-10 text-sm text-muted-foreground">
+                    <Unplug className="h-8 w-8 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">No providers yet</p>
+                    <p className="text-xs mt-1">Add a provider to start using AI.</p>
                   </div>
                 ) : (
-                  <div className="model-picker">
-                    {providers.map(provider => (
-                      <div key={provider.id} className="model-provider-group">
-                        <h4>
-                          {provider.name} ({provider.type})
-                        </h4>
-                        {provider.type === 'local' && (
-                          <div className="local-disclaimer compact">
-                            ⚠️ Local model — quality depends on your hardware and model choice.
+                  <div className="flex flex-col gap-2">
+                    {providers.map(provider => {
+                      const health = getHealth(provider.id)
+                      const testResult = testResults[provider.id]
+                      const isTesting = testingProvider === provider.id
+                      const statusColor = health?.status === 'healthy' ? 'bg-emerald-500' : health?.status === 'degraded' ? 'bg-amber-500' : 'bg-zinc-400'
+
+                      return (
+                        <div key={provider.id} className="rounded-lg border border-border p-3 hover:border-border/80 transition-colors">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={cn('w-2 h-2 rounded-full flex-shrink-0', statusColor)} />
+                              <span className="text-sm font-semibold truncate">{provider.name}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium flex-shrink-0">{provider.type}</span>
+                            </div>
                           </div>
-                        )}
-                        <div className="model-options">
                           {provider.defaultModel && (
-                            <button
-                              className={`model-option ${
-                                projectModel?.providerId === provider.id &&
-                                projectModel?.modelId === provider.defaultModel
-                                  ? 'selected'
-                                  : ''
-                              }`}
-                              onClick={() => handleSetProjectModel(provider.id, provider.defaultModel!)}
-                            >
-                              {provider.defaultModel}
+                            <div className="text-[11px] text-muted-foreground mb-2">Model: <span className="text-foreground font-medium">{provider.defaultModel}</span></div>
+                          )}
+                          <div className="flex gap-1.5">
+                            <button onClick={() => handleTestConnection(provider.id)} disabled={isTesting} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium rounded-md bg-secondary text-secondary-foreground border border-border hover:bg-muted transition-colors disabled:opacity-50">
+                              {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unplug className="h-3 w-3" />}
+                              {isTesting ? 'Testing...' : 'Test'}
                             </button>
+                            <button onClick={() => handleRemoveProvider(provider.id)} className="px-2 py-1.5 text-[11px] font-medium rounded-md text-destructive hover:bg-destructive/10 transition-colors">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                          {testResult && (
+                            <div className={cn('mt-2 px-2.5 py-2 rounded-md text-[11px] flex items-center gap-2', testResult.status === 'healthy' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-destructive/10 text-destructive')}>
+                              {testResult.status === 'healthy' ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                              <div>
+                                <span className="font-medium">{testResult.status === 'healthy' ? 'Connected' : 'Failed'}</span>
+                                {testResult.latencyMs && <span className="ml-1.5 opacity-70">{testResult.latencyMs}ms</span>}
+                                {testResult.error && <span className="block mt-0.5 opacity-80">{testResult.error}</span>}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </>
@@ -370,137 +173,65 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({ onClose, doc
           </div>
         )}
 
-        {/* ── Cost Tab ── */}
-        {activeTab === 'cost' && !documentId && (
-          <div className="cost-display">
-            <h3>Session Cost</h3>
-            <div className="empty-state">
-              <p>Open a document to view its session cost.</p>
-            </div>
-          </div>
-        )}
-        {activeTab === 'cost' && documentId && sessionCost && (
-          <div className="cost-display">
-            <h3>Session Cost</h3>
-            <div className="cost-summary">
-              <div className="cost-metric">
-                <span className="cost-label">Session Total</span>
-                <span className="cost-value cost-total">{formatCost(sessionCost.totalCost)}</span>
-              </div>
-              <div className="cost-metric">
-                <span className="cost-label">Input Tokens</span>
-                <span className="cost-value">{sessionCost.totalInputTokens.toLocaleString()}</span>
-              </div>
-              <div className="cost-metric">
-                <span className="cost-label">Output Tokens</span>
-                <span className="cost-value">{sessionCost.totalOutputTokens.toLocaleString()}</span>
-              </div>
-              <div className="cost-metric">
-                <span className="cost-label">Actions</span>
-                <span className="cost-value">{sessionCost.entries?.length || 0}</span>
-              </div>
-            </div>
-
-            {sessionCost.entries && sessionCost.entries.length > 0 && (
-              <div className="cost-entries">
-                <h4>Per-Action Breakdown</h4>
-                <div className="cost-table">
-                  <div className="cost-table-header">
-                    <span>Action</span>
-                    <span>In Tokens</span>
-                    <span>Out Tokens</span>
-                    <span>Cost</span>
-                    <span>Time</span>
+        {activeTab === 'model' && (
+          <div className="p-3">
+            <h3 className="text-xs font-semibold mb-2 uppercase tracking-wider text-muted-foreground">Project Model</h3>
+            {!documentId ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">Open a document first.</div>
+            ) : providers.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">Add a provider first.</div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {/* OpenRouter providers get the full model browser */}
+                {providers.filter(p => p.type === 'openrouter').map(p => (
+                  <div key={p.id}>
+                    <p className="text-[11px] font-medium text-muted-foreground mb-1.5">{p.name}</p>
+                    <OpenRouterModelBrowser
+                      selectedModelId={projectModel?.providerId === p.id ? projectModel.modelId : undefined}
+                      onSelectModel={(model) => handleSetProjectModel(p.id, model.id)}
+                      providerId={p.id}
+                    />
                   </div>
-                  {sessionCost.entries
-                    .slice()
-                    .reverse()
-                    .map((entry: any) => (
-                      <div key={entry.id} className="cost-table-row">
-                        <span className="action-label">{entry.action}</span>
-                        <span>{entry.cost.inputTokens.toLocaleString()}</span>
-                        <span>{entry.cost.outputTokens.toLocaleString()}</span>
-                        <span className="cost-cell">{formatCost(entry.cost.totalCost)}</span>
-                        <span className="time-cell">{new Date(entry.timestamp).toLocaleTimeString()}</span>
-                      </div>
-                    ))}
-                </div>
+                ))}
+                {/* Non-OpenRouter providers: show default model buttons */}
+                {providers.filter(p => p.type !== 'openrouter' && p.defaultModel).map(p => (
+                  <button key={p.id} onClick={() => handleSetProjectModel(p.id, p.defaultModel!)}
+                    className={cn('w-full text-left px-3 py-2.5 rounded-lg border transition-all text-sm', projectModel?.providerId === p.id && projectModel?.modelId === p.defaultModel ? 'border-primary bg-primary/5 text-primary font-medium' : 'border-border hover:bg-muted')}>
+                    <div className="font-medium">{p.defaultModel}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{p.name}</div>
+                  </button>
+                ))}
               </div>
             )}
           </div>
         )}
-        {activeTab === 'cost' && documentId && !sessionCost && (
-          <div className="cost-display">
-            <h3>Session Cost</h3>
-            <div className="empty-state">
-              <p>No cost data yet. Use AI features to see cost tracking.</p>
-            </div>
-          </div>
-        )}
 
-        {/* ── About Tab ── */}
         {activeTab === 'about' && (
-          <div className="about-section">
-            <h3>About LACON</h3>
+          <div className="p-3">
+            <h3 className="text-xs font-semibold mb-3 uppercase tracking-wider text-muted-foreground">About LACON</h3>
             {appInfo && (
-              <div className="about-info">
-                <div className="about-row">
-                  <span className="label">Version:</span>
-                  <span className="value">{appInfo.currentVersion}</span>
-                </div>
-                <div className="about-row">
-                  <span className="label">Platform:</span>
-                  <span className="value">
-                    {appInfo.platform} ({appInfo.arch})
-                  </span>
-                </div>
-                <div className="about-row">
-                  <span className="label">Build:</span>
-                  <span className="value">{appInfo.isPackaged ? 'Production' : 'Development'}</span>
-                </div>
+              <div className="space-y-1 text-xs mb-4">
+                <div><span className="text-muted-foreground">Version: </span><span className="font-medium">{appInfo.currentVersion}</span></div>
+                <div><span className="text-muted-foreground">Platform: </span><span className="font-medium">{appInfo.platform} ({appInfo.arch})</span></div>
               </div>
             )}
-
-            <div className="privacy-section">
-              <h4>🛡️ Privacy Guarantees</h4>
-              <ul className="privacy-list">
-                <li>✅ No telemetry or analytics — ever.</li>
-                <li>✅ No LACON cloud backend — fully local.</li>
-                <li>✅ API keys encrypted in OS keystore.</li>
-                <li>✅ No data leaves your machine except API calls you initiate.</li>
-                <li>✅ Direct download, no account required.</li>
-              </ul>
-            </div>
-
-            <div className="update-section">
-              <h4>Updates</h4>
-              <p>LACON uses manual updates. Check for new versions on the download page.</p>
-              <button onClick={handleCheckUpdates} className="update-button">
-                🔗 Check for Updates
-              </button>
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <p>✅ No telemetry — fully local</p>
+              <p>✅ API keys encrypted in OS keystore</p>
+              <p>✅ No data leaves your machine</p>
             </div>
           </div>
-        )}
-
-        {showAddForm && (
-          <AddProviderForm
-            onSuccess={() => {
-              setShowAddForm(false)
-              loadProviders()
-              checkHealth()
-            }}
-            onCancel={() => setShowAddForm(false)}
-          />
         )}
       </div>
     </div>
   )
 }
 
-interface AddProviderFormProps {
-  onSuccess: () => void
-  onCancel: () => void
-}
+/* ────────────────────────────────────────────── */
+/*  Add Provider Form (inline, not modal)         */
+/* ────────────────────────────────────────────── */
+
+interface AddProviderFormProps { onSuccess: () => void; onCancel: () => void }
 
 function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
   const [providerType, setProviderType] = useState<ProviderType>('openai')
@@ -508,211 +239,191 @@ function AddProviderForm({ onSuccess, onCancel }: AddProviderFormProps) {
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [defaultModel, setDefaultModel] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [showKey, setShowKey] = useState(false)
   const [useCodingPlan, setUseCodingPlan] = useState(false)
+  const [selectedORModel, setSelectedORModel] = useState<OpenRouterModelInfo | null>(null)
 
-  const providerTypes: Array<{ value: ProviderType; label: string }> = [
-    { value: 'openai', label: 'OpenAI' },
-    { value: 'anthropic', label: 'Anthropic' },
-    { value: 'gemini', label: 'Google Gemini' },
-    { value: 'openrouter', label: 'OpenRouter' },
-    { value: 'zai', label: 'Z.AI (GLM Coding Plan)' },
-    { value: 'local', label: 'Local Model' },
-    { value: 'custom-openai-compatible', label: 'Custom Endpoint' },
+  // Validation state
+  const [phase, setPhase] = useState<'form' | 'validating' | 'success' | 'error'>('form')
+  const [validationMsg, setValidationMsg] = useState('')
+  const [validationLatency, setValidationLatency] = useState<number | null>(null)
+
+  const providerTypes: Array<{ value: ProviderType; label: string; hint: string }> = [
+    { value: 'openai', label: 'OpenAI', hint: 'sk-...' },
+    { value: 'anthropic', label: 'Anthropic', hint: 'sk-ant-...' },
+    { value: 'gemini', label: 'Google Gemini', hint: 'AIza...' },
+    { value: 'openrouter', label: 'OpenRouter', hint: 'sk-or-...' },
+    { value: 'zai', label: 'Z.AI (GLM)', hint: 'Your Z.AI key' },
+    { value: 'local', label: 'Local Model', hint: 'Optional' },
+    { value: 'custom-openai-compatible', label: 'Custom Endpoint', hint: 'API key' },
   ]
 
   const isLocal = providerType === 'local'
+  const isOpenRouter = providerType === 'openrouter'
   const isZai = providerType === 'zai'
+  const currentHint = providerTypes.find(p => p.value === providerType)?.hint || 'API key'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setLoading(true)
+    setPhase('validating')
+    setValidationMsg('Registering provider...')
+    setValidationLatency(null)
 
     try {
       const providerId = `${providerType}-${Date.now()}`
-
-      // Determine base URL for Z.AI based on coding plan toggle
       let resolvedBaseUrl = baseUrl || undefined
       if (isZai) {
-        resolvedBaseUrl = useCodingPlan
-          ? 'https://api.z.ai/api/coding/paas/v4'
-          : 'https://api.z.ai/api/paas/v4'
+        resolvedBaseUrl = useCodingPlan ? 'https://api.z.ai/api/coding/paas/v4' : 'https://api.z.ai/api/paas/v4'
       }
 
-      // Create API key in keystore (encrypted via OS keychain)
-      const keyId = await window.electron.provider.createKey(providerId, providerType, `${name} API Key`, apiKey)
-
-      // Register provider
-      const config: ProviderConfig = {
-        id: providerId,
-        type: providerType,
-        name: name || providerType,
-        apiKeyId: keyId,
-        baseUrl: resolvedBaseUrl,
-        defaultModel: defaultModel || undefined,
-        enabled: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }
-
+      const keyId = await window.electron.provider.createKey(providerId, providerType, `${name || providerType} API Key`, apiKey)
+      const config: ProviderConfig = { id: providerId, type: providerType, name: name || providerType, apiKeyId: keyId, baseUrl: resolvedBaseUrl, defaultModel: defaultModel || undefined, enabled: true, createdAt: Date.now(), updatedAt: Date.now() }
       await window.electron.provider.register(config)
-      onSuccess()
+
+      // Now validate the API key by testing the connection
+      setValidationMsg('Verifying API key...')
+      const result = await window.electron.pricing.testConnection(providerId)
+
+      if (result?.success && result.data?.status === 'healthy') {
+        setValidationLatency(result.data.latencyMs || null)
+        setPhase('success')
+        setValidationMsg('API key is valid — connected successfully!')
+        setTimeout(() => onSuccess(), 1500)
+      } else {
+        const errMsg = result?.data?.error || 'Could not verify connection'
+        setPhase('error')
+        setValidationMsg(`Provider saved but verification failed: ${errMsg}. You can still use it or remove and re-add.`)
+        // Still call onSuccess after delay since the provider is registered
+        setTimeout(() => onSuccess(), 3000)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add provider')
-    } finally {
-      setLoading(false)
+      setPhase('error')
+      setValidationMsg(err instanceof Error ? err.message : 'Failed to add provider')
     }
   }
 
-  return (
-    <div className="add-provider-form-overlay">
-      <div className="add-provider-form">
-        <h3>Add AI Provider</h3>
+  const inputCls = "w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
 
-        {/* Local Model Disclaimer */}
-        {isLocal && (
-          <div className="local-disclaimer form-disclaimer">
-            <span className="disclaimer-icon">⚠️</span>
-            <div>
-              <strong>Local Model Notice</strong>
-              <p>
-                Local models run entirely on your hardware. LACON connects to your local endpoint (e.g., Ollama, LM
-                Studio) and makes no guarantees about output quality, speed, or compatibility. Ensure your local server
-                is running before adding.
-              </p>
+  // Show validation result screen
+  if (phase === 'validating' || phase === 'success' || phase === 'error') {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 px-4 text-center animate-fade-in">
+        {phase === 'validating' && (
+          <>
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <Loader2 className="h-7 w-7 text-primary animate-spin" />
             </div>
-          </div>
+            <p className="text-sm font-medium text-foreground mb-1">Validating</p>
+            <p className="text-xs text-muted-foreground">{validationMsg}</p>
+          </>
         )}
-
-        {/* Z.AI Coding Plan Notice */}
-        {isZai && (
-          <div className="zai-plan-notice form-disclaimer">
-            <span className="disclaimer-icon">🚀</span>
-            <div>
-              <strong>Z.AI — GLM Coding Plan</strong>
-              <p>
-                Monthly access to GLM-5.1 and other world-class models from just $18/month.
-                Get your API key from the{' '}
-                <a href="https://z.ai/manage-apikey/apikey-list" target="_blank" rel="noopener noreferrer">Z.AI Open Platform</a>.
-              </p>
-
-              <label className="coding-plan-toggle">
-                <input
-                  type="checkbox"
-                  checked={useCodingPlan}
-                  onChange={e => setUseCodingPlan(e.target.checked)}
-                />
-                <span>Use GLM Coding Plan endpoint</span>
-              </label>
-              {useCodingPlan && (
-                <p className="coding-plan-endpoint-hint">
-                  Coding endpoint: <code>api.z.ai/api/coding/paas/v4</code>
-                </p>
-              )}
-              {!useCodingPlan && (
-                <p className="coding-plan-endpoint-hint">
-                  General endpoint: <code>api.z.ai/api/paas/v4</code>
-                </p>
-              )}
+        {phase === 'success' && (
+          <>
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4">
+              <Check className="h-7 w-7 text-emerald-500" />
             </div>
-          </div>
+            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Connected!</p>
+            <p className="text-xs text-muted-foreground">{validationMsg}</p>
+            {validationLatency && <p className="text-[11px] text-muted-foreground mt-1">Latency: {validationLatency}ms</p>}
+          </>
         )}
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="provider-type">Provider Type</label>
-            <select
-              id="provider-type"
-              value={providerType}
-              onChange={e => setProviderType(e.target.value as ProviderType)}
-              required
-            >
-              {providerTypes.map(pt => (
-                <option key={pt.value} value={pt.value}>
-                  {pt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="provider-name">Name (optional)</label>
-            <input
-              id="provider-name"
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder={`My ${providerType} Provider`}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="api-key">
-              API Key
-              <span className="key-security-hint">🔐 Stored encrypted in OS keystore</span>
-            </label>
-            <div className="key-input-wrapper">
-              <input
-                id="api-key"
-                type={showKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder={isLocal ? 'Optional for local models' : isZai ? 'Your Z.AI API Key' : 'sk-...'}
-                required={!isLocal}
-              />
-              <button
-                type="button"
-                className="toggle-key-visibility"
-                onClick={() => setShowKey(!showKey)}
-                title={showKey ? 'Hide key' : 'Show key'}
-              >
-                {showKey ? '🙈' : '👁️'}
-              </button>
+        {phase === 'error' && (
+          <>
+            <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <X className="h-7 w-7 text-destructive" />
             </div>
-          </div>
-
-          {(providerType === 'local' || providerType === 'custom-openai-compatible') && (
-            <div className="form-group">
-              <label htmlFor="base-url">Base URL</label>
-              <input
-                id="base-url"
-                type="url"
-                value={baseUrl}
-                onChange={e => setBaseUrl(e.target.value)}
-                placeholder="http://localhost:11434/v1"
-                required
-              />
-            </div>
-          )}
-
-          {/* Z.AI doesn't need manual base-url — it's auto-selected via the coding plan toggle */}
-
-          <div className="form-group">
-            <label htmlFor="default-model">Default Model (optional)</label>
-            <input
-              id="default-model"
-              type="text"
-              value={defaultModel}
-              onChange={e => setDefaultModel(e.target.value)}
-              placeholder={isLocal ? 'llama3.1' : isZai ? 'glm-5.1' : 'gpt-4o'}
-            />
-          </div>
-
-          {error && <div className="form-error">{error}</div>}
-
-          <div className="form-actions">
-            <button type="button" onClick={onCancel} disabled={loading}>
-              Cancel
-            </button>
-            <button type="submit" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Provider'}
-            </button>
-          </div>
-        </form>
+            <p className="text-sm font-semibold text-destructive mb-1">Verification Issue</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{validationMsg}</p>
+            <button onClick={onCancel} className="mt-4 px-4 py-1.5 text-xs font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">Dismiss</button>
+          </>
+        )}
       </div>
+    )
+  }
+
+  return (
+    <div className="animate-fade-in">
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={onCancel} className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h3 className="text-sm font-semibold">Add Provider</h3>
+      </div>
+
+      {isOpenRouter && <OpenRouterSetupGuide />}
+
+      {isLocal && (
+        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10 text-[11px] text-amber-600 dark:text-amber-400 mb-3">
+          ⚠️ Local models run on your hardware. Quality depends on your setup.
+        </div>
+      )}
+
+      {isZai && (
+        <div className="flex flex-col gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-[11px] mb-3">
+          <span className="font-medium text-primary">Z.AI — GLM Coding Plan</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={useCodingPlan} onChange={e => setUseCodingPlan(e.target.checked)} className="rounded" />
+            <span className="text-foreground">Use Coding Plan endpoint</span>
+          </label>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground mb-1">Provider Type</label>
+          <div className="relative">
+            <select value={providerType} onChange={e => setProviderType(e.target.value as ProviderType)} required className={cn(inputCls, 'appearance-none pr-8')}>
+              {providerTypes.map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground mb-1">Display Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={`My ${providerType}`} className={inputCls} />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+            API Key <span className="text-emerald-500 ml-1">🔐 encrypted</span>
+          </label>
+          <div className="relative">
+            <input type={showKey ? 'text' : 'password'} value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={currentHint} required={!isLocal} className={cn(inputCls, 'pr-9')} />
+            <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+              {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {(providerType === 'local' || providerType === 'custom-openai-compatible') && (
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Base URL</label>
+            <input type="url" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="http://localhost:11434/v1" required className={inputCls} />
+          </div>
+        )}
+
+        {isOpenRouter ? (
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Select Model</label>
+            <OpenRouterModelBrowser
+              selectedModelId={selectedORModel?.id || defaultModel}
+              onSelectModel={(model) => { setSelectedORModel(model); setDefaultModel(model.id) }}
+              compact
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Default Model</label>
+            <input type="text" value={defaultModel} onChange={e => setDefaultModel(e.target.value)} placeholder={isLocal ? 'llama3.1' : isZai ? 'glm-5.1' : 'gpt-4o'} className={inputCls} />
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button type="button" onClick={onCancel} className="flex-1 px-3 py-2 text-xs font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border">Cancel</button>
+          <button type="submit" className="flex-1 px-3 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Add & Verify</button>
+        </div>
+      </form>
     </div>
   )
 }

@@ -47,6 +47,7 @@ const agentAPI = {
 const providerAPI = {
   register: (config: any) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_REGISTER, config),
   unregister: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_UNREGISTER, providerId),
+  deleteProvider: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_DELETE, providerId),
   list: () => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_LIST),
   getModels: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_GET_MODELS, providerId),
   checkHealth: (providerId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_CHECK_HEALTH, providerId),
@@ -70,6 +71,8 @@ const providerAPI = {
   onStreamError: (callback: (streamId: string, error: string) => void) => {
     ipcRenderer.on(IPC_CHANNELS.PROVIDER_STREAM_ERROR, (event, streamId, error) => callback(streamId, error))
   },
+  fetchOpenRouterModels: (providerId?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_FETCH_OPENROUTER_MODELS, providerId),
 }
 
 // Tool API (Phase 8)
@@ -233,6 +236,7 @@ const writerLoopAPI = {
   generateSection: (documentId: string, sectionId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GENERATE_SECTION, { documentId, sectionId }),
   generateAll: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GENERATE_ALL, { documentId }),
+  abortGeneration: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ABORT_GENERATION, { documentId }),
   getProgress: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GET_PROGRESS, { documentId }),
   acceptGeneration: (documentId: string, sectionId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ACCEPT_GENERATION, { documentId, sectionId }),
@@ -374,6 +378,14 @@ const projectAPI = {
   getActive: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_GET_ACTIVE),
 }
 
+// AI Detection API
+const detectionAPI = {
+  heuristic: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_HEURISTIC, payload),
+  llmAnalyze: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_LLM_ANALYZE, payload),
+  llmHumanize: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_LLM_HUMANIZE, payload),
+  fullPipeline: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_FULL_PIPELINE, payload),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -395,6 +407,7 @@ contextBridge.exposeInMainWorld('electron', {
   update: updateAPI,
   dialog: dialogAPI,
   project: projectAPI,
+  detection: detectionAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))

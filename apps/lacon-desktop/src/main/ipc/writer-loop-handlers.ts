@@ -283,7 +283,7 @@ export function registerWriterLoopHandlers(): void {
     async (_event, payload: { documentId: string; sectionId: string }) => {
       return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_GENERATE_SECTION, payload, async () => {
         const loop = getWriterLoop(payload.documentId)
-        const result = loop.generateSection(payload.sectionId)
+        const result = await loop.generateSection(payload.sectionId)
         return { success: true, data: result }
       })
     },
@@ -293,7 +293,16 @@ export function registerWriterLoopHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.WRITER_LOOP_GENERATE_ALL, async (_event, payload: { documentId: string }) => {
     return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_GENERATE_ALL, payload, async () => {
       const loop = getWriterLoop(payload.documentId)
-      const progress = loop.generateAll()
+      const progress = await loop.generateAll()
+      return { success: true, data: progress }
+    })
+  })
+
+  // ── writerLoop:abortGeneration ──
+  ipcMain.handle(IPC_CHANNELS.WRITER_LOOP_ABORT_GENERATION, async (_event, payload: { documentId: string }) => {
+    return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_ABORT_GENERATION, payload, async () => {
+      const loop = getWriterLoop(payload.documentId)
+      const progress = loop.abortGeneration()
       return { success: true, data: progress }
     })
   })

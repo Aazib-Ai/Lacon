@@ -1,5 +1,5 @@
 /**
- * DiffViewer — Phase 4
+ * DiffViewer — Paragraph Diff Viewer
  *
  * Side-by-side diff viewer for surgical paragraph editing.
  * Shows original vs revised text with highlighted additions and removals.
@@ -19,59 +19,23 @@ export function DiffViewer({ result, onAccept, onReject }: DiffViewerProps) {
   const { diff, tokenUsage } = result
 
   return (
-    <div
-      style={{
-        borderRadius: '8px',
-        border: '1px solid #e5e7eb',
-        backgroundColor: '#fff',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       {/* Header */}
-      <div
-        style={{
-          padding: '12px 16px',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e5e7eb',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
+      <div className="px-4 py-3 bg-muted/50 border-b border-border flex items-center justify-between">
         <div>
-          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#111827' }}>Paragraph Diff</h4>
-          <span style={{ fontSize: '11px', color: '#6b7280' }}>Paragraph: {diff.paragraphId.slice(0, 12)}...</span>
+          <h4 className="m-0 text-sm font-semibold text-foreground">Paragraph Diff</h4>
+          <span className="text-[11px] text-muted-foreground">Paragraph: {diff.paragraphId.slice(0, 12)}...</span>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           <button
             onClick={onAccept}
-            style={{
-              padding: '6px 16px',
-              fontSize: '13px',
-              fontWeight: 500,
-              backgroundColor: '#059669',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'background-color 150ms',
-            }}
+            className="px-4 py-1.5 text-[13px] font-medium bg-success text-white border-none rounded-md cursor-pointer hover:opacity-90 transition-opacity"
           >
             Accept Change
           </button>
           <button
             onClick={onReject}
-            style={{
-              padding: '6px 16px',
-              fontSize: '13px',
-              fontWeight: 500,
-              backgroundColor: '#dc2626',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'background-color 150ms',
-            }}
+            className="px-4 py-1.5 text-[13px] font-medium bg-destructive text-white border-none rounded-md cursor-pointer hover:opacity-90 transition-opacity"
           >
             Reject
           </button>
@@ -79,22 +43,13 @@ export function DiffViewer({ result, onAccept, onReject }: DiffViewerProps) {
       </div>
 
       {/* Side-by-side diff */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid grid-cols-2">
         {/* Original */}
-        <div style={{ borderRight: '1px solid #e5e7eb' }}>
-          <div
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#fef2f2',
-              borderBottom: '1px solid #fecaca',
-              fontSize: '11px',
-              fontWeight: 600,
-              color: '#991b1b',
-            }}
-          >
+        <div className="border-r border-border">
+          <div className="px-3 py-2 bg-destructive/10 border-b border-destructive/20 text-[11px] font-semibold text-destructive">
             Original
           </div>
-          <div style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.6 }}>
+          <div className="p-3 font-mono text-[13px] leading-relaxed">
             {diff.chunks.map((chunk, i) => (
               <DiffLine key={i} chunk={chunk} side="original" />
             ))}
@@ -103,19 +58,10 @@ export function DiffViewer({ result, onAccept, onReject }: DiffViewerProps) {
 
         {/* Revised */}
         <div>
-          <div
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#f0fdf4',
-              borderBottom: '1px solid #bbf7d0',
-              fontSize: '11px',
-              fontWeight: 600,
-              color: '#166534',
-            }}
-          >
+          <div className="px-3 py-2 bg-success/10 border-b border-success/20 text-[11px] font-semibold text-success">
             Revised
           </div>
-          <div style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.6 }}>
+          <div className="p-3 font-mono text-[13px] leading-relaxed">
             {diff.chunks.map((chunk, i) => (
               <DiffLine key={i} chunk={chunk} side="revised" />
             ))}
@@ -124,17 +70,7 @@ export function DiffViewer({ result, onAccept, onReject }: DiffViewerProps) {
       </div>
 
       {/* Token usage footer */}
-      <div
-        style={{
-          padding: '8px 16px',
-          backgroundColor: '#f8fafc',
-          borderTop: '1px solid #e5e7eb',
-          display: 'flex',
-          gap: '16px',
-          fontSize: '11px',
-          color: '#64748b',
-        }}
-      >
+      <div className="px-4 py-2 bg-muted/50 border-t border-border flex gap-4 text-[11px] text-muted-foreground">
         <span>Input: {tokenUsage.inputTokens.toLocaleString()} tokens</span>
         <span>Output: {tokenUsage.outputTokens.toLocaleString()} tokens</span>
         <span>Cost: ${tokenUsage.estimatedCost.toFixed(4)}</span>
@@ -146,20 +82,12 @@ export function DiffViewer({ result, onAccept, onReject }: DiffViewerProps) {
 
 function DiffLine({ chunk, side }: { chunk: DiffChunk; side: 'original' | 'revised' }) {
   if (chunk.type === 'unchanged') {
-    return <div style={{ padding: '2px 0', color: '#374151' }}>{chunk.content}</div>
+    return <div className="py-0.5 text-foreground">{chunk.content}</div>
   }
 
   if (chunk.type === 'removed' && side === 'original') {
     return (
-      <div
-        style={{
-          padding: '2px 4px',
-          backgroundColor: '#fecaca',
-          color: '#991b1b',
-          textDecoration: 'line-through',
-          borderRadius: '2px',
-        }}
-      >
+      <div className="py-0.5 px-1 bg-destructive/20 text-destructive line-through rounded-sm">
         {chunk.content}
       </div>
     )
@@ -167,14 +95,7 @@ function DiffLine({ chunk, side }: { chunk: DiffChunk; side: 'original' | 'revis
 
   if (chunk.type === 'added' && side === 'revised') {
     return (
-      <div
-        style={{
-          padding: '2px 4px',
-          backgroundColor: '#bbf7d0',
-          color: '#166534',
-          borderRadius: '2px',
-        }}
-      >
+      <div className="py-0.5 px-1 bg-success/20 text-success rounded-sm">
         {chunk.content}
       </div>
     )
