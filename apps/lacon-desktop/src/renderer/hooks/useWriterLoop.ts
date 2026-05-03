@@ -198,6 +198,21 @@ export function useWriterLoop(documentId: string | undefined) {
     fetchState()
   }, [fetchState])
 
+  // Auto-load persisted reviews from disk when documentId changes
+  useEffect(() => {
+    if (!documentId) return
+    writerLoop().loadReview(documentId).then((res: any) => {
+      if (res?.success && res.data?.result && mountedRef.current) {
+        dispatch({
+          type: 'SET_REVIEW',
+          review: res.data.result,
+          passCount: res.data.passCount,
+          canAutoPass: res.data.canAutoPass,
+        })
+      }
+    }).catch(() => { /* ignore — no persisted review */ })
+  }, [documentId])
+
   // Listen for generation-stopped events (fired by any hook instance after abort)
   useEffect(() => {
     const handler = (e: Event) => {
@@ -513,7 +528,7 @@ export function useWriterLoop(documentId: string | undefined) {
       generationTriggeredRef.current = false
 
       // Wait a moment for the backend generateAll loop to finalize
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => { setTimeout(resolve, 500) })
 
       // Refresh state (stage will have transitioned out of generating)
       await fetchState()
@@ -715,14 +730,14 @@ export function useWriterLoop(documentId: string | undefined) {
   )
 
   const surgicalEdit = useCallback(
-    async (paragraphId: string, instruction: string, fullDocumentContent: any) => {
+    async (paragraphId: string, instruction: string, fullDocumentContent: any, originalText?: string) => {
       if (!documentId) {
         return null
       }
-      dispatch({ type: 'START_LOADING' })
+      // Don't dispatch START_LOADING — surgical edits use per-flag loading in the UI
       try {
         const res = await withTimeout(
-          writerLoop().surgicalEdit(documentId, paragraphId, instruction, fullDocumentContent),
+          writerLoop().surgicalEdit(documentId, paragraphId, instruction, fullDocumentContent, originalText),
           60000,
           'Surgical edit',
         )
@@ -735,7 +750,7 @@ export function useWriterLoop(documentId: string | undefined) {
           error: res?.error?.message || 'Surgical edit failed',
           retryable: true,
           action: 'surgical-edit',
-          retryFn: () => surgicalEdit(paragraphId, instruction, fullDocumentContent),
+          retryFn: () => surgicalEdit(paragraphId, instruction, fullDocumentContent, originalText),
         })
         return null
       } catch (err: any) {
@@ -744,7 +759,7 @@ export function useWriterLoop(documentId: string | undefined) {
           error: err.message || 'Surgical edit failed. Please try again.',
           retryable: true,
           action: 'surgical-edit',
-          retryFn: () => surgicalEdit(paragraphId, instruction, fullDocumentContent),
+          retryFn: () => surgicalEdit(paragraphId, instruction, fullDocumentContent, originalText),
         })
         return null
       }

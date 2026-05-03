@@ -184,8 +184,9 @@ export interface WriterLoopAPI {
   getReview: (documentId: string) => Promise<any>
   acceptReviewFlag: (documentId: string, flagId: string) => Promise<any>
   rejectReviewFlag: (documentId: string, flagId: string) => Promise<any>
-  surgicalEdit: (documentId: string, paragraphId: string, instruction: string, fullDocumentContent: any) => Promise<any>
+  surgicalEdit: (documentId: string, paragraphId: string, instruction: string, fullDocumentContent: any, originalText?: string) => Promise<any>
   rewriteAll: (documentId: string, instruction: string, documentContent: any) => Promise<any>
+  loadReview: (documentId: string) => Promise<any>
 }
 
 // Research API (Phase 5 - Writer Harness)

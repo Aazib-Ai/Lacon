@@ -1,0 +1,275 @@
+/* ═══════════════════════════════════════════════════════════════
+   ProseMirror Editor — Typography, Lists, Tasks, Code, etc.
+   These target library-generated DOM and must remain as CSS.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Spellcheck styling ─── */
+.ProseMirror [data-spellcheck="true"] {
+  text-decoration: wavy underline red;
+  text-decoration-skip-ink: none;
+}
+
+/* ─── Highlight styling — support multiple colors ─── */
+.ProseMirror mark {
+  padding: 0.125rem 0;
+  border-radius: 0.125rem;
+}
+
+.ProseMirror mark[data-color="#fef08a"] { background-color: #fef08a; }
+.ProseMirror mark[data-color="#86efac"] { background-color: #86efac; }
+.ProseMirror mark[data-color="#93c5fd"] { background-color: #93c5fd; }
+.ProseMirror mark[data-color="#fda4af"] { background-color: #fda4af; }
+.ProseMirror mark[data-color="#c4b5fd"] { background-color: #c4b5fd; }
+.ProseMirror mark[data-color="#fdba74"] { background-color: #fdba74; }
+.ProseMirror mark:not([data-color]) { background-color: #fef08a; }
+
+/* ─── Selection colors — match app accent ─── */
+
+.ProseMirror ::selection {
+  background: hsl(32 95% 52% / 0.25);
+  color: inherit;
+}
+
+.ProseMirror ::-moz-selection {
+  background: hsl(32 95% 52% / 0.25);
+  color: inherit;
+}
+
+.dark .ProseMirror ::selection {
+  background: hsl(32 95% 58% / 0.30);
+  color: inherit;
+}
+
+.dark .ProseMirror ::-moz-selection {
+  background: hsl(32 95% 58% / 0.30);
+  color: inherit;
+}
+
+/* ProseMirror node selection (images, code blocks, etc.) */
+.ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid hsl(32 95% 52% / 0.5);
+  border-radius: 4px;
+}
+
+/* Persistent selection highlight — visible when editor loses focus */
+.ProseMirror .selection-persist {
+  background: hsl(32 95% 52% / 0.22);
+  border-radius: 2px;
+}
+
+.dark .ProseMirror .selection-persist {
+  background: hsl(32 95% 58% / 0.28);
+}
+
+/* ─── Base Editor ─── */
+
+.ProseMirror {
+  outline: none !important;
+  cursor: text;
+}
+
+.ProseMirror:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.prose { position: relative; }
+
+/* ─── Typography ─── */
+
+.ProseMirror p {
+  margin: 0.75rem 0;
+  line-height: 1.8;
+  color: hsl(var(--foreground));
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 11pt;
+}
+
+.ProseMirror h1 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 1.75rem 0 0.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.ProseMirror h2 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.625rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.ProseMirror h3 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  line-height: 1.4;
+}
+
+.ProseMirror h4 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  line-height: 1.5;
+}
+
+/* ─── Lists ─── */
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.ProseMirror ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+/* Ensure list markers are visible (not white-on-white) */
+.ProseMirror ul:not([data-type="taskList"]),
+.ProseMirror ol {
+  color: hsl(var(--foreground));
+}
+
+.ProseMirror ul:not([data-type="taskList"]) ::marker,
+.ProseMirror ol ::marker {
+  color: hsl(var(--foreground));
+}
+
+.ProseMirror li {
+  margin: 0.5rem 0;
+  line-height: 1.75;
+}
+
+/* ─── Task Lists ─── */
+
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  line-height: 1.8;
+}
+
+/* Remove all paragraph margins inside task items for clean alignment */
+.ProseMirror ul[data-type="taskList"] li > div p {
+  margin: 0.15rem 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  top: 0.15em;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  cursor: pointer;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 2px;
+  border: 1.5px solid hsl(var(--foreground) / 0.35);
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 150ms ease;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.ProseMirror ul[data-type="taskList"] input[type="checkbox"]:hover {
+  border-color: hsl(var(--foreground) / 0.6);
+}
+
+.ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked {
+  border-color: hsl(var(--foreground) / 0.5);
+}
+
+.ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+  content: '✓';
+  color: hsl(var(--foreground));
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Dim completed task text */
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* ─── Code & Pre ─── */
+
+.ProseMirror code {
+  @apply bg-muted text-sm rounded px-1.5 py-0.5;
+  font-family: 'Courier New', monospace;
+}
+
+.ProseMirror pre {
+  @apply bg-foreground text-background rounded-lg p-4 overflow-x-auto my-4;
+}
+
+.ProseMirror pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+/* ─── Blockquote, Links, HR ─── */
+
+.ProseMirror blockquote {
+  @apply border-l-4 border-border pl-4 my-4 italic text-muted-foreground;
+}
+
+.ProseMirror a {
+  @apply text-primary underline cursor-pointer;
+}
+
+.ProseMirror a:hover {
+  @apply text-primary/80;
+}
+
+.ProseMirror hr {
+  @apply border-none border-t-2 border-border my-8;
+}
+
+/* ─── Text alignment ─── */
+.ProseMirror [style*="text-align: left"] { text-align: left; }
+.ProseMirror [style*="text-align: center"] { text-align: center; }
+.ProseMirror [style*="text-align: right"] { text-align: right; }
+.ProseMirror [style*="text-align: justify"] { text-align: justify; }
+
+/* ─── Placeholder ─── */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  @apply text-muted-foreground/50;
+  pointer-events: none;
+  height: 0;
+}

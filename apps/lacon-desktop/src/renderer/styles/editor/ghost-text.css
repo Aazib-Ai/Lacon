@@ -1,0 +1,40 @@
+/* ═══════════════════════════════════════════════════════════════
+   Ghost Text — AI Suggestion Overlays & Paragraph Identity
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Ghost Text Extension ─── */
+.ghost-text {
+  @apply text-muted-foreground/60 italic;
+  pointer-events: none;
+}
+
+.ghost-text-hint {
+  @apply text-xs text-muted-foreground/40 ml-2;
+}
+
+/* ─── Ghost Text Suggestions ─── */
+.ghost-text-suggestion {
+  @apply text-muted-foreground/60 italic pointer-events-none select-none;
+  animation: ghostFadeIn 0.3s ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost-text-suggestion {
+    animation: none;
+  }
+}
+
+/* ─── Paragraph Identity Highlights ─── */
+[data-paragraph-id] {
+  position: relative;
+}
+
+[data-paragraph-id]:hover::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  @apply bg-primary/30 rounded-sm;
+}

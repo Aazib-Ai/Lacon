@@ -74,7 +74,7 @@ export const BulletList = Node.create<BulletListOptions>({
   },
 
   parseHTML() {
-    return [{ tag: 'ul' }]
+    return [{ tag: 'ul:not([data-type="taskList"])' }]
   },
 
   renderHTML({ HTMLAttributes }) {

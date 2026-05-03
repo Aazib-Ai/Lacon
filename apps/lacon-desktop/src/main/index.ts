@@ -19,6 +19,7 @@ import { registerSkillHandlers } from './ipc/skill-handlers'
 import { registerToolHandlers } from './ipc/tool-handlers'
 import { registerVersionHandlers } from './ipc/version-handlers'
 import { registerWriterLoopHandlers } from './ipc/writer-loop-handlers'
+import { registerSlidesHandlers } from './ipc/slides-handlers'
 import { getReleaseOperationsService } from './release-engineering/release-operations-service'
 import { getUpdaterService } from './release-engineering/updater-service'
 import { getKeyStore } from './security/keystore'
@@ -142,6 +143,9 @@ async function initializeApp() {
     // Register AI detection handlers
     registerDetectionHandlers()
 
+    // Register slides handlers (Presentation Generator)
+    registerSlidesHandlers()
+
     logger.info('IPC handlers registered')
 
     logger.info('Application initialized successfully')
@@ -168,8 +172,7 @@ function createWindow() {
 
   // Load the app
   if (process.env.VITE_DEV_SERVER_URL) {
-    const rendererUrl = new URL('/src/renderer/index.html', process.env.VITE_DEV_SERVER_URL).toString()
-    mainWindow.loadURL(rendererUrl)
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))

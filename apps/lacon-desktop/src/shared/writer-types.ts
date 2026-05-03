@@ -352,6 +352,8 @@ export interface ReviewFlag {
   message: string
   suggestedRewrite: string
   originalText: string
+  /** Persisted acceptance/rejection status */
+  status?: 'accepted' | 'rejected'
 }
 
 /** Result of a review pass */

@@ -1,0 +1,80 @@
+/* ═══════════════════════════════════════════════════════════════
+   Mentions — Mention list dropdown & Resize Handles
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Mention Styles ─── */
+.editor-mention {
+  @apply bg-muted rounded px-1.5 py-0.5;
+}
+
+.editor-mention:hover {
+  @apply bg-muted-foreground/20;
+}
+
+/* Mention list dropdown */
+.mention-list {
+  @apply bg-popover border border-border rounded-lg shadow-lg overflow-hidden;
+}
+
+.mention-list-empty {
+  @apply px-3 py-2 text-muted-foreground text-sm;
+}
+
+.mention-list-item {
+  @apply flex items-center justify-between px-3 py-2 cursor-pointer;
+}
+
+.mention-list-item:hover,
+.mention-list-item.is-selected {
+  @apply bg-muted;
+}
+
+.mention-list-item-label {
+  @apply font-medium;
+}
+
+.mention-list-item-type {
+  @apply text-xs text-muted-foreground uppercase;
+}
+
+/* ─── Sidebar Resize Handle ─── */
+.sidebar-resize-handle {
+  position: relative;
+  flex-shrink: 0;
+  background: transparent;
+  z-index: 10;
+}
+
+.sidebar-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 12px;
+  left: -4px;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:active {
+  background: hsl(var(--primary) / 0.04);
+}
+
+/* ─── Right Panel Resize Handle ─── */
+.right-panel-resize-handle {
+  position: relative;
+  flex-shrink: 0;
+  background: transparent;
+  z-index: 10;
+}
+
+.right-panel-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 12px;
+  left: -4px;
+}
+
+.right-panel-resize-handle:hover,
+.right-panel-resize-handle:active {
+  background: hsl(var(--primary) / 0.04);
+}

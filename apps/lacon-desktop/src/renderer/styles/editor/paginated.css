@@ -1,0 +1,58 @@
+/* ═══════════════════════════════════════════════════════════════
+   Paginated Editor — Canvas & Page Styles
+   Google Docs-like paginated document layout
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * The outer scrollable canvas — the grey area behind the white pages.
+ * Matches Google Docs' grey workspace background.
+ */
+.paginated-canvas {
+  background: #f0f1f3;
+  overflow: auto;
+}
+
+.dark .paginated-canvas {
+  background: hsl(224 30% 10%);
+}
+
+/**
+ * The centered column that holds the scaled document.
+ */
+.paginated-document-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  padding-bottom: 24px;
+  min-height: 100%;
+}
+
+/**
+ * The main document — a white paper-like container.
+ * Width and minHeight are set inline.
+ */
+.paginated-document {
+  position: relative;
+  background: #ffffff;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.dark .paginated-document {
+  background: hsl(224 40% 9%);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/**
+ * The editor content area — continuous flow with page-matching padding.
+ */
+.paginated-editor-content {
+  position: relative;
+}

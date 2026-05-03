@@ -1,0 +1,144 @@
+/* ═══════════════════════════════════════════════════════════════
+   Refine Diff Overlay — Accept/Reject revised text
+   ═══════════════════════════════════════════════════════════════ */
+
+.refine-diff-overlay {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 46;
+  width: 100%;
+  max-width: 600px;
+  background: hsl(var(--card) / 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 14px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 12px 40px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  animation: refine-diff-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.refine-diff-overlay__content {
+  padding: 14px 16px 10px;
+}
+
+.refine-diff-overlay__label {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(142 71% 45%);
+  margin-bottom: 6px;
+}
+
+.refine-diff-overlay__text {
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  color: hsl(var(--foreground) / 0.9);
+  max-height: 140px;
+  overflow-y: auto;
+  border-left: 3px solid hsl(142 71% 45% / 0.35);
+  padding-left: 12px;
+}
+
+.refine-diff-overlay__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 14px 10px;
+  border-top: 1px solid hsl(var(--border) / 0.3);
+}
+
+.refine-diff-overlay__reject-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 520;
+  font-family: 'Inter', sans-serif;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--secondary) / 0.5);
+  border: 1px solid hsl(var(--border) / 0.3);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.refine-diff-overlay__reject-btn:hover {
+  background: hsl(0 72% 51% / 0.1);
+  border-color: hsl(0 72% 51% / 0.3);
+  color: hsl(0 72% 45%);
+}
+
+.refine-diff-overlay__accept-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 560;
+  font-family: 'Inter', sans-serif;
+  color: white;
+  background: hsl(142 71% 45%);
+  border: none;
+  cursor: pointer;
+  transition: all 120ms ease;
+  box-shadow: 0 1px 4px hsl(142 71% 45% / 0.3);
+}
+
+.refine-diff-overlay__accept-btn:hover {
+  background: hsl(142 71% 40%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px hsl(142 71% 45% / 0.35);
+}
+
+.refine-diff-overlay__dismiss-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground) / 0.4);
+  background: transparent;
+  transition: all 120ms ease;
+}
+
+.refine-diff-overlay__dismiss-btn:hover {
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--secondary) / 0.5);
+}
+
+/* ── Editor highlight for pending refine ── */
+[data-highlight="refine-pending"],
+mark[data-color="refine-pending"] {
+  background: hsl(142 71% 45% / 0.12) !important;
+  border-bottom: 2px solid hsl(142 71% 45% / 0.4);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+/* ─── Dark mode ─── */
+.dark .refine-diff-overlay {
+  background: hsl(var(--card) / 0.93);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.25),
+    0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+.dark [data-highlight="refine-pending"],
+.dark mark[data-color="refine-pending"] {
+  background: hsl(142 71% 45% / 0.1) !important;
+  border-bottom-color: hsl(142 71% 45% / 0.3);
+}

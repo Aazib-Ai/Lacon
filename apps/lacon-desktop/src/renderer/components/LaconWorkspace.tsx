@@ -24,6 +24,7 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/renderer/lib/utils'
+import { countWords } from '@/renderer/utils/content-analytics'
 
 import { useAIDetection } from '../hooks/useAIDetection'
 import { useProject } from '../hooks/useProject'
@@ -37,6 +38,11 @@ import { ModernEditor } from './ModernEditor'
 import { NewDocumentDialog } from './NewDocumentDialog'
 import { OnboardingBanner } from './OnboardingBanner'
 import { ProviderSettings } from './ProviderSettings'
+import { type RefineAction } from './RefineBar'
+import type { SelectedParagraphData } from './RefineButton'
+import { getSelectedParagraphData } from './RefineButton'
+import { RefineDiffOverlay, type RefineDiffData } from './RefineDiffOverlay'
+import { ReviewDiffOverlay, type ReviewDiffItem } from './ReviewDiffOverlay'
 import { SkillsLibraryPanel } from './SkillsLibraryPanel'
 import { Badge } from './ui/Badge'
 import { Button } from './ui/Button'
@@ -47,6 +53,9 @@ import { ResearchWorkbench } from './WriterLoop/ResearchWorkbench'
 import { ReviewPanelWrapper as ReviewPanel } from './WriterLoop/ReviewPanelWrapper'
 import { VersionHistory } from './WriterLoop/VersionHistory'
 import { WriterLoopPanel } from './WriterLoop/WriterLoopPanel'
+import type { SlideDeck } from '../../shared/slides-types'
+import { SlidesGeneratorDialog } from './SlidesGeneratorDialog'
+import { SlideEditor } from './SlideEditor'
 
 /** Sidebar resize constraints */
 const SIDEBAR_MIN_WIDTH = 200
@@ -69,6 +78,7 @@ export function LaconWorkspace() {
   const [darkMode, setDarkMode] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [newFileDialogOpen, setNewFileDialogOpen] = useState(false)
+  const [wordCount, setWordCount] = useState(0)
 
   // Sidebar resize state
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
@@ -117,6 +127,38 @@ export function LaconWorkspace() {
 
   // Editor ref for accessing getMarkdown/getHTML
   const editorRef = useRef<ModernEditorHandle>(null)
+
+  // ─── Refine workflow state ───
+  const [refineLoading, setRefineLoading] = useState(false)
+  const [refineParagraphData, setRefineParagraphData] = useState<SelectedParagraphData | null>(null)
+  const [refineDiff, setRefineDiff] = useState<RefineDiffData | null>(null)
+  const [refineExpandTrigger, setRefineExpandTrigger] = useState(0)
+
+  // ─── Review diff workflow state ───
+  const [reviewDiffs, setReviewDiffs] = useState<ReviewDiffItem[]>([])
+  /** Stores the editor HTML before any review edits were applied (for undo on reject) */
+  const reviewUndoSnapshotRef = useRef<string | null>(null)
+
+  // ─── Slides workflow state ───
+  const [slidesDialogOpen, setSlidesDialogOpen] = useState(false)
+  const [slideDeck, setSlideDeck] = useState<SlideDeck | null>(null)
+  const [slidesEditorOpen, setSlidesEditorOpen] = useState(false)
+
+  // Load existing slide deck when file changes
+  useEffect(() => {
+    if (!activeFilePath) {
+      setSlideDeck(null)
+      return
+    }
+    const electron = (window as any).electron
+    electron.slides.load(activeFilePath).then((result: any) => {
+      if (result?.success && result.data) {
+        setSlideDeck(result.data)
+      } else {
+        setSlideDeck(null)
+      }
+    }).catch(() => setSlideDeck(null))
+  }, [activeFilePath])
 
   // Dark mode
   useEffect(() => {
@@ -226,9 +268,26 @@ export function LaconWorkspace() {
     (html: string) => {
       if (!activeFilePath) {return}
       updateProjectContent(html)
+      // Update word count from the editor's plain text
+      const text = editorRef.current?.getText?.() || ''
+      setWordCount(countWords(text))
     },
     [activeFilePath, updateProjectContent],
   )
+
+  // ── Compute initial word count when a file loads ──
+  useEffect(() => {
+    if (!activeFilePath) {
+      setWordCount(0)
+      return
+    }
+    // Short delay to let the editor mount and parse content
+    const timer = setTimeout(() => {
+      const text = editorRef.current?.getText?.() || ''
+      setWordCount(countWords(text))
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [activeFilePath])
 
   // ── Auto-write generated content to editor when generation completes ──
   const contentWrittenRef = useRef(false)
@@ -268,6 +327,228 @@ export function LaconWorkspace() {
     try {
       localStorage.setItem('lacon-onboarding-dismissed', 'true')
     } catch {} // eslint-disable-line no-empty
+  }, [])
+
+  // ─── Refine workflow handlers ───
+
+  // Track editor selection changes to auto-populate refine data.
+  // DEBOUNCED (300ms) so we don't interfere with active drag-to-select.
+  const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastRefineTextRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const editor = editorRef.current?.getEditor?.()
+    if (!editor) return
+
+    const handleSelectionUpdate = () => {
+      // Clear any pending update
+      if (selectionTimerRef.current) {
+        clearTimeout(selectionTimerRef.current)
+      }
+
+      // Debounce: only process after 300ms of no further selection changes
+      selectionTimerRef.current = setTimeout(() => {
+        const data = getSelectedParagraphData(editor)
+        const newText = data?.text || null
+
+        // Only update state if the selection actually changed
+        if (newText !== lastRefineTextRef.current) {
+          lastRefineTextRef.current = newText
+          setRefineParagraphData(data)
+        }
+      }, 300)
+    }
+
+    editor.on('selectionUpdate', handleSelectionUpdate)
+    return () => {
+      editor.off('selectionUpdate', handleSelectionUpdate)
+      if (selectionTimerRef.current) {
+        clearTimeout(selectionTimerRef.current)
+      }
+    }
+  }, [activeFilePath]) // Re-attach when file changes
+
+  // Also called from RefineButton click (explicit trigger)
+  const handleRefineOpen = useCallback((data: SelectedParagraphData) => {
+    setRefineParagraphData(data)
+    setRefineDiff(null)
+    // Increment trigger to signal FloatingAIBar to auto-expand
+    setRefineExpandTrigger(prev => prev + 1)
+  }, [])
+
+  const handleRefineAction = useCallback(
+    async (action: RefineAction, instruction: string) => {
+      if (!documentId || !refineParagraphData) return
+      setRefineLoading(true)
+
+      try {
+        const docContent = editorRef.current?.getJSON?.() || { type: 'doc', content: [] }
+        const result = await writerLoop.surgicalEdit(
+          refineParagraphData.paragraphId,
+          instruction,
+          docContent,
+          refineParagraphData.text,
+        )
+
+        if (result?.revisedText) {
+          setRefineDiff({
+            originalText: refineParagraphData.text,
+            revisedText: result.revisedText,
+            from: refineParagraphData.from,
+            to: refineParagraphData.to,
+            isAddParagraph: action === 'add-paragraph',
+          })
+        }
+      } catch (err) {
+        console.error('[LaconWorkspace] Refine action failed:', err)
+      } finally {
+        setRefineLoading(false)
+      }
+    },
+    [documentId, refineParagraphData, writerLoop],
+  )
+
+  const handleRefineAccept = useCallback(() => {
+    setRefineDiff(null)
+    setRefineParagraphData(null)
+  }, [])
+
+  const handleRefineReject = useCallback(() => {
+    setRefineDiff(null)
+    setRefineParagraphData(null)
+  }, [])
+
+  // ─── Review diff workflow handlers ───
+
+  /**
+   * Called when a review surgical edit completes.
+   * Strategy:
+   * 1. Save an undo snapshot (only on the first edit in a batch)
+   * 2. Apply the text change immediately via HTML replacement
+   * 3. Find the revised text in the editor and highlight it
+   * 4. Add to reviewDiffs for the overlay
+   */
+  const handleReviewDiffReady = useCallback(
+    (data: { flagId: string; originalText: string; revisedText: string }) => {
+      const editor = editorRef.current?.getEditor?.()
+      if (!editor) return
+
+      // 1. Save undo snapshot before first edit in this batch
+      if (!reviewUndoSnapshotRef.current) {
+        reviewUndoSnapshotRef.current = editor.getHTML()
+      }
+
+      // 2. Find the paragraph/textblock that contains the original text
+      const searchNeedle = data.originalText.slice(0, 80)
+      let targetBlockPos = -1
+      let targetBlockEnd = -1
+
+      editor.state.doc.descendants((node: any, pos: number) => {
+        if (targetBlockPos !== -1) return false
+        if (node.isTextblock) {
+          const blockText = node.textContent
+          if (blockText.includes(searchNeedle)) {
+            targetBlockPos = pos
+            targetBlockEnd = pos + node.nodeSize
+            return false
+          }
+        }
+        return undefined
+      })
+
+      if (targetBlockPos === -1) return
+
+      // 3. Replace the paragraph's text content with the revised text
+      const contentFrom = targetBlockPos + 1
+      const contentTo = targetBlockEnd - 1
+
+      try {
+        editor
+          .chain()
+          .focus()
+          .setTextSelection({ from: contentFrom, to: contentTo })
+          .deleteSelection()
+          .insertContent(data.revisedText)
+          .run()
+      } catch {
+        return
+      }
+
+      // 4. Re-find the inserted text and highlight it
+      let highlightFrom = -1
+      let highlightTo = -1
+      const revisedNeedle = data.revisedText.slice(0, 80)
+
+      editor.state.doc.descendants((node: any, pos: number) => {
+        if (highlightFrom !== -1) return false
+        if (node.isTextblock) {
+          const blockText = node.textContent
+          if (blockText.includes(revisedNeedle)) {
+            highlightFrom = pos + 1
+            highlightTo = pos + 1 + blockText.length
+            return false
+          }
+        }
+        return undefined
+      })
+
+      if (highlightFrom !== -1 && highlightTo !== -1) {
+        try {
+          editor
+            .chain()
+            .setTextSelection({ from: highlightFrom, to: highlightTo })
+            .setHighlight({ color: 'review-pending' })
+            .run()
+        } catch {
+          // Highlight is non-critical
+        }
+      }
+
+      // 5. Add to diffs for overlay display
+      const newDiff: ReviewDiffItem = {
+        flagId: data.flagId,
+        originalText: data.originalText,
+        revisedText: data.revisedText,
+        from: highlightFrom,
+        to: highlightTo,
+      }
+
+      setReviewDiffs(prev => [...prev, newDiff])
+    },
+    [],
+  )
+
+  /** Accept All: keep the applied changes, just remove highlights */
+  const handleReviewAcceptAll = useCallback(() => {
+    const editor = editorRef.current?.getEditor?.()
+    if (editor) {
+      // Remove all review-pending highlights
+      for (const diff of reviewDiffs) {
+        if (diff.from !== -1 && diff.to !== -1) {
+          try {
+            editor
+              .chain()
+              .setTextSelection({ from: diff.from, to: diff.to })
+              .unsetHighlight()
+              .run()
+          } catch {
+            // Positions may have shifted
+          }
+        }
+      }
+    }
+    setReviewDiffs([])
+    reviewUndoSnapshotRef.current = null
+  }, [reviewDiffs])
+
+  /** Reject All: restore the undo snapshot (original HTML before any edits) */
+  const handleReviewRejectAll = useCallback(() => {
+    const editor = editorRef.current?.getEditor?.()
+    if (editor && reviewUndoSnapshotRef.current) {
+      editor.commands.setContent(reviewUndoSnapshotRef.current)
+    }
+    setReviewDiffs([])
+    reviewUndoSnapshotRef.current = null
   }, [])
 
   // ─── Sidebar Resize Handlers ───
@@ -506,12 +787,28 @@ export function LaconWorkspace() {
 
           {/* Editor area */}
           <div className="flex-1 overflow-hidden">
-            {activeFilePath ? (
+            {slidesEditorOpen ? (
+              <SlideEditor
+                deck={slideDeck}
+                documentId={activeFilePath || ''}
+                onDeckChange={setSlideDeck}
+                onRequestGenerate={() => setSlidesDialogOpen(true)}
+                onClose={() => setSlidesEditorOpen(false)}
+              />
+            ) : activeFilePath ? (
               <ModernEditor
                 key={activeFilePath}
                 content={activeFileContent || ''}
                 onChangeHTML={handleEditorContentChange}
                 editorRef={editorRef}
+                onRefine={handleRefineOpen}
+                onCreateSlides={() => {
+                  if (slideDeck) {
+                    setSlidesEditorOpen(true)
+                  } else {
+                    setSlidesDialogOpen(true)
+                  }
+                }}
               />
             ) : (
               /* ── No file open empty state ── */
@@ -531,7 +828,27 @@ export function LaconWorkspace() {
             )}
           </div>
 
-          {/* Floating AI bar */}
+          {/* Refine diff overlay (accept/reject AI revisions) */}
+          {refineDiff && editorRef.current?.getEditor?.() && (
+            <RefineDiffOverlay
+              diff={refineDiff}
+              editor={editorRef.current.getEditor()}
+              onAccept={handleRefineAccept}
+              onReject={handleRefineReject}
+            />
+          )}
+
+          {/* Review diff overlay (accept/reject review fixes) */}
+          {reviewDiffs.length > 0 && editorRef.current?.getEditor?.() && (
+            <ReviewDiffOverlay
+              diffs={reviewDiffs}
+              editor={editorRef.current.getEditor()}
+              onAcceptAll={handleReviewAcceptAll}
+              onRejectAll={handleReviewRejectAll}
+            />
+          )}
+
+          {/* Floating AI bar — always visible, context-aware */}
           {!zenMode && activeFilePath && (
             <FloatingAIBar
               documentId={documentId}
@@ -542,6 +859,11 @@ export function LaconWorkspace() {
                 setRightPanelOpen(true)
               }}
               _onSurgicalEdit={writerLoop.surgicalEdit}
+              onAbortGeneration={writerLoop.abortGeneration}
+              refineParagraphData={refineParagraphData}
+              refineLoading={refineLoading}
+              onRefineAction={handleRefineAction}
+              refineExpandTrigger={refineExpandTrigger}
             />
           )}
         </main>
@@ -663,6 +985,7 @@ export function LaconWorkspace() {
                     {activeTab === 'detect' && 'AI Score · Humanize · ML Verify'}
                     {activeTab === 'history' && 'Snapshots · Versions · Timeline'}
                     {activeTab === 'skills' && 'Library · Compose · Rules'}
+                    {activeTab === 'slides' && 'Generate · Edit · Export PPTX'}
                   </span>
                 </div>
               </div>
@@ -681,6 +1004,9 @@ export function LaconWorkspace() {
                   <ReviewPanel
                     documentId={documentId}
                     getEditorJSON={() => editorRef.current?.getJSON?.() ?? { type: 'doc', content: [] }}
+                    getEditorHTML={() => editorRef.current?.getHTML?.() ?? ''}
+                    setEditorHTML={(html: string) => editorRef.current?.setHTML?.(html)}
+                    onReviewDiffReady={handleReviewDiffReady}
                   />
                 </TabsContent>
 
@@ -707,7 +1033,7 @@ export function LaconWorkspace() {
       {/* ─── STATUS BAR ─── */}
       <LaconStatusBar
         documentId={documentId}
-        wordCount={0}
+        wordCount={wordCount}
         writerStage={writerLoop.stage}
         activeSkills={writerLoop.session?.activeSkillIds || []}
         onOpenSkillsTab={() => {
@@ -726,6 +1052,19 @@ export function LaconWorkspace() {
         open={newFileDialogOpen}
         onClose={() => setNewFileDialogOpen(false)}
         onCreateFile={handleCreateFile}
+      />
+
+      {/* ─── SLIDES GENERATOR DIALOG ─── */}
+      <SlidesGeneratorDialog
+        open={slidesDialogOpen}
+        onClose={() => setSlidesDialogOpen(false)}
+        documentTitle={activeFilePath ? activeFilePath.split(/[\/\\]/).pop()?.replace(/\.[^.]+$/, '') || 'Untitled' : 'Untitled'}
+        documentContent={editorRef.current?.getText?.() || ''}
+        documentId={activeFilePath || ''}
+        onGenerated={(deck) => {
+          setSlideDeck(deck)
+          setSlidesEditorOpen(true)
+        }}
       />
     </div>
   )

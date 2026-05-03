@@ -1,0 +1,67 @@
+/* ═══════════════════════════════════════════════════════════════
+   Base Reset — Body, Focus, Accessibility, Scrollbar
+   ═══════════════════════════════════════════════════════════════ */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+  }
+}
+
+/* ─── Focus & Accessibility ─── */
+*:focus-visible {
+  @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+
+/* Remove focus ring from the editor itself — it's a document, not a button */
+.ProseMirror:focus-visible,
+.ProseMirror:focus,
+.ProseMirror-focused,
+.paginated-document:focus-within,
+.paginated-document *:focus-visible,
+/* Remove focus ring from the floating AI bar */
+.floating-ai-expanded:focus-within,
+.floating-ai-expanded *:focus-visible,
+.floating-ai-expanded *:focus,
+.floating-ai-pill:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}

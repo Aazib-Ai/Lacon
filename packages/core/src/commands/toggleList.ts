@@ -181,6 +181,66 @@ export const toggleList: RawCommands['toggleList'] =
           .command(() => joinListForwards(tr, listType))
           .run()
       }
+
+      // Cross-type list conversion (e.g. bulletList <-> taskList):
+      // The target list type expects different item types than the current list contains.
+      // Strategy: lift the current list items out to paragraphs, then wrap them in the new list type.
+      if (isList(currentList.node.type.name, extensions)) {
+        // Determine the item type used by the current list (e.g. listItem or taskItem)
+        const currentItemType = currentList.node.firstChild?.type
+
+        if (currentItemType) {
+          // For AllSelection over a whole-doc list, normalize the selection first
+          if (isAllSelection && hasWholeDocSelectedList) {
+            return chain()
+              .command(({ tr: trx, dispatch: disp }) => {
+                const nextSelection = createInnerSelectionForWholeDocList(trx)
+
+                if (!nextSelection) {
+                  return false
+                }
+
+                trx.setSelection(nextSelection)
+
+                if (disp) {
+                  disp(trx)
+                }
+
+                return true
+              })
+              .liftListItem(currentItemType)
+              .command(() => {
+                const canWrapInList = can().wrapInList(listType, attributes)
+
+                if (canWrapInList) {
+                  return true
+                }
+
+                return commands.clearNodes()
+              })
+              .wrapInList(listType, attributes)
+              .command(() => joinListBackwards(tr, listType))
+              .command(() => joinListForwards(tr, listType))
+              .run()
+          }
+
+          return chain()
+            .liftListItem(currentItemType)
+            .command(() => {
+              const canWrapInList = can().wrapInList(listType, attributes)
+
+              if (canWrapInList) {
+                return true
+              }
+
+              return commands.clearNodes()
+            })
+            .wrapInList(listType, attributes)
+            .command(() => joinListBackwards(tr, listType))
+            .command(() => joinListForwards(tr, listType))
+            .run()
+        }
+      }
     }
 
     if (!keepMarks || !marks || !dispatch) {

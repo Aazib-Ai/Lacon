@@ -38,9 +38,12 @@ import {
   ListOrdered,
   Minus,
   Plus,
+  Presentation,
+  Redo2,
   Strikethrough,
   Type,
   Underline as UnderlineIcon,
+  Undo2,
 } from 'lucide-react'
 import React, { useCallback } from 'react'
 
@@ -76,6 +79,121 @@ const preventFocusLoss = (e: React.MouseEvent) => e.preventDefault()
 
 /** Format a shortcut string for display (e.g. "Ctrl+B") */
 const fmtShortcut = (s?: string) => (s ? ` (${s})` : '')
+
+// ────────────────────────────────────────────────────────────────────
+// Smart List Toggle — splits paragraphs into individual list items
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * Before toggling a list, split a single selected paragraph into multiple
+ * paragraphs so each sentence/line becomes its own list item.
+ *
+ * Split strategy:
+ *  1. HardBreak nodes (Shift+Enter / `<br>`) → each line becomes a paragraph
+ *  2. Sentence boundaries (`.` `!` `?` followed by space + uppercase) → each sentence becomes a paragraph
+ *  3. If no split points found, do nothing (single-item list — standard behavior)
+ */
+function splitParagraphBeforeListToggle(editor: TiptapEditor): void {
+  const { state } = editor
+  const { from, to } = state.selection
+
+  // Only process when there's a text selection
+  if (from === to) return
+
+  // Don't split if we're already inside a list (toggle will untoggle)
+  if (editor.isActive('bulletList') || editor.isActive('orderedList') || editor.isActive('taskList')) {
+    return
+  }
+
+  // Collect paragraphs in the selection
+  const paragraphs: { node: any; pos: number }[] = []
+  state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+    if (node.type.name === 'paragraph') {
+      paragraphs.push({ node, pos })
+      return false // don't descend
+    }
+  })
+
+  // Only split when exactly one paragraph is selected
+  // (multiple paragraphs already become separate list items by default)
+  if (paragraphs.length !== 1) return
+
+  const { node: para, pos: paraPos } = paragraphs[0]
+  if (para.content.size < 2) return // too short to split
+
+  // ── Strategy 1: split at hardBreak nodes ──
+  const hardBreakOffsets: number[] = []
+  para.forEach((child: any, offset: number) => {
+    if (child.type.name === 'hardBreak') {
+      hardBreakOffsets.push(offset)
+    }
+  })
+
+  if (hardBreakOffsets.length > 0) {
+    const { tr } = state
+    // Process in reverse so earlier positions aren't invalidated
+    for (let i = hardBreakOffsets.length - 1; i >= 0; i--) {
+      const absPos = tr.mapping.map(paraPos + 1 + hardBreakOffsets[i])
+      tr.delete(absPos, absPos + 1) // remove hardBreak
+      tr.split(absPos)              // split into two paragraphs
+    }
+    // Select all the resulting paragraphs
+    const newEnd = tr.mapping.map(paraPos + para.nodeSize)
+    tr.setSelection(
+      // @ts-ignore — TextSelection.create works fine with mapped positions
+      editor.state.selection.constructor.create(tr.doc, paraPos + 1, newEnd - 1),
+    )
+    editor.view.dispatch(tr)
+    return
+  }
+
+  // ── Strategy 2: split at sentence boundaries ──
+  const text = para.textContent
+  if (!text || text.length < 20) return // too short
+
+  // Match: sentence-ending punctuation + whitespace + uppercase letter
+  const boundaries: number[] = []
+  const sentenceRx = /[.!?]\s+(?=[A-Z])/g
+  let m: RegExpExecArray | null
+  while ((m = sentenceRx.exec(text)) !== null) {
+    boundaries.push(m.index + m[0].length) // position of the uppercase letter
+  }
+  if (boundaries.length === 0) return
+
+  // Verify the paragraph only has text/mark nodes (no inline atoms that shift positions)
+  let hasInlineAtoms = false
+  para.forEach((child: any) => {
+    if (!child.isText && child.type.name !== 'hardBreak') {
+      hasInlineAtoms = true
+    }
+  })
+  if (hasInlineAtoms) return // can't safely map text offsets
+
+  const { tr } = state
+  for (let i = boundaries.length - 1; i >= 0; i--) {
+    const absPos = tr.mapping.map(paraPos + 1 + boundaries[i])
+    tr.split(absPos)
+  }
+  const newEnd = tr.mapping.map(paraPos + para.nodeSize)
+  tr.setSelection(
+    // @ts-ignore
+    editor.state.selection.constructor.create(tr.doc, paraPos + 1, newEnd - 1),
+  )
+  editor.view.dispatch(tr)
+}
+
+/**
+ * Smart toggle: split paragraph into items, then toggle the list type.
+ */
+function smartToggleList(editor: TiptapEditor, type: 'bullet' | 'ordered' | 'task') {
+  splitParagraphBeforeListToggle(editor)
+  // After splitting, the editor state is updated synchronously
+  switch (type) {
+    case 'bullet':  return editor.chain().focus().toggleBulletList().run()
+    case 'ordered': return editor.chain().focus().toggleOrderedList().run()
+    case 'task':    return editor.chain().focus().toggleTaskList().run()
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────
 // Reusable primitives
@@ -256,9 +374,10 @@ interface EditorToolbarProps {
   editor: TiptapEditor
   zoom: number
   onZoomChange: (zoom: number) => void
+  onCreateSlides?: () => void
 }
 
-export function EditorToolbar({ editor, zoom, onZoomChange }: EditorToolbarProps) {
+export function EditorToolbar({ editor, zoom, onZoomChange, onCreateSlides }: EditorToolbarProps) {
   // ── Font-size handlers ──
   const handleFontSizeIncrease = useCallback(() => {
     const current = getCurrentFontSize(editor)
@@ -305,6 +424,24 @@ export function EditorToolbar({ editor, zoom, onZoomChange }: EditorToolbarProps
       >
         <div className="flex items-center gap-1 px-3 py-1.5 flex-wrap">
 
+          {/* ── Group: Undo / Redo ── */}
+          <ToolbarIconButton
+            icon={Undo2}
+            label="Undo"
+            shortcut="Ctrl+Z"
+            onClick={() => editor.chain().focus().undo().run()}
+            className={!editor.can().undo() ? 'opacity-40 pointer-events-none' : ''}
+          />
+          <ToolbarIconButton
+            icon={Redo2}
+            label="Redo"
+            shortcut="Ctrl+Shift+Z"
+            onClick={() => editor.chain().focus().redo().run()}
+            className={!editor.can().redo() ? 'opacity-40 pointer-events-none' : ''}
+          />
+
+          <ToolbarSeparator />
+
           {/* ── Group: Export ── */}
           <DropdownMenu>
             <Tooltip>
@@ -312,11 +449,11 @@ export function EditorToolbar({ editor, zoom, onZoomChange }: EditorToolbarProps
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-full bg-foreground/90 hover:bg-foreground text-background text-xs font-medium px-3 py-1.5 transition-colors gap-1.5"
+                    className="inline-flex items-center justify-center rounded-md text-xs font-medium px-2 py-1.5 transition-colors gap-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     <Download className="h-3.5 w-3.5" />
                     Export
-                    <ChevronDown className="h-3 w-3 opacity-60" />
+                    <ChevronDown className="h-3 w-3 opacity-50" />
                   </button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
@@ -348,6 +485,26 @@ export function EditorToolbar({ editor, zoom, onZoomChange }: EditorToolbarProps
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* ── Create Slides Button ── */}
+          {onCreateSlides && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-md text-xs font-medium px-2 py-1.5 transition-colors gap-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  onMouseDown={preventFocusLoss}
+                  onClick={onCreateSlides}
+                >
+                  <Presentation className="h-3.5 w-3.5" />
+                  Slides
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Generate presentation slides with AI
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           <ToolbarSeparator />
 
@@ -454,21 +611,21 @@ export function EditorToolbar({ editor, zoom, onZoomChange }: EditorToolbarProps
             </Tooltip>
             <DropdownMenuContent onMouseDown={preventFocusLoss} align="start">
               <DropdownMenuItem
-                onSelect={() => editor.chain().focus().toggleBulletList().run()}
+                onSelect={() => smartToggleList(editor, 'bullet')}
                 className={cn(editor.isActive('bulletList') && 'bg-accent')}
               >
                 <List className="h-4 w-4 mr-2" />
                 Bullet List
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => editor.chain().focus().toggleOrderedList().run()}
+                onSelect={() => smartToggleList(editor, 'ordered')}
                 className={cn(editor.isActive('orderedList') && 'bg-accent')}
               >
                 <ListOrdered className="h-4 w-4 mr-2" />
                 Ordered List
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => editor.chain().focus().toggleTaskList().run()}
+                onSelect={() => smartToggleList(editor, 'task')}
                 className={cn(editor.isActive('taskList') && 'bg-accent')}
               >
                 <CheckSquare className="h-4 w-4 mr-2" />

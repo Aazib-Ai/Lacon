@@ -58,20 +58,20 @@ function ErrorBanner({
       role="alert"
       id="outline-editor-error"
     >
-      <div className="text-2xl flex-shrink-0 leading-none">⚠️</div>
+      <div className="text-sm flex-shrink-0 leading-none font-bold text-foreground">!</div>
       <div className="flex-1 flex flex-col gap-1.5">
         <div className="text-sm font-bold text-destructive">{actionLabel} Failed</div>
         <div className="text-sm text-destructive/80 leading-snug break-words">{error}</div>
         <div className="text-xs text-muted-foreground leading-snug">
-          💡 Check that your AI provider is configured and your API key is valid in Settings.
+          Check that your AI provider is configured and your API key is valid in Settings.
         </div>
         <div className="flex gap-2 mt-1">
           {errorMeta?.retryable && errorMeta?.retryFn && (
             <button
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-foreground text-background hover:opacity-90 transition-opacity"
               onClick={errorMeta.retryFn}
             >
-              🔄 Retry
+              Retry
             </button>
           )}
           {onDismiss && (
@@ -111,8 +111,8 @@ function LoadingIndicator({ label }: { label: string }) {
         </p>
       )}
       {elapsed > 30 && (
-        <p className="text-xs text-warning m-0 px-3 py-2 bg-warning/10 rounded-lg border border-warning/20">
-          💡 If this takes too long, check your provider connection in Settings.
+        <p className="text-xs text-muted-foreground m-0 px-3 py-2 bg-muted/50 rounded-lg border border-border">
+          If this takes too long, check your provider connection in Settings.
         </p>
       )}
     </div>
@@ -122,10 +122,10 @@ function LoadingIndicator({ label }: { label: string }) {
 // ─────────────────────────── Stage Badge ───────────────────────────
 
 const stageBadgeStyles: Record<string, string> = {
-  'awaiting-outline-approval': 'bg-warning/15 text-warning',
-  generating: 'bg-success/15 text-success',
-  complete: 'bg-success/20 text-success',
-  paused: 'bg-muted-foreground/15 text-muted-foreground',
+  'awaiting-outline-approval': 'border-border text-muted-foreground',
+  generating: 'border-border text-muted-foreground',
+  complete: 'border-border text-muted-foreground',
+  paused: 'border-border text-muted-foreground',
 }
 
 // ─────────────────────────── Generation Progress View ───────────────────────────
@@ -178,13 +178,8 @@ function GenerationProgressView({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={cn(
-            'w-10 h-10 rounded-xl flex items-center justify-center text-lg',
-            isComplete
-              ? 'bg-success/15 text-success'
-              : 'bg-primary/15 text-primary'
-          )}>
-            {isComplete ? '✅' : '✍️'}
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold bg-muted text-foreground">
+            {isComplete ? '✓' : '…'}
           </div>
           <div>
             <h3 className="text-base font-bold m-0 text-foreground">
@@ -201,9 +196,9 @@ function GenerationProgressView({
         {!isComplete && onAbort && (
           <button
             onClick={onAbort}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground border border-border hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10 transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground border border-border hover:text-foreground hover:bg-muted transition-all"
           >
-            ⏹ Stop
+            Stop
           </button>
         )}
       </div>
@@ -219,10 +214,7 @@ function GenerationProgressView({
         <div className="h-2.5 rounded-full bg-muted/60 overflow-hidden">
           <div
             className={cn(
-              'h-full rounded-full transition-all duration-700 ease-out',
-              isComplete
-                ? 'bg-gradient-to-r from-green-500 to-emerald-400'
-                : 'bg-gradient-to-r from-primary to-purple-500'
+              'h-full rounded-full transition-all duration-700 ease-out bg-foreground'
             )}
             style={{ width: `${percent}%` }}
           />
@@ -234,7 +226,7 @@ function GenerationProgressView({
         <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-primary/5 border border-primary/15">
           <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
           <span className="text-sm text-foreground font-medium">
-            Writing: <span className="text-primary">{currentTitle}</span>
+            Writing: {currentTitle}
           </span>
         </div>
       )}
@@ -259,10 +251,10 @@ function GenerationProgressView({
               {/* Status icon */}
               <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
                 {isCompleted && (
-                  <span className="text-success text-sm">✓</span>
+                  <span className="text-foreground text-sm">✓</span>
                 )}
                 {isCurrent && (
-                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
                 )}
                 {isPending && (
                   <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/30" />
@@ -347,7 +339,7 @@ export function OutlineEditor({
           />
           <button
             id="outline-generate-btn"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-br from-primary to-purple-500 text-primary-foreground hover:brightness-110 hover:shadow-lg hover:shadow-primary/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             disabled={!editingInstruction.trim() || loading}
             onClick={() => {
               if (editingInstruction.trim()) {
@@ -356,7 +348,7 @@ export function OutlineEditor({
               }
             }}
           >
-            ✨ Try Again
+            Try Again
           </button>
         </div>
       </div>
@@ -367,7 +359,7 @@ export function OutlineEditor({
   if (!outline && stage === 'idle') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[320px] text-center gap-3 p-6" id="outline-editor-empty">
-        <div className="text-5xl mb-2 grayscale-[0.2]">📝</div>
+         <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-lg font-bold text-muted-foreground mb-2">W</div>
         <h3 className="text-xl font-semibold m-0 text-foreground">Start Writing</h3>
         <p className="text-sm text-muted-foreground m-0 mb-2 max-w-[360px]">
           Enter your writing instruction below to generate a structured outline.
@@ -383,7 +375,7 @@ export function OutlineEditor({
           />
           <button
             id="outline-generate-btn"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-br from-primary to-purple-500 text-primary-foreground hover:brightness-110 hover:shadow-lg hover:shadow-primary/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-background border border-border text-foreground hover:bg-muted transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             disabled={!editingInstruction.trim() || loading}
             onClick={() => {
               if (editingInstruction.trim()) {
@@ -392,7 +384,7 @@ export function OutlineEditor({
               }
             }}
           >
-            {loading ? 'Generating…' : '✨ Generate Outline'}
+             {loading ? 'Generating…' : 'Generate Outline'}
           </button>
         </div>
       </div>
@@ -433,7 +425,7 @@ export function OutlineEditor({
           <h2 className="text-xl font-bold m-0 text-foreground">{outline.title}</h2>
           <span
             className={cn(
-              'inline-flex items-center px-2.5 py-1 rounded-full text-[0.7rem] font-semibold uppercase tracking-wide bg-primary/15 text-primary',
+              'inline-flex items-center px-2.5 py-1 rounded-full text-[0.7rem] font-semibold uppercase tracking-wide border border-border text-muted-foreground',
               stageBadgeStyles[stage],
             )}
             data-stage={stage}
@@ -441,11 +433,11 @@ export function OutlineEditor({
             {stageBadgeText(stage)}
           </span>
         </div>
-        <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">📄 {outline.sections.length} sections</span>
-          <span className="flex items-center gap-1">📝 ~{outline.totalEstimatedWords.toLocaleString()} words</span>
-          <span className="flex items-center gap-1">🕐 {new Date(outline.createdAt).toLocaleTimeString()}</span>
-        </div>
+         <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+           <span>{outline.sections.length} sections</span>
+           <span>~{outline.totalEstimatedWords.toLocaleString()} words</span>
+           <span>{new Date(outline.createdAt).toLocaleTimeString()}</span>
+         </div>
       </div>
 
       {/* ── Error ── */}
@@ -473,7 +465,7 @@ export function OutlineEditor({
       {isEditable && (
         <button
           id="outline-add-section-btn"
-          className="w-full py-3 rounded-lg border-2 border-dashed border-border text-center text-sm text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
+           className="w-full py-3 rounded-lg border-2 border-dashed border-border text-center text-sm text-muted-foreground hover:border-foreground/30 hover:text-foreground hover:bg-muted/30 transition-all"
           onClick={() => onAddSection()}
         >
           + Add Section
@@ -484,13 +476,13 @@ export function OutlineEditor({
       <div className="flex gap-2 mt-2 pt-3 border-t border-border flex-wrap">
         {isEditable && (
           <>
-            <button
-              id="outline-approve-btn"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-br from-primary to-purple-500 text-primary-foreground hover:brightness-110 hover:shadow-lg hover:shadow-primary/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={loading || outline.sections.length === 0}
-              onClick={onApprove}
-            >
-              ✅ Approve &amp; Start Generation
+             <button
+               id="outline-approve-btn"
+               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+               disabled={loading || outline.sections.length === 0}
+               onClick={onApprove}
+             >
+               Approve & Start Generation
             </button>
             <button
               id="outline-regenerate-btn"
@@ -501,17 +493,17 @@ export function OutlineEditor({
                 if (instruction?.trim()) {onRegenerate(instruction.trim())}
               }}
             >
-              🔄 Regenerate
+               Regenerate
             </button>
           </>
         )}
         <button
           id="outline-reset-btn"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-muted-foreground border border-border hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          disabled={loading || stage === 'idle'}
-          onClick={onReset}
-        >
-          ⏹ Reset
+           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-muted-foreground border border-border hover:text-foreground hover:bg-muted transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+           disabled={loading || stage === 'idle'}
+           onClick={onReset}
+         >
+           Reset
         </button>
       </div>
     </div>
@@ -519,6 +511,21 @@ export function OutlineEditor({
 }
 
 // ─────────────────────────── Section Card ───────────────────────────
+
+/**
+ * Curated palette for section number badges.
+ * Each section gets a distinct color to visually differentiate them.
+ */
+const sectionBadgeColors = [
+  'bg-muted text-foreground',
+  'bg-muted text-foreground',
+  'bg-muted text-foreground',
+  'bg-muted text-foreground',
+  'bg-muted text-foreground',
+  'bg-muted text-foreground',
+  'bg-muted text-foreground',
+  'bg-muted text-foreground',
+]
 
 interface SectionCardProps {
   section: OutlineSection
@@ -575,7 +582,7 @@ function SectionCard({
         className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-purple-500 text-white text-xs font-bold flex-shrink-0">
+        <span className={cn('flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold flex-shrink-0', sectionBadgeColors[index % sectionBadgeColors.length])}>
           {index + 1}
         </span>
         <div className="flex-1 min-w-0 flex items-baseline gap-2 flex-wrap">
@@ -670,32 +677,38 @@ function SectionCard({
           {/* Subsections */}
           {section.subsections.length > 0 && (
             <div>
-              <h4 className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground mb-1 mt-0">Subsections</h4>
-              {section.subsections.map(sub => (
-                <div
-                  key={sub.id}
-                  className="group flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/50 border border-transparent hover:border-border transition-colors"
-                  id={`outline-subsection-${sub.id}`}
-                >
-                  <span className="flex-1 text-sm font-medium text-foreground">{sub.title}</span>
-                  <span className="text-[0.7rem] text-muted-foreground">~{sub.estimatedWords}w</span>
-                  {sub.keyPoints.length > 0 && (
-                    <ul className="list-disc text-xs pl-4 text-muted-foreground m-0">
-                      {sub.keyPoints.map((p, i) => (
-                        <li key={i}>{p}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {isEditable && (
-                    <button
-                      className="bg-transparent border-none text-muted-foreground cursor-pointer text-[0.7rem] opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                      onClick={() => onRemoveSubsection(sub.id)}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
+              <h4 className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 mt-0">Subsections</h4>
+              <div className="flex flex-col gap-1.5">
+                {section.subsections.map(sub => (
+                  <div
+                    key={sub.id}
+                    className="group rounded-md bg-muted/50 border border-transparent hover:border-border transition-colors overflow-hidden"
+                    id={`outline-subsection-${sub.id}`}
+                  >
+                    {/* Subsection header row */}
+                    <div className="flex items-center gap-2 px-2.5 py-1.5">
+                      <span className="flex-1 text-sm font-medium text-foreground leading-snug">{sub.title}</span>
+                      <span className="text-[0.7rem] text-muted-foreground whitespace-nowrap flex-shrink-0">~{sub.estimatedWords}w</span>
+                      {isEditable && (
+                        <button
+                          className="bg-transparent border-none text-muted-foreground cursor-pointer text-[0.7rem] opacity-0 group-hover:opacity-100 hover:text-destructive transition-all flex-shrink-0"
+                          onClick={() => onRemoveSubsection(sub.id)}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {/* Key points below, properly separated */}
+                    {sub.keyPoints.length > 0 && (
+                      <ul className="list-disc text-xs pl-7 pr-2.5 pb-2 text-muted-foreground m-0 space-y-0.5">
+                        {sub.keyPoints.map((p, i) => (
+                          <li key={i} className="leading-snug">{p}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

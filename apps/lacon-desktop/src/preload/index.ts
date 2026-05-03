@@ -251,15 +251,18 @@ const writerLoopAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ACCEPT_REVIEW_FLAG, { documentId, flagId }),
   rejectReviewFlag: (documentId: string, flagId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REJECT_REVIEW_FLAG, { documentId, flagId }),
-  surgicalEdit: (documentId: string, paragraphId: string, instruction: string, fullDocumentContent: any) =>
+  surgicalEdit: (documentId: string, paragraphId: string, instruction: string, fullDocumentContent: any, originalText?: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_SURGICAL_EDIT, {
       documentId,
       paragraphId,
       instruction,
       fullDocumentContent,
+      originalText,
     }),
   rewriteAll: (documentId: string, instruction: string, documentContent: any) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REWRITE_ALL, { documentId, instruction, documentContent }),
+  loadReview: (documentId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_LOAD_REVIEW, { documentId }),
 }
 
 // Research API (Phase 5 - Writer Harness)
@@ -388,6 +391,14 @@ const detectionAPI = {
   fullPipeline: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_FULL_PIPELINE, payload),
 }
 
+// Slides API (Presentation Generator)
+const slidesAPI = {
+  generate: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SLIDES_GENERATE, payload),
+  save: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SLIDES_SAVE, payload),
+  load: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.SLIDES_LOAD, { documentId }),
+  exportPptx: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.SLIDES_EXPORT_PPTX, payload),
+}
+
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('electron', {
   agent: agentAPI,
@@ -410,6 +421,7 @@ contextBridge.exposeInMainWorld('electron', {
   dialog: dialogAPI,
   project: projectAPI,
   detection: detectionAPI,
+  slides: slidesAPI,
   invoke: api.invoke,
   onAgentStream: (callback: (chunk: any) => void) => {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))

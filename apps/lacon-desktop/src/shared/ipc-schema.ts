@@ -201,6 +201,7 @@ export const IPC_CHANNELS = {
   WRITER_LOOP_REJECT_REVIEW_FLAG: 'writerLoop:rejectReviewFlag',
   WRITER_LOOP_SURGICAL_EDIT: 'writerLoop:surgicalEdit',
   WRITER_LOOP_REWRITE_ALL: 'writerLoop:rewriteAll',
+  WRITER_LOOP_LOAD_REVIEW: 'writerLoop:loadReview',
 
   // Writer Harness: Research operations (Phase 5)
   RESEARCH_GET_LOG: 'research:getLog',
@@ -265,6 +266,12 @@ export const IPC_CHANNELS = {
   DETECT_LLM_ANALYZE: 'detect:llmAnalyze',
   DETECT_LLM_HUMANIZE: 'detect:llmHumanize',
   DETECT_FULL_PIPELINE: 'detect:fullPipeline',
+
+  // Slides operations (Presentation Generator)
+  SLIDES_GENERATE: 'slides:generate',
+  SLIDES_SAVE: 'slides:save',
+  SLIDES_LOAD: 'slides:load',
+  SLIDES_EXPORT_PPTX: 'slides:exportPptx',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

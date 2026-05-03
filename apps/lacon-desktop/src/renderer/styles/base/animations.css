@@ -1,0 +1,168 @@
+/* ═══════════════════════════════════════════════════════════════
+   Animations — @keyframes & Utility Classes
+   All animation definitions centralized here.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Generic Transitions ─── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--lacon-writer-glow) / 0.4); }
+  50% { box-shadow: 0 0 0 6px hsl(var(--lacon-writer-glow) / 0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes ghostFadeIn {
+  from { opacity: 0; }
+  to { opacity: 0.6; }
+}
+
+/* ─── AI Bar Animations ─── */
+
+@keyframes aiBarEntrance {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes aiExpandIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+    max-height: 56px;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 300px;
+  }
+}
+
+@keyframes aiPillPulse {
+  0%, 100% {
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.06),
+      0 4px 16px rgba(0, 0, 0, 0.04),
+      0 0 0 0 hsl(var(--accent) / 0.15);
+  }
+  50% {
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.08),
+      0 4px 16px rgba(0, 0, 0, 0.04),
+      0 0 0 6px hsl(var(--accent) / 0);
+  }
+}
+
+@keyframes aiActiveBorderPulse {
+  0%, 100% {
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      0 0 0 2px hsl(var(--accent) / 0.1);
+  }
+  50% {
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      0 0 0 4px hsl(var(--accent) / 0.04);
+  }
+}
+
+@keyframes aiErrorFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Refine Animations ─── */
+
+@keyframes refine-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes refine-bar-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes refine-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes refine-diff-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* ─── AI Detection ─── */
+
+@keyframes gaugeAppear {
+  from { stroke-dashoffset: 283; }
+  to { stroke-dashoffset: var(--gauge-offset); }
+}
+
+/* ─── Animation Utility Classes ─── */
+
+.animate-fade-in { animation: fadeIn 200ms ease-out; }
+.animate-slide-in-right { animation: slideInRight 250ms ease-out; }
+.animate-slide-in-left { animation: slideInLeft 250ms ease-out; }
+.animate-slide-in-up { animation: slideInUp 250ms ease-out; }
+.animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 30%, hsl(var(--primary)/0.08) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}

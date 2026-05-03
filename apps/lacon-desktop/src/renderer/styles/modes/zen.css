@@ -1,0 +1,46 @@
+/* ═══════════════════════════════════════════════════════════════
+   Zen Mode — All [data-zen="true"] overrides consolidated
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-zen="true"] .lacon-sidebar,
+[data-zen="true"] .lacon-right-panel {
+  width: 0 !important;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+[data-zen="true"] .lacon-toolbar {
+  opacity: 0;
+  transition: opacity var(--lacon-transition);
+}
+
+[data-zen="true"]:hover .lacon-toolbar,
+[data-zen="true"] .lacon-toolbar:focus-within {
+  opacity: 1;
+}
+
+[data-zen="true"] .lacon-statusbar {
+  @apply bg-transparent border-none;
+}
+
+[data-zen="true"] .lacon-statusbar > *:not(.zen-exit-hint) {
+  display: none;
+}
+
+[data-zen="true"] .sidebar-resize-handle {
+  display: none;
+}
+
+[data-zen="true"] .right-panel-resize-handle {
+  display: none;
+}
+
+[data-zen="true"] .floating-ai-bar-wrapper {
+  display: none;
+}
+
+[data-zen="true"] .refine-bar-wrapper,
+[data-zen="true"] .refine-diff-overlay {
+  display: none;
+}

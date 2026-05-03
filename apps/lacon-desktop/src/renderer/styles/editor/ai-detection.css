@@ -1,0 +1,33 @@
+/* ═══════════════════════════════════════════════════════════════
+   AI Detection — Gauge Animation & Paragraph Flagging
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Gauge ring animation */
+.ai-gauge-ring {
+  animation: gaugeAppear 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Editor paragraph flagging */
+[data-ai-flagged="true"] {
+  position: relative;
+  background: hsl(var(--destructive) / 0.04);
+  border-radius: 4px;
+  transition: background 300ms ease;
+}
+
+[data-ai-flagged="true"]::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--destructive));
+  opacity: 0.6;
+}
+
+[data-ai-flagged="true"]:hover {
+  background: hsl(var(--destructive) / 0.08);
+}

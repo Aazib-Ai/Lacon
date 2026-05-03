@@ -1,60 +1,187 @@
 /**
  * FloatingAIBar — Context-aware AI input at the bottom of the editor
  *
- * - No selection: "Tell AI what to write..." → triggers planning
- * - Text selected: "How should AI change this?" → triggers surgical edit
- * - Shows error feedback when API calls fail
- * - Shows elapsed time for long operations
+ * Unified bar with two modes:
+ *   - DEFAULT: "Tell AI what to write..." → triggers planning
+ *   - REFINE:  Shows refine action buttons (Rephrase, Add Paragraph, More…)
+ *              when a paragraph is selected. User can also type a custom instruction.
+ *
+ * The bar is ALWAYS visible. When text is selected, it seamlessly transforms
+ * to show refine actions. When no text is selected, it returns to default.
  */
 
-import { AlertCircle, ArrowUp, Loader2,Sparkles, X } from 'lucide-react'
-import React, { useEffect,useRef, useState } from 'react'
+import {
+  AlertCircle,
+  ArrowUp,
+  BookOpen,
+  ChevronDown,
+  Expand,
+  FileText,
+  GraduationCap,
+  Loader2,
+  PenLine,
+  RefreshCw,
+  Scissors,
+  Sparkles,
+  SpellCheck,
+  Square,
+  X,
+} from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import ReactDOM from 'react-dom'
 
 import { cn } from '@/renderer/lib/utils'
 
+import type { SelectedParagraphData } from './RefineButton'
+import { buildRefineInstruction, type RefineAction } from './RefineBar'
 import { Button } from './ui/Button'
+
+/* ─── More Actions for Refine Mode ─── */
+
+interface RefineActionDef {
+  id: RefineAction
+  label: string
+  icon: React.ElementType
+  description: string
+}
+
+const MORE_ACTIONS: RefineActionDef[] = [
+  { id: 'match-style', label: 'Match Writing Style', icon: PenLine, description: "Mirror the document's existing voice" },
+  { id: 'make-concise', label: 'Make Concise', icon: Scissors, description: 'Shorten by 30-50%' },
+  { id: 'make-formal', label: 'Make Formal', icon: GraduationCap, description: 'Professional/academic tone' },
+  { id: 'expand', label: 'Expand', icon: Expand, description: 'Add detail and evidence' },
+  { id: 'simplify', label: 'Simplify', icon: BookOpen, description: 'Plain language, short sentences' },
+  { id: 'fix-grammar', label: 'Fix Grammar', icon: SpellCheck, description: 'Grammar & spelling only' },
+]
+
+/* ─── Props ─── */
 
 interface FloatingAIBarProps {
   documentId: string | undefined
   writerStage: string
   onStartPlanning: (instruction: string) => void
   _onSurgicalEdit: (paragraphId: string, instruction: string, fullDocumentContent: any) => Promise<any>
+  /** Optional: callback to abort an in-progress generation */
+  onAbortGeneration?: () => Promise<any>
+  /** Currently selected paragraph data (from editor) */
+  refineParagraphData?: SelectedParagraphData | null
+  /** Whether a refine action is in progress */
+  refineLoading?: boolean
+  /** Callback to trigger a refine action */
+  onRefineAction?: (action: RefineAction, instruction: string) => void
+  /** Trigger counter — increment to auto-expand with refine data */
+  refineExpandTrigger?: number
 }
 
-export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSurgicalEdit }: FloatingAIBarProps) {
+/* ─── Component ─── */
+
+export function FloatingAIBar({
+  documentId,
+  writerStage,
+  onStartPlanning,
+  _onSurgicalEdit,
+  onAbortGeneration,
+  refineParagraphData,
+  refineLoading,
+  onRefineAction,
+  refineExpandTrigger,
+}: FloatingAIBarProps) {
+  /* ── State ── */
+  const [isExpanded, setIsExpanded] = useState(false)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [hasSelection, setHasSelection] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [showMore, setShowMore] = useState(false)
+
+  /* ── Snapshot of refine data captured when bar expands ── */
+  const capturedRefineDataRef = useRef<SelectedParagraphData | null>(null)
+
+  /* ── Refs ── */
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
+  const moreBtnRef = useRef<HTMLButtonElement>(null)
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Listen for text selection in the editor
-  useEffect(() => {
-    const checkSelection = () => {
-      const selection = window.getSelection()
-      setHasSelection(!!(selection && selection.toString().trim().length > 0))
-    }
-    document.addEventListener('selectionchange', checkSelection)
-    return () => document.removeEventListener('selectionchange', checkSelection)
-  }, [])
+  /* ── Derived ── */
+  const isGenerating = writerStage === 'generating'
+  const isActive = isLoading || isGenerating || !!refineLoading
+  // Use the captured refine data when expanded (so it survives editor blur),
+  // fall back to live refineParagraphData when collapsed
+  const activeRefineData = isExpanded
+    ? (capturedRefineDataRef.current || refineParagraphData)
+    : refineParagraphData
+  const hasRefineData = !!(activeRefineData && activeRefineData.text.trim().length > 0)
 
-  // Ctrl+/ to focus
+  // Auto-expand when refineExpandTrigger increments (RefineButton clicked)
+  useEffect(() => {
+    if (refineExpandTrigger && refineExpandTrigger > 0) {
+      capturedRefineDataRef.current = refineParagraphData || null
+      setIsExpanded(true)
+    }
+  }, [refineExpandTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ctrl+/ to focus / expand
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === '/') {
         e.preventDefault()
-        inputRef.current?.focus()
+        setIsExpanded(true)
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus()
+        })
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Track elapsed time during loading
+  // Click outside to collapse (only if input is empty and not loading)
   useEffect(() => {
-    if (!isLoading) {
+    if (!isExpanded) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node) &&
+        !input.trim() &&
+        !isActive
+      ) {
+        setIsExpanded(false)
+        setShowMore(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 100)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isExpanded, input, isActive])
+
+  // Close "More" menu on outside click
+  useEffect(() => {
+    if (!showMore) return
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      const inMenu = moreMenuRef.current?.contains(target)
+      const inBtn = moreBtnRef.current?.contains(target)
+      if (!inMenu && !inBtn) {
+        setShowMore(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMore])
+
+  // Track elapsed time during loading / generation
+  useEffect(() => {
+    if (!isActive) {
       setElapsed(0)
       return
     }
@@ -63,9 +190,26 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
       setElapsed(Math.floor((Date.now() - start) / 1000))
     }, 1000)
     return () => clearInterval(timer)
-  }, [isLoading])
+  }, [isActive])
 
-  // Auto-dismiss errors after 8 seconds
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '0px'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
+    }
+  }, [input])
+
+  // Auto-focus textarea when expanded
+  useEffect(() => {
+    if (isExpanded) {
+      const timer = setTimeout(() => textareaRef.current?.focus(), 80)
+      return () => clearTimeout(timer)
+    }
+  }, [isExpanded])
+
+  /* ── Error helpers ── */
+
   const showError = (message: string) => {
     setError(message)
     if (errorTimerRef.current) {
@@ -85,21 +229,44 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || !documentId || isLoading) {return}
+  /* ── Handlers ── */
 
+  const handleExpand = useCallback(() => {
+    if (!isExpanded) {
+      // Capture the current refine data before expanding — this prevents
+      // loss of selection state when the editor loses focus
+      capturedRefineDataRef.current = refineParagraphData || null
+      setIsExpanded(true)
+    }
+  }, [isExpanded, refineParagraphData])
+
+  const handleCollapse = useCallback(() => {
+    if (!isActive) {
+      setIsExpanded(false)
+      setInput('')
+      setShowMore(false)
+      capturedRefineDataRef.current = null
+      dismissError()
+    }
+  }, [isActive])
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!input.trim() || !documentId || isLoading) return
+
+    // If we have refine data, submit as a custom refine action
+    if (hasRefineData && onRefineAction && activeRefineData) {
+      const instruction = buildRefineInstruction('custom', input.trim(), activeRefineData)
+      onRefineAction('custom', instruction)
+      setInput('')
+      return
+    }
+
+    // Default: planning mode
     setIsLoading(true)
     dismissError()
     try {
-      if (hasSelection) {
-        // Surgical edit mode — for now, just pass as planning instruction
-        // In full integration, this would get the paragraph ID from the editor
-        onStartPlanning(input.trim())
-      } else {
-        // Planning mode
-        onStartPlanning(input.trim())
-      }
+      onStartPlanning(input.trim())
       setInput('')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
@@ -110,112 +277,340 @@ export function FloatingAIBar({ documentId, writerStage, onStartPlanning, _onSur
     }
   }
 
+  const handleRefineQuickAction = useCallback(
+    (action: RefineAction) => {
+      if (isActive || !onRefineAction || !activeRefineData) return
+      const instruction = buildRefineInstruction(action, '', activeRefineData)
+      onRefineAction(action, instruction)
+      setShowMore(false)
+    },
+    [isActive, onRefineAction, activeRefineData],
+  )
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      handleCollapse()
+    }
+  }
+
+  const handleCancel = async () => {
+    if (isCancelling) return
+    setIsCancelling(true)
+    try {
+      if (onAbortGeneration) {
+        await onAbortGeneration()
+      }
+    } catch (err) {
+      console.error('Abort failed:', err)
+    } finally {
+      setIsCancelling(false)
+      setIsLoading(false)
+    }
+  }
+
+  /* ── Placeholder ── */
+
   const getPlaceholder = () => {
-    if (hasSelection) {return 'How should AI change this selection?'}
-    if (writerStage === 'idle') {return 'Describe what you want to write...'}
+    if (hasRefineData) return 'Refine selected content with AI…'
+    if (writerStage === 'idle') return 'Describe what you want to write...'
     return 'Tell AI what else needs to be changed...'
   }
 
-  const placeholder = getPlaceholder()
+  /* ── Preview snippet ── */
+  const previewText = activeRefineData?.text
+    ? activeRefineData.text.length > 50
+      ? activeRefineData.text.slice(0, 50) + '…'
+      : activeRefineData.text
+    : ''
+
+  /* ── Render: Collapsed Pill ── */
+
+  if (!isExpanded) {
+    return (
+      <div
+        className="floating-ai-bar-wrapper"
+        data-testid="floating-ai-bar"
+      >
+        <button
+          onMouseDown={(e) => {
+            // Prevent editor blur so the text selection is preserved
+            e.preventDefault()
+          }}
+          onClick={handleExpand}
+          className={cn(
+            'floating-ai-pill',
+            hasRefineData && 'floating-ai-pill--selection',
+            isGenerating && 'floating-ai-pill--generating',
+          )}
+          aria-label="Open AI input"
+          data-testid="ai-pill-trigger"
+        >
+          {/* Sparkle icon */}
+          <span className="floating-ai-pill__icon">
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+          </span>
+
+          {/* Label */}
+          <span className="floating-ai-pill__label">
+            {isGenerating
+              ? `Generating${elapsed > 0 ? ` · ${elapsed}s` : '...'}`
+              : hasRefineData
+                ? 'Refine selected text'
+                : 'Ask AI to write'}
+          </span>
+
+          {/* Selection badge */}
+          {hasRefineData && !isGenerating && (
+            <span className="floating-ai-pill__badge">Selection</span>
+          )}
+
+          {/* Keyboard hint */}
+          <kbd className="floating-ai-pill__kbd">Ctrl+/</kbd>
+        </button>
+      </div>
+    )
+  }
+
+  /* ── Render: Expanded Bar ── */
 
   return (
-    <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-20 animate-slide-in-up" data-testid="floating-ai-bar">
-      <form
-        onSubmit={handleSubmit}
+    <div
+      ref={containerRef}
+      className="floating-ai-bar-wrapper"
+      data-testid="floating-ai-bar"
+      onMouseDown={(e) => {
+        // Prevent clicks in this bar from stealing editor focus/selection
+        // Exception: allow clicks on the textarea so users can type
+        if (!(e.target instanceof HTMLTextAreaElement)) {
+          e.preventDefault()
+        }
+      }}
+    >
+      <div
         className={cn(
-          'flex items-center gap-3 px-5 py-3 rounded-2xl shadow-lg border backdrop-blur-md transition-all duration-200 min-w-[560px] max-w-[700px]',
-          'bg-card/95 border-border/60',
-          'hover:shadow-xl hover:border-border',
-          'focus-within:shadow-xl focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-primary/20',
-          hasSelection && 'border-accent/40 focus-within:border-accent/60 focus-within:ring-accent/20',
-          error && 'border-red-500/40',
+          'floating-ai-expanded',
+          error && 'floating-ai-expanded--error',
+          isActive && 'floating-ai-expanded--active',
+          hasRefineData && 'floating-ai-expanded--selection',
         )}
       >
-        {/* Icon */}
-        <div
-          className={cn(
-            'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors',
-            error ? 'bg-red-500/15 text-red-400' :
-            hasSelection ? 'bg-accent/15 text-accent' : 'bg-primary/10 text-primary',
-          )}
-        >
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> :
-           error ? <AlertCircle className="h-4 w-4" /> :
-           <Sparkles className="h-4 w-4" />}
-        </div>
+        {/* ── Refine actions row (only when paragraph is selected) ── */}
+        {hasRefineData && !isActive && (
+          <div className="refine-bar__actions">
+            {/* Selection preview */}
+            <div className="refine-bar__preview" title={activeRefineData?.text}>
+              <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="refine-bar__preview-text">{previewText}</span>
+            </div>
 
-        {/* Input */}
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder={placeholder}
-          disabled={isLoading || !documentId}
-          className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-50"
-          aria-label="AI instruction input"
-          data-testid="ai-input"
-        />
+            <div className="refine-bar__action-buttons">
+              {/* Add New Paragraph */}
+              <button
+                className="refine-bar__action-btn"
+                onClick={() => handleRefineQuickAction('add-paragraph')}
+                disabled={isActive}
+                data-testid="refine-add-paragraph"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Add Paragraph
+              </button>
 
-        {/* Loading elapsed indicator */}
-        {isLoading && elapsed > 3 && (
-          <span className="text-[10px] font-mono text-muted-foreground/60 flex-shrink-0 tabular-nums">
-            {elapsed}s
-          </span>
-        )}
+              {/* Rephrase */}
+              <button
+                className="refine-bar__action-btn refine-bar__action-btn--primary"
+                onClick={() => handleRefineQuickAction('rephrase')}
+                disabled={isActive}
+                data-testid="refine-rephrase"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Rephrase
+              </button>
 
-        {/* Mode badge */}
-        {hasSelection && !isLoading && (
-          <span className="text-[10px] font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-full flex-shrink-0">
-            Edit Selection
-          </span>
-        )}
+              {/* More dropdown */}
+              <div className="refine-bar__more-wrapper" ref={moreMenuRef}>
+                <button
+                  ref={moreBtnRef}
+                  className="refine-bar__action-btn"
+                  onClick={() => setShowMore(!showMore)}
+                  disabled={isActive}
+                  data-testid="refine-more"
+                >
+                  More
+                  <ChevronDown className={cn('h-3 w-3 transition-transform', showMore && 'rotate-180')} />
+                </button>
 
-        {/* Submit */}
-        <Button
-          type="submit"
-          size="icon"
-          disabled={!input.trim() || isLoading || !documentId}
-          className={cn(
-            'h-8 w-8 rounded-full flex-shrink-0 transition-all',
-            input.trim()
-              ? 'bg-foreground text-background hover:bg-foreground/90 scale-100'
-              : 'bg-muted text-muted-foreground scale-95',
-          )}
-          data-testid="ai-submit"
-        >
-          <ArrowUp className="h-4 w-4" />
-        </Button>
-      </form>
-
-      {/* Error toast */}
-      {error && (
-        <div className="mt-2 mx-auto max-w-[600px] flex items-start gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 backdrop-blur-md animate-slide-in-up">
-          <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-red-300 leading-relaxed">{error}</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-              Check your provider settings or try again.
-            </p>
+                {showMore && moreBtnRef.current && ReactDOM.createPortal(
+                  <div
+                    className="refine-bar__more-menu"
+                    data-testid="refine-more-menu"
+                    ref={moreMenuRef}
+                    style={{
+                      position: 'fixed',
+                      bottom: `${window.innerHeight - moreBtnRef.current.getBoundingClientRect().top + 6}px`,
+                      right: `${window.innerWidth - moreBtnRef.current.getBoundingClientRect().right}px`,
+                    }}
+                  >
+                    {MORE_ACTIONS.map((action) => (
+                      <button
+                        key={action.id}
+                        className="refine-bar__more-item"
+                        onClick={() => handleRefineQuickAction(action.id)}
+                      >
+                        <action.icon className="h-4 w-4 flex-shrink-0" />
+                        <div className="refine-bar__more-item-content">
+                          <span className="refine-bar__more-item-label">{action.label}</span>
+                          <span className="refine-bar__more-item-desc">{action.description}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>,
+                  document.body,
+                )}
+              </div>
+            </div>
           </div>
-          <button
-            onClick={dismissError}
-            className="flex-shrink-0 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-            aria-label="Dismiss error"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Keyboard hint */}
-      {!error && (
-        <div className="text-center mt-1.5">
-          <span className="text-[10px] text-muted-foreground/40">
-            <kbd className="font-mono">Ctrl+/</kbd> to focus
-          </span>
+        {/* ── Input area ── */}
+        <form
+          onSubmit={handleSubmit}
+          className="floating-ai-expanded__form"
+        >
+          {/* Left icon */}
+          <div
+            className={cn(
+              'floating-ai-expanded__icon-ring',
+              error
+                ? 'floating-ai-expanded__icon-ring--error'
+                : hasRefineData
+                  ? 'floating-ai-expanded__icon-ring--selection'
+                  : 'floating-ai-expanded__icon-ring--default',
+            )}
+          >
+            {isActive ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : error ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+          </div>
+
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={getPlaceholder()}
+            disabled={isActive || !documentId}
+            rows={1}
+            className="floating-ai-expanded__textarea"
+            aria-label="AI instruction input"
+            data-testid="ai-input"
+          />
+
+          {/* Right action cluster */}
+          <div className="floating-ai-expanded__actions">
+            {/* Elapsed timer */}
+            {isActive && elapsed > 2 && (
+              <span className="floating-ai-expanded__elapsed">
+                {elapsed}s
+              </span>
+            )}
+
+            {/* Mode badge */}
+            {hasRefineData && !isActive && (
+              <span className="floating-ai-expanded__mode-badge">
+                Refine
+              </span>
+            )}
+
+            {/* Cancel button (visible during generation) */}
+            {isActive && (
+              <Button
+                type="button"
+                size="icon"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className={cn(
+                  'floating-ai-expanded__cancel-btn',
+                  isCancelling && 'opacity-50',
+                )}
+                title="Cancel AI request"
+                aria-label="Cancel AI request"
+                data-testid="ai-cancel"
+              >
+                <Square className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
+            {/* Submit button */}
+            {!isActive && (
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!input.trim() || !documentId}
+                className={cn(
+                  'floating-ai-expanded__submit-btn',
+                  input.trim()
+                    ? 'floating-ai-expanded__submit-btn--ready'
+                    : 'floating-ai-expanded__submit-btn--idle',
+                )}
+                data-testid="ai-submit"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </form>
+
+        {/* ── Bottom row: hints + collapse ── */}
+        <div className="floating-ai-expanded__footer">
+          <div className="floating-ai-expanded__hints">
+            {error ? (
+              <div className="floating-ai-expanded__error-row">
+                <AlertCircle className="h-3 w-3 text-red-400 flex-shrink-0" />
+                <span className="floating-ai-expanded__error-text">{error}</span>
+                <button
+                  onClick={dismissError}
+                  className="floating-ai-expanded__error-dismiss"
+                  aria-label="Dismiss error"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="floating-ai-expanded__hint">
+                  <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> new line · <kbd>Esc</kbd> close
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Collapse chevron */}
+          {!isActive && (
+            <button
+              onClick={handleCollapse}
+              className="floating-ai-expanded__collapse"
+              aria-label="Collapse AI bar"
+              data-testid="ai-collapse"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

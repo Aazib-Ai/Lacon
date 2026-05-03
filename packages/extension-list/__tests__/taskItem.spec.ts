@@ -663,4 +663,246 @@ describe('TaskItem', () => {
     expect(from).toBe(1)
     expect(to).toBe(14)
   })
+
+  // ──────────────────────────────────────────────────────────
+  // Cross-type list conversion tests
+  // ──────────────────────────────────────────────────────────
+
+  it('converts a bullet list to a task list', () => {
+    editor = new Editor({
+      extensions: [Document, Paragraph, Text, ListItem, BulletList, OrderedList, TaskList, TaskItem.configure({ nested: true })],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Item 1' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    // Place cursor inside the list item
+    editor.commands.setTextSelection(4)
+    editor.commands.toggleTaskList()
+
+    const json = editor.getJSON()
+
+    expect(json.content![0].type).toBe('taskList')
+    expect(json.content![0].content![0].type).toBe('taskItem')
+  })
+
+  it('converts a task list to a bullet list', () => {
+    editor = new Editor({
+      extensions: [Document, Paragraph, Text, ListItem, BulletList, OrderedList, TaskList, TaskItem.configure({ nested: true })],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Task 1' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    editor.commands.setTextSelection(4)
+    editor.commands.toggleBulletList()
+
+    const json = editor.getJSON()
+
+    expect(json.content![0].type).toBe('bulletList')
+    expect(json.content![0].content![0].type).toBe('listItem')
+  })
+
+  it('converts a task list to an ordered list', () => {
+    editor = new Editor({
+      extensions: [Document, Paragraph, Text, ListItem, BulletList, OrderedList, TaskList, TaskItem.configure({ nested: true })],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Task 1' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    editor.commands.setTextSelection(4)
+    editor.commands.toggleOrderedList()
+
+    const json = editor.getJSON()
+
+    expect(json.content![0].type).toBe('orderedList')
+    expect(json.content![0].content![0].type).toBe('listItem')
+  })
+
+  it('converts an ordered list to a task list', () => {
+    editor = new Editor({
+      extensions: [Document, Paragraph, Text, ListItem, BulletList, OrderedList, TaskList, TaskItem.configure({ nested: true })],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'orderedList',
+            attrs: { start: 1, type: null },
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Item 1' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    editor.commands.setTextSelection(4)
+    editor.commands.toggleTaskList()
+
+    const json = editor.getJSON()
+
+    expect(json.content![0].type).toBe('taskList')
+    expect(json.content![0].content![0].type).toBe('taskItem')
+  })
+
+  it('toggles off a task list when clicking task list again', () => {
+    editor = new Editor({
+      extensions: [Document, Paragraph, Text, ListItem, BulletList, OrderedList, TaskList, TaskItem.configure({ nested: true })],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Task 1' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    editor.commands.setTextSelection(4)
+    editor.commands.toggleTaskList()
+
+    const json = editor.getJSON()
+
+    expect(json.content![0].type).toBe('paragraph')
+    expect(json.content![0].content![0].text).toBe('Task 1')
+  })
+
+  it('converts a bullet list with multiple items to a task list', () => {
+    editor = new Editor({
+      extensions: [Document, Paragraph, Text, ListItem, BulletList, OrderedList, TaskList, TaskItem.configure({ nested: true })],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Item A' }] },
+                ],
+              },
+              {
+                type: 'listItem',
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Item B' }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    editor.commands.setTextSelection(4)
+    editor.commands.toggleTaskList()
+
+    const json = editor.getJSON()
+
+    expect(json.content![0].type).toBe('taskList')
+    // All items should be converted
+    expect(json.content![0].content!.length).toBeGreaterThanOrEqual(1)
+    expect(json.content![0].content![0].type).toBe('taskItem')
+  })
+
+  it('converts a bullet list to a task list with whole document selected', () => {
+    editor = new Editor({
+      extensions: [Document, Paragraph, Text, ListItem, BulletList, OrderedList, TaskList, TaskItem.configure({ nested: true })],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Item 1' }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    editor.commands.selectAll()
+    editor.commands.toggleTaskList()
+
+    const json = editor.getJSON()
+
+    expect(json.content![0].type).toBe('taskList')
+    expect(json.content![0].content![0].type).toBe('taskItem')
+  })
 })

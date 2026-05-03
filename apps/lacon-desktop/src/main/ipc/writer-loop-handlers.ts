@@ -354,6 +354,10 @@ export function registerWriterLoopHandlers(): void {
         // Extract paragraphs from document content
         const paragraphs = extractParagraphs(payload.documentContent)
 
+        // Gather generation results for AI context
+        const progress = loop.getProgress()
+        const generationResults = progress.results || []
+
         // Create pre-review snapshot
         loop.createSnapshot('before-review', payload.documentContent)
 
@@ -364,7 +368,7 @@ export function registerWriterLoopHandlers(): void {
         }
 
         const contentText = paragraphs.map(p => p.text).join('\n\n')
-        const result = reviewer.runReview(contentText, outline, paragraphs)
+        const result = await reviewer.runReview(contentText, outline, paragraphs, generationResults)
         return { success: true, data: result }
       })
     },
@@ -382,12 +386,28 @@ export function registerWriterLoopHandlers(): void {
     })
   })
 
+  // ── writerLoop:loadReview ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_LOAD_REVIEW,
+    async (_event, payload: { documentId: string }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_LOAD_REVIEW, payload, async () => {
+        const reviewer = getReviewer(payload.documentId)
+        const result = reviewer.loadLatestReview()
+        return {
+          success: true,
+          data: { result, passCount: reviewer.getPassCount(), canAutoPass: reviewer.canAutoPass() },
+        }
+      })
+    },
+  )
+
   // ── writerLoop:acceptReviewFlag ──
   ipcMain.handle(
     IPC_CHANNELS.WRITER_LOOP_ACCEPT_REVIEW_FLAG,
     async (_event, payload: { documentId: string; flagId: string }) => {
       return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_ACCEPT_REVIEW_FLAG, payload, async () => {
-        // Flag acceptance is tracked by the UI; here we just acknowledge
+        const reviewer = getReviewer(payload.documentId)
+        reviewer.setFlagStatus(payload.flagId, 'accepted')
         return { success: true, data: { flagId: payload.flagId, accepted: true } }
       })
     },
@@ -398,6 +418,8 @@ export function registerWriterLoopHandlers(): void {
     IPC_CHANNELS.WRITER_LOOP_REJECT_REVIEW_FLAG,
     async (_event, payload: { documentId: string; flagId: string }) => {
       return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_REJECT_REVIEW_FLAG, payload, async () => {
+        const reviewer = getReviewer(payload.documentId)
+        reviewer.setFlagStatus(payload.flagId, 'rejected')
         return { success: true, data: { flagId: payload.flagId, accepted: false } }
       })
     },
@@ -408,18 +430,66 @@ export function registerWriterLoopHandlers(): void {
     IPC_CHANNELS.WRITER_LOOP_SURGICAL_EDIT,
     async (
       _event,
-      payload: { documentId: string; paragraphId: string; instruction: string; fullDocumentContent: any },
+      payload: { documentId: string; paragraphId: string; instruction: string; fullDocumentContent: any; originalText?: string },
     ) => {
       return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_SURGICAL_EDIT, payload, async () => {
         const reviewer = getReviewer(payload.documentId)
         const paragraphs = extractParagraphs(payload.fullDocumentContent)
-        const target = paragraphs.find(p => p.id === payload.paragraphId)
-        if (!target) {
-          throw new Error(`Paragraph not found: ${payload.paragraphId}`)
+
+        // 1. Try exact ID match
+        let target = paragraphs.find(p => p.id === payload.paragraphId)
+
+        // 2. Fallback: match by original text content (handles LLM-generated IDs like "section-1")
+        if (!target && payload.originalText) {
+          const needle = payload.originalText.slice(0, 100).toLowerCase()
+          target = paragraphs.find(p => p.text.toLowerCase().includes(needle))
         }
 
-        const result = reviewer.surgicalEdit(
-          payload.paragraphId,
+        // 3. Fallback: match paragraphId pattern "section-N" to Nth heading
+        if (!target) {
+          const sectionMatch = payload.paragraphId.match(/^section-(\d+)$/)
+          if (sectionMatch) {
+            const sectionIdx = parseInt(sectionMatch[1], 10) - 1
+            const headings = paragraphs.filter(p => p.id.startsWith('auto-') || true)
+            if (sectionIdx >= 0 && sectionIdx < headings.length) {
+              // Find the Nth heading node (type=heading)
+              const headingNodes: typeof paragraphs = []
+              if (payload.fullDocumentContent?.content) {
+                let autoIdx = 0
+                for (const node of payload.fullDocumentContent.content) {
+                  if (node.type === 'heading') {
+                    const id = node.attrs?.paragraphId || `auto-${autoIdx}`
+                    headingNodes.push({ id, text: extractNodeText(node) })
+                  }
+                  if (node.type === 'paragraph' || node.type === 'heading') {
+                    autoIdx++
+                  }
+                }
+              }
+              if (sectionIdx < headingNodes.length) {
+                target = headingNodes[sectionIdx]
+              }
+            }
+          }
+        }
+
+        // 4. Last resort: use the first paragraph or the whole document
+        if (!target) {
+          // Just pass the instruction to the LLM with a generic paragraph
+          const allText = paragraphs.map(p => p.text).join('\n\n')
+          const originalText = payload.originalText || allText.slice(0, 500)
+          console.warn(`[Reviewer] Could not find paragraph "${payload.paragraphId}", using text match fallback`)
+          const result = await reviewer.surgicalEdit(
+            payload.paragraphId,
+            originalText,
+            payload.instruction,
+            payload.fullDocumentContent,
+          )
+          return { success: true, data: result }
+        }
+
+        const result = await reviewer.surgicalEdit(
+          target.id,
           target.text,
           payload.instruction,
           payload.fullDocumentContent,
@@ -445,7 +515,7 @@ export function registerWriterLoopHandlers(): void {
             ? payload.documentContent
             : JSON.stringify(payload.documentContent)
 
-        const result = reviewer.rewriteAll(contentText, payload.instruction)
+        const result = await reviewer.rewriteAll(contentText, payload.instruction)
         return { success: true, data: result }
       })
     },
