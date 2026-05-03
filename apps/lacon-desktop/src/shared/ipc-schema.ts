@@ -210,6 +210,7 @@ export const IPC_CHANNELS = {
   RESEARCH_SET_MODE: 'research:setMode',
   RESEARCH_IMPORT_FILE: 'research:importFile',
   RESEARCH_FACT_CHECK: 'research:factCheck',
+  RESEARCH_WEB_SEARCH: 'research:webSearch',
 
   // Writer Harness: Citation operations (Phase 5)
   CITATION_FORMAT: 'citation:format',

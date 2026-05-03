@@ -11,8 +11,8 @@
  */
 
 import { randomUUID } from 'crypto'
-import { readFileSync, writeFileSync } from 'fs'
-import { basename } from 'path'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { basename, join } from 'path'
 
 import type {
   CitationStyle,
@@ -26,7 +26,7 @@ import { getActiveProjectPath, getProjectWorkspaceService } from './project-work
 /** Resolve project path or throw if no project is open */
 function requireProjectPath(): string {
   const p = getActiveProjectPath()
-  if (!p) throw new Error('No project is open')
+  if (!p) {throw new Error('No project is open')}
   return p
 }
 
@@ -216,6 +216,41 @@ export class ResearchLogService {
     return this.addEntry(documentId, `Imported from ${fileName}`, [source], excerpts, [], [fileType, 'import'])
   }
 
+  /**
+   * Get research entries from ALL documents in the project.
+   * Used for cross-file research sharing and coverage evaluation.
+   */
+  getProjectResearch(projectPath: string): { documentId: string; entries: ResearchLogEntry[] }[] {
+    const docsDir = join(projectPath, '.lacon', 'documents')
+    if (!existsSync(docsDir)) {return []}
+
+    const results: { documentId: string; entries: ResearchLogEntry[] }[] = []
+
+    try {
+      const docFolders = readdirSync(docsDir, { withFileTypes: true }).filter(d => d.isDirectory())
+
+      for (const folder of docFolders) {
+        const researchPath = join(docsDir, folder.name, 'research.json')
+        if (existsSync(researchPath)) {
+          try {
+            const raw = readFileSync(researchPath, 'utf-8')
+            const log = JSON.parse(raw) as ResearchLog
+            results.push({
+              documentId: folder.name,
+              entries: (log.entries || []).map((e: any) => this.migrateEntry(e)),
+            })
+          } catch {
+            // Skip corrupted research files
+          }
+        }
+      }
+    } catch {
+      // Skip if docs directory is unreadable
+    }
+
+    return results
+  }
+
   // ── Helpers ──
 
   /**
@@ -241,7 +276,9 @@ export class ResearchLogService {
    * Build a summary string from all research entries.
    */
   private buildSummary(entries: ResearchLogEntry[]): string {
-    if (entries.length === 0) {return ''}
+    if (entries.length === 0) {
+      return ''
+    }
     return entries.map(e => `• ${e.query}${e.sources.length > 0 ? ` (${e.sources.length} sources)` : ''}`).join('\n')
   }
 

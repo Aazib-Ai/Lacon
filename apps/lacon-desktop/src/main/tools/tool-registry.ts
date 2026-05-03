@@ -6,6 +6,8 @@
 import type { ToolContract } from '../../shared/agent-types'
 import type { ToolRegistryEntry } from '../../shared/tool-types'
 import { getProviderManager } from '../providers/provider-manager'
+import { getContentExtractorService } from '../services/content-extractor'
+import { getWebSearchService } from '../services/web-search-service'
 import {
   createExpandTool,
   createPolishTool,
@@ -191,26 +193,17 @@ export class ToolRegistry {
   }
 
   /**
-   * Helper: Execute web search (mock implementation)
+   * Helper: Execute web search via WebSearchService
    */
   private async executeWebSearch(query: string): Promise<any[]> {
-    // Mock implementation - in production, integrate with web search API
-    return [
-      {
-        id: '1',
-        url: 'https://example.com/article1',
-        title: 'Example Article 1',
-        snippet: `This is a relevant article about ${query}`,
-        relevanceScore: 0.9,
-      },
-      {
-        id: '2',
-        url: 'https://example.com/article2',
-        title: 'Example Article 2',
-        snippet: `Another relevant article discussing ${query}`,
-        relevanceScore: 0.8,
-      },
-    ]
+    const results = await getWebSearchService().searchAll(query)
+    return results.map((r, i) => ({
+      id: String(i + 1),
+      url: r.url,
+      title: r.title,
+      snippet: r.snippet,
+      relevanceScore: r.relevanceScore,
+    }))
   }
 
   /**
@@ -226,7 +219,24 @@ export class ToolRegistry {
 
     const provider = providers[0]
 
-    const sourcesText = sources.map(s => `${s.title}\n${s.snippet}\nURL: ${s.url}`).join('\n\n')
+    const sourcesText = await Promise.all(
+      sources.slice(0, 3).map(async (s: any) => {
+        // Try extracting full article text for richer summaries
+        let content = s.snippet || ''
+        try {
+          if (s.url) {
+            const article = await getContentExtractorService().extractArticle(s.url)
+            if (article) {
+              content = article.textContent.slice(0, 2000)
+            }
+          }
+        } catch {
+          /* use snippet */
+        }
+        return `${s.title}\n${content}\nURL: ${s.url}`
+      }),
+    )
+    const sourcesBlock = sourcesText.join('\n\n')
 
     const response = await providerManager.chatCompletion(
       provider.id,
@@ -239,7 +249,7 @@ export class ToolRegistry {
           },
           {
             role: 'user',
-            content: `Query: ${query}\n\nSources:\n${sourcesText}`,
+            content: `Query: ${query}\n\nSources:\n${sourcesBlock}`,
           },
         ],
         temperature: 0.5,

@@ -1,15 +1,26 @@
 /**
- * ResearchWorkbench — Research Timeline UI
+ * ResearchWorkbench — Research Timeline UI with Web Search
  *
- * Research timeline outside the writer loop.
- * Features: entry timeline, mode selector, citation style, file import, fact-check.
+ * Features:
+ * - Web search (quick preview + deep research)
+ * - URL auto-detection and direct import
+ * - Entry timeline with source/excerpt display
+ * - Mode selector, citation style, fact-check
+ * - File import (txt, pdf, docx, pptx)
+ * - Section linking for research entries
  */
 
 import React, { useState } from 'react'
 
-import type { CitationStyle, FactCheckResult, ResearchLogEntry, ResearchMode } from '../../../shared/writer-types'
-import { cn } from '../../lib/utils'
+import type {
+  CitationStyle,
+  FactCheckResult,
+  ResearchLogEntry,
+  ResearchMode,
+  WebSearchResult,
+} from '../../../shared/writer-types'
 import { useResearch } from '../../hooks/useResearch'
+import { cn } from '../../lib/utils'
 
 interface ResearchWorkbenchProps {
   documentId: string
@@ -31,9 +42,25 @@ const STYLE_LABELS: Record<CitationStyle, string> = {
 }
 const SOURCE_ICONS: Record<string, string> = { web: '🌐', file: '📄', manual: '✏️' }
 
+function getTagStyle(t: string): string {
+  if (t === 'web-search') {return 'bg-blue-500/10 text-blue-400'}
+  if (t === 'summarized') {return 'bg-green-500/10 text-green-400'}
+  if (t === 'import' || t === 'pdf' || t === 'docx') {return 'bg-amber-500/10 text-amber-400'}
+  if (t === 'url-import') {return 'bg-purple-500/10 text-purple-400'}
+  return 'bg-muted text-muted-foreground'
+}
+
+function getModeStyle(mode: string): string {
+  if (mode === 'auto') {return 'bg-primary/10 text-primary'}
+  if (mode === 'supervised') {return 'bg-warning/10 text-warning'}
+  return 'bg-muted text-muted-foreground'
+}
+
 function getEntryIcon(entry: ResearchLogEntry): string {
   const src = entry.sources[0]
-  if (!src) {return '✏️'}
+  if (!src) {
+    return '✏️'
+  }
   return SOURCE_ICONS[src.type] || '📋'
 }
 
@@ -42,8 +69,11 @@ function getEntryIcon(entry: ResearchLogEntry): string {
 const FactCheckPanel: React.FC<{ result: FactCheckResult }> = ({ result }) => {
   const pct = Math.round(result.confidence * 100)
   let level: 'high' | 'medium' | 'low' = 'low'
-  if (pct >= 70) {level = 'high'}
-  else if (pct >= 40) {level = 'medium'}
+  if (pct >= 70) {
+    level = 'high'
+  } else if (pct >= 40) {
+    level = 'medium'
+  }
 
   const levelStyles = {
     high: 'border-success/20 bg-success/5',
@@ -78,13 +108,41 @@ const FactCheckPanel: React.FC<{ result: FactCheckResult }> = ({ result }) => {
   )
 }
 
+/** Quick search result card */
+const SearchResultCard: React.FC<{
+  result: WebSearchResult
+  onAdd: () => void
+  adding?: boolean
+}> = ({ result, onAdd, adding }) => (
+  <div className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-border bg-card hover:border-primary/30 transition-colors">
+    <span className="text-base mt-0.5">{result.source === 'wikipedia' ? '📚' : '🌐'}</span>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium text-foreground truncate m-0">{result.title}</p>
+      <p className="text-xs text-muted-foreground line-clamp-2 m-0 mt-0.5">{result.snippet}</p>
+      <span className="text-[0.6rem] text-muted-foreground/60 break-all">{result.url?.slice(0, 60)}</span>
+    </div>
+    <button
+      onClick={onAdd}
+      disabled={adding}
+      className="px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0 disabled:opacity-40"
+    >
+      {adding ? '...' : '+ Add'}
+    </button>
+  </div>
+)
+
+/** Research entry card */
 const EntryCard: React.FC<{
   entry: ResearchLogEntry
   expanded: boolean
   onToggle: () => void
   onDelete: () => void
-}> = ({ entry, expanded, onToggle, onDelete }) => {
+  sections?: Array<{ id: string; title: string }>
+  onLinkSection?: (sectionId: string) => void
+}> = ({ entry, expanded, onToggle, onDelete, sections, onLinkSection }) => {
   const icon = getEntryIcon(entry)
+  const hasSummary = entry.tags.includes('summarized')
+
   return (
     <div className={cn('rounded-lg border border-border bg-card transition-all', expanded && 'ring-1 ring-primary/20')}>
       <div
@@ -96,20 +154,18 @@ const EntryCard: React.FC<{
           <span className="text-sm font-medium text-foreground block truncate">{entry.query}</span>
           <span className="text-xs text-muted-foreground">
             {new Date(entry.createdAt).toLocaleDateString()} · {entry.sources.length} src
+            {entry.excerpts.length > 0 && ` · ${entry.excerpts.length} excerpts`}
           </span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           {entry.tags.map(t => (
-            <span key={t} className="text-[0.65rem] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+            <span key={t} className={cn('text-[0.65rem] px-1.5 py-0.5 rounded font-medium', getTagStyle(t))}>
               {t}
             </span>
           ))}
-          <span className={cn(
-            'text-[0.65rem] px-1.5 py-0.5 rounded font-semibold uppercase',
-            entry.mode === 'auto' ? 'bg-primary/10 text-primary' :
-            entry.mode === 'supervised' ? 'bg-warning/10 text-warning' :
-            'bg-muted text-muted-foreground'
-          )}>
+          <span
+            className={cn('text-[0.65rem] px-1.5 py-0.5 rounded font-semibold uppercase', getModeStyle(entry.mode))}
+          >
             {entry.mode}
           </span>
         </div>
@@ -119,39 +175,105 @@ const EntryCard: React.FC<{
       </div>
       {expanded && (
         <div className="px-4 pb-4 border-t border-border pt-3 animate-in fade-in duration-200">
+          {/* Sources with clickable URLs */}
           {entry.sources.length > 0 && (
             <div className="mb-3">
-              <h5 className="text-xs font-semibold text-muted-foreground mb-1 mt-0">Sources</h5>
+              <h5 className="text-xs font-semibold text-muted-foreground mb-1.5 mt-0">Sources</h5>
               {entry.sources.map((s, i) => (
-                <div key={i} className="text-sm text-foreground">
-                  <span>{SOURCE_ICONS[s.type] || '📋'}</span> {s.title}
+                <div key={i} className="text-sm text-foreground mb-1">
+                  <span>{SOURCE_ICONS[s.type] || '📋'}</span> <span className="font-medium">{s.title}</span>
+                  {s.url && (
+                    <a
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary/70 hover:text-primary ml-2 break-all"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      ↗ {s.url.slice(0, 50)}
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
           )}
+
+          {/* Excerpts — LLM summary first if available */}
           {entry.excerpts.length > 0 && (
             <div className="mb-3">
-              <h5 className="text-xs font-semibold text-muted-foreground mb-1 mt-0">Excerpts</h5>
+              <h5 className="text-xs font-semibold text-muted-foreground mb-1.5 mt-0">
+                {hasSummary ? 'AI Summary & Excerpts' : 'Excerpts'}
+              </h5>
               {entry.excerpts.map((e, i) => (
-                <blockquote key={i} className="text-sm text-muted-foreground border-l-2 border-primary/30 pl-3 my-1 italic">
-                  {e.slice(0, 300)}
+                <blockquote
+                  key={i}
+                  className={cn(
+                    'text-sm border-l-2 pl-3 my-1.5',
+                    i === 0 && hasSummary
+                      ? 'text-foreground border-primary/40 bg-primary/5 rounded-r-md py-2 pr-2'
+                      : 'text-muted-foreground border-primary/20 italic',
+                  )}
+                >
+                  {i === 0 && hasSummary && (
+                    <span className="text-[0.65rem] font-semibold text-primary block mb-1">🤖 AI Summary</span>
+                  )}
+                  {e.slice(0, 400)}
+                  {e.length > 400 ? '...' : ''}
                 </blockquote>
               ))}
             </div>
           )}
+
+          {/* Linked sections */}
+          {entry.linkedSectionIds.length > 0 && (
+            <div className="mb-3">
+              <h5 className="text-xs font-semibold text-muted-foreground mb-1 mt-0">Linked Sections</h5>
+              <div className="flex flex-wrap gap-1">
+                {entry.linkedSectionIds.map(sid => (
+                  <span
+                    key={sid}
+                    className="text-[0.65rem] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium"
+                  >
+                    📎 {sections?.find(s => s.id === sid)?.title || sid}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {entry.citationFormatted && (
             <div className="mb-3">
               <h5 className="text-xs font-semibold text-muted-foreground mb-1 mt-0">Citation</h5>
-              <code className="text-xs bg-muted px-2 py-1 rounded block text-foreground">{entry.citationFormatted}</code>
+              <code className="text-xs bg-muted px-2 py-1 rounded block text-foreground">
+                {entry.citationFormatted}
+              </code>
             </div>
           )}
-          <div className="flex gap-2">
+
+          {/* Actions */}
+          <div className="flex gap-2 flex-wrap">
             <button
               className="px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors"
               onClick={onDelete}
             >
               🗑 Delete
             </button>
+            {sections && sections.length > 0 && onLinkSection && (
+              <select
+                className="px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:border-primary"
+                value=""
+                onChange={e => {
+                  if (e.target.value) {onLinkSection(e.target.value)}
+                }}
+              >
+                <option value="">🔗 Link to section...</option>
+                {sections.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
       )}
@@ -167,27 +289,75 @@ export const ResearchWorkbench: React.FC<ResearchWorkbenchProps> = ({ documentId
     mode,
     citationStyle,
     factCheckResult,
+    searchResults,
+    searching,
+    deepResearching,
     loading,
     error,
     addEntry,
     deleteEntry,
+    updateEntry,
     setMode,
     setCitationStyle,
     importFile,
     factCheck,
+    webSearch,
+    deepResearch,
+    clearSearch,
   } = useResearch(documentId)
-  const [newQuery, setNewQuery] = useState('')
-  const [showAddForm, setShowAddForm] = useState(false)
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearchPanel, setShowSearchPanel] = useState(false)
+  const [showNoteForm, setShowNoteForm] = useState(false)
+  const [noteText, setNoteText] = useState('')
   const [selectedSection, setSelectedSection] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [addingResultUrl, setAddingResultUrl] = useState<string | null>(null)
 
-  const handleAdd = async () => {
-    if (!newQuery.trim()) {return}
-    await addEntry(newQuery.trim())
-    setNewQuery('')
-    setShowAddForm(false)
+  // Search handler — detects URLs vs queries
+  const handleSearch = async () => {
+    const q = searchQuery.trim()
+    if (!q) {return}
+
+    // URL detection → deep research directly
+    if (/^https?:\/\//.test(q)) {
+      await deepResearch(q)
+      setSearchQuery('')
+      return
+    }
+
+    await webSearch(q)
   }
 
+  // Deep research handler
+  const handleDeepResearch = async () => {
+    if (!searchQuery.trim()) {return}
+    await deepResearch(searchQuery.trim())
+    setSearchQuery('')
+  }
+
+  // Add a single search result as a research entry
+  const handleAddResult = async (result: WebSearchResult) => {
+    setAddingResultUrl(result.url)
+    await addEntry(
+      result.title,
+      [{ url: result.url, title: result.title, type: 'web' }],
+      [result.snippet],
+      [],
+      [result.source],
+    )
+    setAddingResultUrl(null)
+  }
+
+  // Manual note handler
+  const handleAddNote = async () => {
+    if (!noteText.trim()) {return}
+    await addEntry(noteText.trim())
+    setNoteText('')
+    setShowNoteForm(false)
+  }
+
+  // File import handler
   const handleImport = async () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -213,18 +383,47 @@ export const ResearchWorkbench: React.FC<ResearchWorkbenchProps> = ({ documentId
     if (s) {await factCheck(s.id, s.content)}
   }
 
+  // Link a research entry to an outline section
+  const handleLinkSection = async (entryId: string, sectionId: string) => {
+    const entry = entries.find(e => e.id === entryId)
+    if (!entry) {return}
+    const currentLinked = entry.linkedSectionIds || []
+    if (currentLinked.includes(sectionId)) {return}
+    await updateEntry(entryId, { linkedSectionIds: [...currentLinked, sectionId] })
+  }
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 m-0">
-          🔬 Research Workbench <span className="text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{entries.length}</span>
+          🔬 Research Workbench
+          <span className="text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+            {entries.length}
+          </span>
         </h3>
         <div className="flex gap-2">
           <button
-            className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-            onClick={() => setShowAddForm(!showAddForm)}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+              showSearchPanel ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary hover:bg-primary/20',
+            )}
+            onClick={() => {
+              setShowSearchPanel(!showSearchPanel)
+              setShowNoteForm(false)
+              clearSearch()
+            }}
           >
-            + Add
+            🔍 Search
+          </button>
+          <button
+            className="px-3 py-1.5 text-xs font-medium rounded-md bg-secondary text-secondary-foreground border border-border hover:bg-muted transition-colors"
+            onClick={() => {
+              setShowNoteForm(!showNoteForm)
+              setShowSearchPanel(false)
+            }}
+          >
+            ✏️ Note
           </button>
           <button
             className="px-3 py-1.5 text-xs font-medium rounded-md bg-secondary text-secondary-foreground border border-border hover:bg-muted transition-colors"
@@ -235,6 +434,7 @@ export const ResearchWorkbench: React.FC<ResearchWorkbenchProps> = ({ documentId
         </div>
       </div>
 
+      {/* Mode & Citation bar */}
       <div className="flex items-center gap-4 px-4 py-2.5 border-b border-border flex-wrap">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-muted-foreground">Mode</label>
@@ -244,7 +444,7 @@ export const ResearchWorkbench: React.FC<ResearchWorkbenchProps> = ({ documentId
                 key={m}
                 className={cn(
                   'px-2.5 py-1 text-xs font-medium transition-colors',
-                  mode === m ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
+                  mode === m ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted',
                 )}
                 onClick={() => setMode(m)}
                 title={MODE_LABELS[m].desc}
@@ -279,7 +479,9 @@ export const ResearchWorkbench: React.FC<ResearchWorkbenchProps> = ({ documentId
               >
                 <option value="">Select section...</option>
                 {sections.map(s => (
-                  <option key={s.id} value={s.id}>{s.title}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
                 ))}
               </select>
               <button
@@ -294,45 +496,134 @@ export const ResearchWorkbench: React.FC<ResearchWorkbenchProps> = ({ documentId
         )}
       </div>
 
+      {/* Error */}
       {error && (
         <div className="mx-4 mt-3 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-xs border border-destructive/20">
           {error}
         </div>
       )}
 
-      {showAddForm && (
+      {/* Search Panel */}
+      {showSearchPanel && (
+        <div className="px-4 py-3 border-b border-border bg-muted/30">
+          <div className="flex gap-2 mb-3">
+            <input
+              className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+              placeholder="Search the web or paste a URL..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              autoFocus
+            />
+            <button
+              className="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center gap-1.5"
+              onClick={handleSearch}
+              disabled={!searchQuery.trim() || searching}
+            >
+              {searching ? (
+                <span className="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              ) : (
+                '🔍'
+              )}
+              Search
+            </button>
+          </div>
+
+          {/* URL detection hint */}
+          {searchQuery.trim().startsWith('http') && (
+            <p className="text-[0.65rem] text-muted-foreground mb-2 m-0">
+              🔗 URL detected — will extract article content directly
+            </p>
+          )}
+
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <h5 className="text-xs font-semibold text-muted-foreground m-0">
+                  {searchResults.length} results found
+                </h5>
+                <button className="text-[0.65rem] text-muted-foreground hover:text-foreground" onClick={clearSearch}>
+                  Clear
+                </button>
+              </div>
+              {searchResults.map((result, i) => (
+                <SearchResultCard
+                  key={`${result.url}-${i}`}
+                  result={result}
+                  onAdd={() => handleAddResult(result)}
+                  adding={addingResultUrl === result.url}
+                />
+              ))}
+              <button
+                className="w-full px-4 py-2.5 text-xs font-semibold rounded-md bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors disabled:opacity-40 mt-2"
+                onClick={handleDeepResearch}
+                disabled={deepResearching}
+              >
+                {deepResearching ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    Extracting articles & summarizing with AI...
+                  </span>
+                ) : (
+                  '🔬 Deep Research — Extract & Summarize All'
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* No results state */}
+          {searchResults.length === 0 && !searching && searchQuery.trim() && (
+            <p className="text-xs text-muted-foreground text-center py-2 m-0">
+              Press Enter or click Search to find results
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Manual Note Form */}
+      {showNoteForm && (
         <div className="flex gap-2 px-4 py-3 border-b border-border">
           <input
             className="flex-1 px-3 py-1.5 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:border-primary"
-            placeholder="Research query or note..."
-            value={newQuery}
-            onChange={e => setNewQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            placeholder="Add a research note..."
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAddNote()}
             autoFocus
           />
           <button
             className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
-            onClick={handleAdd}
-            disabled={!newQuery.trim()}
+            onClick={handleAddNote}
+            disabled={!noteText.trim()}
           >
             Add
           </button>
           <button
             className="px-3 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            onClick={() => setShowAddForm(false)}
+            onClick={() => setShowNoteForm(false)}
           >
             Cancel
           </button>
         </div>
       )}
 
-      {factCheckResult && <div className="px-4 pt-3"><FactCheckPanel result={factCheckResult} /></div>}
+      {/* Fact Check Panel */}
+      {factCheckResult && (
+        <div className="px-4 pt-3">
+          <FactCheckPanel result={factCheckResult} />
+        </div>
+      )}
 
+      {/* Research Timeline */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
         {entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <span className="text-3xl mb-2">📚</span>
-            <p className="text-sm m-0">No research entries yet.</p>
+            <span className="text-3xl mb-3">📚</span>
+            <p className="text-sm font-medium m-0 mb-1">No research entries yet</p>
+            <p className="text-xs text-muted-foreground/70 m-0 text-center max-w-[240px]">
+              Use 🔍 Search to find web sources, ✏️ Note to add manual research, or 📂 Import to add files.
+            </p>
           </div>
         ) : (
           entries.map(entry => (
@@ -342,12 +633,16 @@ export const ResearchWorkbench: React.FC<ResearchWorkbenchProps> = ({ documentId
               expanded={expandedId === entry.id}
               onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
               onDelete={() => deleteEntry(entry.id)}
+              sections={sections}
+              onLinkSection={sectionId => handleLinkSection(entry.id, sectionId)}
             />
           ))
         )}
       </div>
+
+      {/* Loading Overlay */}
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
           <div className="w-6 h-6 border-2 border-border border-t-primary rounded-full animate-spin" />
         </div>
       )}

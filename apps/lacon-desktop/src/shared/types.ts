@@ -204,6 +204,7 @@ export interface ResearchAPI {
   setMode: (documentId: string, mode: string) => Promise<any>
   importFile: (documentId: string, filePath: string, fileType: string) => Promise<any>
   factCheck: (documentId: string, sectionId: string, sectionContent: string) => Promise<any>
+  webSearch: (documentId: string, query: string, mode: 'quick' | 'deep') => Promise<any>
 }
 
 // Citation API (Phase 5 - Writer Harness)

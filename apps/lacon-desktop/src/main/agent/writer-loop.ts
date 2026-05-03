@@ -32,6 +32,7 @@ import type {
 } from '../../shared/writer-types'
 import { getProviderManager } from '../providers/provider-manager'
 import { getActiveProjectPath, getProjectWorkspaceService } from '../services/project-workspace-service'
+import { getResearchLogService } from '../services/research-log-service'
 
 // ─────────────────────────── Transition Map ───────────────────────────
 
@@ -72,8 +73,6 @@ export interface WriterLoopEvent {
 export type WriterLoopListener = (event: WriterLoopEvent) => void
 
 // ─────────────────────────── Planner Module ───────────────────────────
-
-
 
 /**
  * Build the system prompt for outline generation.
@@ -144,12 +143,15 @@ function buildOutlineUserMessage(instruction: string, researchContext?: Research
  * Parse the LLM's JSON response into a WriterOutline.
  * Validates and assigns UUIDs to each section/subsection.
  */
-function parseOutlineResponse(raw: string, instruction: string): WriterOutline | null {
+function parseOutlineResponse(raw: string, _instruction: string): WriterOutline | null {
   try {
     // Strip markdown fences if present
     let cleaned = raw.trim()
     if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim()
+      cleaned = cleaned
+        .replace(/^```(?:json)?\s*/, '')
+        .replace(/```\s*$/, '')
+        .trim()
     }
 
     const parsed = JSON.parse(cleaned)
@@ -225,7 +227,9 @@ export async function generateOutline(
       if (content) {
         const outline = parseOutlineResponse(content, instruction)
         if (outline) {
-          console.log(`[Planner] LLM outline generated: ${outline.sections.length} sections, ~${outline.totalEstimatedWords} words`)
+          console.log(
+            `[Planner] LLM outline generated: ${outline.sections.length} sections, ~${outline.totalEstimatedWords} words`,
+          )
           return outline
         }
         console.warn('[Planner] LLM returned unparseable outline, falling back to deterministic')
@@ -355,7 +359,7 @@ export class WriterLoop {
   getSession(): WriterSession {
     const ws = getProjectWorkspaceService()
     const projectPath = getActiveProjectPath()
-    if (!projectPath) throw new Error('No project is open')
+    if (!projectPath) {throw new Error('No project is open')}
     return ws.getSession(this.documentId, projectPath)
   }
 
@@ -396,7 +400,7 @@ export class WriterLoop {
 
     const ws = getProjectWorkspaceService()
     const projectPath = getActiveProjectPath()
-    if (!projectPath) throw new Error('No project is open')
+    if (!projectPath) {throw new Error('No project is open')}
     const updated = ws.updateSession(this.documentId, projectPath, { stage: nextStage })
 
     this.emit('stage-changed', { from: current, to: nextStage })
@@ -410,7 +414,11 @@ export class WriterLoop {
   /**
    * Start the planning stage: generate an outline from the instruction via LLM.
    */
-  async startPlanning(instruction: string, composedSkillPrompt: string, researchContext?: ResearchContext): Promise<WriterOutline> {
+  async startPlanning(
+    instruction: string,
+    composedSkillPrompt: string,
+    researchContext?: ResearchContext,
+  ): Promise<WriterOutline> {
     // Transition to planning
     this.transition('planning')
 
@@ -579,7 +587,7 @@ export class WriterLoop {
   }): WriterSession {
     const ws = getProjectWorkspaceService()
     const projectPath = getActiveProjectPath()
-    if (!projectPath) throw new Error('No project is open')
+    if (!projectPath) {throw new Error('No project is open')}
     const updated = ws.updateSession(this.documentId, projectPath, updates)
     this.emit('session-updated', updated)
     return updated
@@ -624,7 +632,22 @@ export class WriterLoop {
   /**
    * Build the system prompt for section content generation.
    */
-  private buildSectionSystemPrompt(outline: WriterOutline, section: OutlineSection, neighborContext: string, contextSummary: string): string {
+  private buildSectionSystemPrompt(
+    outline: WriterOutline,
+    section: OutlineSection,
+    neighborContext: string,
+    contextSummary: string,
+    researchContext: string,
+  ): string {
+    const researchBlock = researchContext
+      ? `
+Research material available for this section:
+${researchContext}
+
+IMPORTANT: Use this research to ground your writing in facts. Reference specific data, statistics, and findings where relevant. Do NOT fabricate information — if the research doesn't cover something, write from general knowledge.
+`
+      : ''
+
     return `You are an expert writer producing a section of a longer document.
 
 Document title: "${outline.title}"
@@ -633,7 +656,7 @@ Target length: approximately ${section.estimatedWords} words.
 
 ${neighborContext ? `Context from neighboring sections:\n${neighborContext}\n` : ''}
 ${contextSummary ? `Summary of what has been written so far:\n${contextSummary}\n` : ''}
-
+${researchBlock}
 Key points to cover in this section:
 ${section.keyPoints.map((kp, i) => `${i + 1}. ${kp}`).join('\n')}
 
@@ -665,7 +688,9 @@ Rules:
       `<ol>\n${keyPointsHtml}\n</ol>`,
       `<p>This section covers approximately ${section.estimatedWords} words on the topic of "${section.title}".</p>`,
       neighborContext ? `<p><em>Context: ${neighborContext}</em></p>` : '',
-    ].filter(Boolean).join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n')
   }
 
   /**
@@ -706,6 +731,50 @@ Rules:
       contextSummary = `...${contextSummary.slice(contextSummary.indexOf(' ') + 1)}`
     }
 
+    // Gather research context for this section
+    let researchContext = ''
+    try {
+      const log = getResearchLogService().getLog(this.documentId)
+      if (log.entries.length > 0) {
+        const titleTerms = section.title
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(t => t.length > 3)
+
+        // Priority 1: Entries explicitly linked to this section
+        const linked = log.entries.filter(e => e.linkedSectionIds.includes(sectionId))
+
+        // Priority 2: Entries matching section title (fuzzy)
+        const relevant = log.entries.filter(e => {
+          if (linked.find(l => l.id === e.id)) {return false}
+          const text = (`${e.query  } ${  e.excerpts.join(' ')}`).toLowerCase()
+          const matchCount = titleTerms.filter(t => text.includes(t)).length
+          return titleTerms.length > 0 && matchCount / titleTerms.length > 0.3
+        })
+
+        // Priority 3: General unlinked research (fallback)
+        const general = log.entries.filter(
+          e =>
+            e.linkedSectionIds.length === 0 && !linked.find(l => l.id === e.id) && !relevant.find(r => r.id === e.id),
+        )
+
+        // Combine: linked first, then relevant, then general (cap at 5)
+        const all = [...linked, ...relevant.slice(0, 3), ...general.slice(0, 2)].slice(0, 5)
+
+        if (all.length > 0) {
+          researchContext = all.map(e => `[Source: ${e.query}]\n${e.excerpts.slice(0, 2).join('\n')}`).join('\n---\n')
+          // Hard cap at 2000 chars to fit LLM context window
+          if (researchContext.length > 2000) {
+            researchContext = `${researchContext.slice(0, 2000)  }...`
+          }
+          console.log(`[Generator] Injecting ${all.length} research entries for "${section.title}"`)
+        }
+      }
+    } catch (err) {
+      // Research log may not exist — continue without
+      console.warn('[Generator] Could not load research context:', err)
+    }
+
     // Update progress: mark this section as in-progress
     this.sectionProgress.currentSectionId = sectionId
     this.sectionProgress.currentSectionTitle = section.title
@@ -724,9 +793,17 @@ Rules:
 
       if (enabledProvider) {
         const modelId = enabledProvider.defaultModel || 'gpt-4o-mini'
-        const systemPrompt = this.buildSectionSystemPrompt(outline, section, neighborContext, contextSummary)
+        const systemPrompt = this.buildSectionSystemPrompt(
+          outline,
+          section,
+          neighborContext,
+          contextSummary,
+          researchContext,
+        )
 
-        console.log(`[Generator] Writing section "${section.title}" via LLM (provider: ${enabledProvider.id}, model: ${modelId})`)
+        console.log(
+          `[Generator] Writing section "${section.title}" via LLM (provider: ${enabledProvider.id}, model: ${modelId})`,
+        )
 
         const response = await pm.chatCompletion(
           enabledProvider.id,
@@ -747,13 +824,17 @@ Rules:
           generatedContent = content.trim()
           // Strip markdown fences if present
           if (generatedContent.startsWith('```')) {
-            generatedContent = generatedContent.replace(/^```(?:html)?\s*/, '').replace(/```\s*$/, '').trim()
+            generatedContent = generatedContent
+              .replace(/^```(?:html)?\s*/, '')
+              .replace(/```\s*$/, '')
+              .trim()
           }
           tokenUsage = {
             inputTokens: response.usage?.promptTokens || 0,
             outputTokens: response.usage?.completionTokens || 0,
             model: modelId,
-            estimatedCost: (response.usage?.promptTokens || 0) * 0.000003 + (response.usage?.completionTokens || 0) * 0.000015,
+            estimatedCost:
+              (response.usage?.promptTokens || 0) * 0.000003 + (response.usage?.completionTokens || 0) * 0.000015,
           }
           usedLLM = true
           console.log(`[Generator] Section "${section.title}" complete (${tokenUsage.outputTokens} tokens)`)
@@ -795,7 +876,10 @@ Rules:
     // Update rolling summary
     if (usedLLM) {
       // Summarize what was written for context in subsequent sections
-      const plainText = generatedContent!.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      const plainText = generatedContent!
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
       this.rollingSummary.summary += `\n[${section.title}]: ${plainText.slice(0, 300)}`
     } else {
       this.rollingSummary.summary += `\n[${section.title}]: ${section.keyPoints.join('; ')}`
@@ -836,7 +920,9 @@ Rules:
 
     for (const section of outline.sections) {
       if (this.generationAborted) {
-        console.log(`[Generator] Generation aborted by user after ${this.sectionProgress.completedSections}/${outline.sections.length} sections`)
+        console.log(
+          `[Generator] Generation aborted by user after ${this.sectionProgress.completedSections}/${outline.sections.length} sections`,
+        )
 
         this.generationRunning = false
         this.sectionProgress.status = 'complete'
@@ -856,7 +942,11 @@ Rules:
         try {
           this.transition('reviewing')
         } catch {
-          try { this.transition('idle') } catch { /* already idle */ }
+          try {
+            this.transition('idle')
+          } catch {
+            /* already idle */
+          }
         }
 
         return this.sectionProgress
@@ -886,7 +976,9 @@ Rules:
     this.emit('snapshot-created', snapshot)
     this.emit('generation-complete', this.sectionProgress)
 
-    console.log(`[Generator] Generation complete: ${this.sectionProgress.completedSections}/${this.sectionProgress.totalSections} sections`)
+    console.log(
+      `[Generator] Generation complete: ${this.sectionProgress.completedSections}/${this.sectionProgress.totalSections} sections`,
+    )
 
     // Auto-transition to complete (or reviewing if we add that later)
     try {
@@ -895,7 +987,9 @@ Rules:
       // If transition fails, try complete
       try {
         this.transition('idle')
-      } catch { /* already idle */ }
+      } catch {
+        /* already idle */
+      }
     }
 
     return this.sectionProgress
@@ -950,7 +1044,7 @@ Rules:
   createSnapshot(trigger: DocumentSnapshot['trigger'], content?: any): DocumentSnapshot {
     const ws = getProjectWorkspaceService()
     const projectPath = getActiveProjectPath()
-    if (!projectPath) throw new Error('No project is open')
+    if (!projectPath) {throw new Error('No project is open')}
     const snapshotsDir = ws.getSnapshotsPath(this.documentId, projectPath)
 
     const snapshot: DocumentSnapshot = {

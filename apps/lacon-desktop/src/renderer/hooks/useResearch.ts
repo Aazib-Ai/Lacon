@@ -13,6 +13,7 @@ import type {
   ResearchLog,
   ResearchLogEntry,
   ResearchMode,
+  WebSearchResult,
 } from '../../shared/writer-types'
 
 // ─────────────────────────── State ───────────────────────────
@@ -28,6 +29,12 @@ export interface ResearchState {
   citationStyle: CitationStyle
   /** Latest fact-check result */
   factCheckResult: FactCheckResult | null
+  /** Quick search results (preview) */
+  searchResults: WebSearchResult[]
+  /** Whether a quick search is in progress */
+  searching: boolean
+  /** Whether a deep research operation is in progress */
+  deepResearching: boolean
   /** Loading flag */
   loading: boolean
   /** Error message */
@@ -40,6 +47,9 @@ const initialState: ResearchState = {
   mode: 'supervised',
   citationStyle: 'apa',
   factCheckResult: null,
+  searchResults: [],
+  searching: false,
+  deepResearching: false,
   loading: false,
   error: null,
 }
@@ -54,6 +64,11 @@ type ResearchAction =
   | { type: 'SET_MODE'; mode: ResearchMode }
   | { type: 'SET_CITATION_STYLE'; style: CitationStyle }
   | { type: 'SET_FACT_CHECK'; result: FactCheckResult }
+  | { type: 'SET_SEARCH_RESULTS'; results: WebSearchResult[] }
+  | { type: 'CLEAR_SEARCH_RESULTS' }
+  | { type: 'START_SEARCHING' }
+  | { type: 'START_DEEP_RESEARCH' }
+  | { type: 'STOP_DEEP_RESEARCH' }
   | { type: 'SET_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
 
@@ -92,8 +107,18 @@ function researchReducer(state: ResearchState, action: ResearchAction): Research
       return { ...state, citationStyle: action.style, loading: false, error: null }
     case 'SET_FACT_CHECK':
       return { ...state, factCheckResult: action.result, loading: false, error: null }
+    case 'SET_SEARCH_RESULTS':
+      return { ...state, searchResults: action.results, searching: false, error: null }
+    case 'CLEAR_SEARCH_RESULTS':
+      return { ...state, searchResults: [] }
+    case 'START_SEARCHING':
+      return { ...state, searching: true, error: null }
+    case 'START_DEEP_RESEARCH':
+      return { ...state, deepResearching: true, error: null }
+    case 'STOP_DEEP_RESEARCH':
+      return { ...state, deepResearching: false }
     case 'SET_ERROR':
-      return { ...state, error: action.error, loading: false }
+      return { ...state, error: action.error, loading: false, searching: false, deepResearching: false }
     case 'CLEAR_ERROR':
       return { ...state, error: null }
     default:
@@ -129,18 +154,24 @@ export function useResearch(documentId: string | undefined) {
   }
 
   const handleResponse = useCallback((response: any, onSuccess?: (data: any) => void) => {
-    if (!mountedRef.current) {return}
+    if (!mountedRef.current) {
+      return
+    }
     if (!response?.success) {
       dispatch({ type: 'SET_ERROR', error: response?.error?.message || 'Unknown error' })
       return
     }
-    if (onSuccess) {onSuccess(response.data)}
+    if (onSuccess) {
+      onSuccess(response.data)
+    }
   }, [])
 
   // ── Fetch Log ──
 
   const fetchLog = useCallback(async () => {
-    if (!documentId) {return}
+    if (!documentId) {
+      return
+    }
     dispatch({ type: 'START_LOADING' })
     try {
       const res = await research().getLog(documentId)
@@ -161,7 +192,9 @@ export function useResearch(documentId: string | undefined) {
 
   const addEntry = useCallback(
     async (query: string, sources?: any[], excerpts?: string[], linkedSectionIds?: string[], tags?: string[]) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       dispatch({ type: 'START_LOADING' })
       try {
         const res = await research().addEntry(documentId, query, sources, excerpts, linkedSectionIds, tags)
@@ -178,7 +211,9 @@ export function useResearch(documentId: string | undefined) {
 
   const updateEntry = useCallback(
     async (entryId: string, updates: Partial<ResearchLogEntry>) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await research().updateEntry(documentId, entryId, updates)
         handleResponse(res, entry => {
@@ -193,7 +228,9 @@ export function useResearch(documentId: string | undefined) {
 
   const deleteEntry = useCallback(
     async (entryId: string) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await research().deleteEntry(documentId, entryId)
         handleResponse(res, () => {
@@ -210,7 +247,9 @@ export function useResearch(documentId: string | undefined) {
 
   const setMode = useCallback(
     async (mode: ResearchMode) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await research().setMode(documentId, mode)
         handleResponse(res, () => {
@@ -225,7 +264,9 @@ export function useResearch(documentId: string | undefined) {
 
   const setCitationStyle = useCallback(
     async (style: CitationStyle) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       try {
         const res = await citation().setStyle(documentId, style)
         handleResponse(res, () => {
@@ -243,7 +284,9 @@ export function useResearch(documentId: string | undefined) {
 
   const importFile = useCallback(
     async (filePath: string, fileType: 'pdf' | 'docx' | 'txt' | 'pptx') => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       dispatch({ type: 'START_LOADING' })
       try {
         const res = await research().importFile(documentId, filePath, fileType)
@@ -262,7 +305,9 @@ export function useResearch(documentId: string | undefined) {
 
   const factCheck = useCallback(
     async (sectionId: string, sectionContent: string) => {
-      if (!documentId) {return null}
+      if (!documentId) {
+        return null
+      }
       dispatch({ type: 'START_LOADING' })
       try {
         const res = await research().factCheck(documentId, sectionId, sectionContent)
@@ -280,6 +325,47 @@ export function useResearch(documentId: string | undefined) {
     [documentId],
   )
 
+  // ── Web Search ──
+
+  const webSearch = useCallback(
+    async (query: string) => {
+      if (!documentId) {return}
+      dispatch({ type: 'START_SEARCHING' })
+      try {
+        const res = await research().webSearch(documentId, query, 'quick')
+        handleResponse(res, (data: any) => {
+          dispatch({ type: 'SET_SEARCH_RESULTS', results: data.results || [] })
+        })
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId, handleResponse],
+  )
+
+  const deepResearch = useCallback(
+    async (query: string) => {
+      if (!documentId) {return}
+      dispatch({ type: 'START_DEEP_RESEARCH' })
+      try {
+        const res = await research().webSearch(documentId, query, 'deep')
+        handleResponse(res, (entry: any) => {
+          dispatch({ type: 'SET_ENTRY', entry })
+          dispatch({ type: 'CLEAR_SEARCH_RESULTS' })
+          dispatch({ type: 'STOP_DEEP_RESEARCH' })
+        })
+        await fetchLog()
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId, handleResponse, fetchLog],
+  )
+
+  const clearSearch = useCallback(() => {
+    dispatch({ type: 'CLEAR_SEARCH_RESULTS' })
+  }, [])
+
   return {
     ...state,
     fetchLog,
@@ -290,5 +376,8 @@ export function useResearch(documentId: string | undefined) {
     setCitationStyle,
     importFile,
     factCheck,
+    webSearch,
+    deepResearch,
+    clearSearch,
   }
 }

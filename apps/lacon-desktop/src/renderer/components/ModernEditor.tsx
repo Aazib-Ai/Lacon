@@ -5,7 +5,6 @@ import TextAlign from '@tiptap/extension-text-align'
 import { FontSize } from '@tiptap/extension-text-style/font-size'
 import { TextStyle } from '@tiptap/extension-text-style/text-style'
 import Underline from '@tiptap/extension-underline'
-
 import { Markdown } from '@tiptap/markdown'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -39,6 +38,9 @@ const PAGE = {
   CONTAINER_PAD_BOTTOM: 24,
 } as const
 
+/** Full page break height: bottom margin + gap + top margin */
+const PAGE_BREAK_HEIGHT = PAGE.MARGIN_BOTTOM + PAGE.GAP + PAGE.MARGIN_TOP
+
 // ────────────────────────────────────────────────────────────────────
 // Editor extensions — HTML-native
 // ────────────────────────────────────────────────────────────────────
@@ -64,16 +66,16 @@ const coreExtensions = [
  * Used for backward-compat: open .md files gracefully, then save as HTML.
  */
 function looksLikeMarkdown(content: string): boolean {
-  if (!content || content.trim().length === 0) return false
+  if (!content || content.trim().length === 0) {return false}
   const trimmed = content.trimStart()
   // If it starts with an HTML tag, it's HTML
-  if (trimmed.startsWith('<')) return false
+  if (trimmed.startsWith('<')) {return false}
   // Common Markdown patterns
-  if (/^#{1,6}\s/.test(trimmed)) return true
-  if (/^[-*+]\s/.test(trimmed)) return true
-  if (/^\d+\.\s/.test(trimmed)) return true
+  if (/^#{1,6}\s/.test(trimmed)) {return true}
+  if (/^[-*+]\s/.test(trimmed)) {return true}
+  if (/^\d+\.\s/.test(trimmed)) {return true}
   // Plain text with no HTML tags at all — treat as Markdown
-  if (!/<[a-z][\s\S]*>/i.test(content)) return true
+  if (!/<[a-z][\s\S]*>/i.test(content)) {return true}
   return false
 }
 
@@ -91,15 +93,15 @@ function useCanvasHeight(canvasRef: React.RefObject<HTMLDivElement | null>) {
 
   useEffect(() => {
     const el = canvasRef.current
-    if (!el) return
+    if (!el) {return}
 
     const measure = () => {
       const canvasH = el.clientHeight
       // The page content height = canvas height minus:
       //   - container top + bottom padding
       //   - page top + bottom margins (which are part of the page chrome)
-      const available = canvasH - PAGE.CONTAINER_PAD_TOP - PAGE.CONTAINER_PAD_BOTTOM
-                        - PAGE.MARGIN_TOP - PAGE.MARGIN_BOTTOM
+      const available =
+        canvasH - PAGE.CONTAINER_PAD_TOP - PAGE.CONTAINER_PAD_BOTTOM - PAGE.MARGIN_TOP - PAGE.MARGIN_BOTTOM
       setContentHeight(Math.max(PAGE.MIN_CONTENT_HEIGHT, available))
     }
 
@@ -114,88 +116,171 @@ function useCanvasHeight(canvasRef: React.RefObject<HTMLDivElement | null>) {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// usePageCount — track content height → compute page count
+// usePaginationGaps — push blocks past page boundaries
 // ────────────────────────────────────────────────────────────────────
 
-function usePageCount(editorElement: HTMLElement | null, contentHeight: number) {
+interface PageBreakInfo {
+  /** Position of the gap center in document coordinates (relative to .paginated-document) */
+  top: number
+  /** Total gap height including margins */
+  height: number
+}
+
+/**
+ * After ProseMirror renders, walks all top-level block elements and
+ * pushes any that straddle a page boundary to the next page by adding
+ * margin-top. Returns the positions of the page break gaps for rendering
+ * the grey separator overlays.
+ */
+function usePaginationGaps(editorElement: HTMLElement | null, contentHeight: number) {
+  const [pageBreaks, setPageBreaks] = useState<PageBreakInfo[]>([])
   const [pageCount, setPageCount] = useState(1)
+  const isPaginatingRef = useRef(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (!editorElement) return
+    if (!editorElement || contentHeight <= 0) {return}
 
-    const measure = () => {
-      const height = editorElement.scrollHeight
-      setPageCount(Math.max(1, Math.ceil(height / contentHeight)))
+    const paginate = () => {
+      if (isPaginatingRef.current) {return}
+      isPaginatingRef.current = true
+
+      try {
+        const children = Array.from(editorElement.children) as HTMLElement[]
+
+        // Step 1: Reset all previous pagination margins
+        for (const child of children) {
+          if (child.hasAttribute('data-page-gap')) {
+            child.style.marginTop = ''
+            child.removeAttribute('data-page-gap')
+          }
+        }
+
+        // Step 2: Force reflow to get clean measurements
+        // eslint-disable-next-line no-void
+        void editorElement.offsetHeight
+
+        // Step 3: Measure natural positions (no gaps applied)
+        const naturalPositions = children.map(c => ({
+          top: c.offsetTop,
+          height: c.offsetHeight,
+        }))
+
+        // Step 4: Calculate gaps needed
+        const gaps: { index: number; gap: number }[] = []
+        const breaks: PageBreakInfo[] = []
+        let accumulatedGap = 0
+        let nextBoundary = contentHeight // first page boundary in text coords
+
+        for (let i = 0; i < children.length; i++) {
+          const pos = naturalPositions[i]
+          // Simulated position after previous gaps
+          const simTop = pos.top + accumulatedGap
+          const simBottom = simTop + pos.height
+
+          // Advance boundary if element starts past it
+          while (simTop >= nextBoundary + accumulatedGap) {
+            nextBoundary += contentHeight
+          }
+
+          const effectiveBoundary = nextBoundary + accumulatedGap
+
+          // Does this element cross the page boundary?
+          if (simBottom > effectiveBoundary && simTop < effectiveBoundary) {
+            // Skip elements taller than a page — can't avoid splitting
+            if (pos.height >= contentHeight) {
+              nextBoundary += contentHeight
+              continue
+            }
+
+            // Gap = push element to after the full page break
+            const gap = effectiveBoundary - simTop + PAGE_BREAK_HEIGHT
+
+            gaps.push({ index: i, gap })
+
+            // The overlay top in document coords
+            breaks.push({
+              top: PAGE.MARGIN_TOP + effectiveBoundary + PAGE.MARGIN_BOTTOM,
+              height: PAGE.GAP,
+            })
+
+            accumulatedGap += gap
+            nextBoundary += contentHeight
+          }
+        }
+
+        // Step 5: Apply all gaps
+        for (const { index, gap } of gaps) {
+          const child = children[index]
+          const existingMargin = parseFloat(getComputedStyle(child).marginTop) || 0
+          child.style.marginTop = `${existingMargin + gap}px`
+          child.setAttribute('data-page-gap', String(gap))
+        }
+
+        // Calculate total page count
+        // eslint-disable-next-line no-void
+        void editorElement.offsetHeight
+        const totalTextHeight = editorElement.scrollHeight
+        const pages = Math.max(1, Math.ceil(totalTextHeight / (contentHeight + PAGE_BREAK_HEIGHT)))
+
+        setPageBreaks(breaks)
+        setPageCount(pages)
+      } finally {
+        // Release the lock after a short delay to avoid re-entrant calls
+        // from our own margin changes triggering the mutation observer
+        setTimeout(() => {
+          isPaginatingRef.current = false
+        }, 30)
+      }
     }
 
-    // Initial measurement
-    measure()
+    /** Debounced wrapper — batches rapid DOM changes (e.g. streaming AI content) */
+    const schedulePaginate = () => {
+      if (debounceRef.current) {clearTimeout(debounceRef.current)}
+      debounceRef.current = setTimeout(() => {
+        requestAnimationFrame(paginate)
+      }, 80)
+    }
 
-    const observer = new ResizeObserver(() => {
-      measure()
-    })
+    // Initial run
+    requestAnimationFrame(paginate)
 
-    // Also listen for mutations (new nodes, text changes)
-    const mutationObserver = new MutationObserver(() => {
-      // requestAnimationFrame to batch with layout
-      requestAnimationFrame(measure)
-    })
-
-    observer.observe(editorElement)
+    // Watch for content changes (typing, agent writes, setContent)
+    const mutationObserver = new MutationObserver(schedulePaginate)
     mutationObserver.observe(editorElement, {
       childList: true,
       subtree: true,
       characterData: true,
     })
 
+    // Watch for size changes
+    const resizeObserver = new ResizeObserver(schedulePaginate)
+    resizeObserver.observe(editorElement)
+
+    // Safety net: periodically check for missed updates (handles edge cases
+    // where agent content is inserted via setContent which may not always
+    // trigger MutationObserver if ProseMirror recreates the DOM tree)
+    const interval = setInterval(() => {
+      requestAnimationFrame(paginate)
+    }, 500)
+
     return () => {
-      observer.disconnect()
+      if (debounceRef.current) {clearTimeout(debounceRef.current)}
+      clearInterval(interval)
       mutationObserver.disconnect()
+      resizeObserver.disconnect()
+      // Clean up pagination margins
+      const cleanChildren = Array.from(editorElement.children) as HTMLElement[]
+      for (const child of cleanChildren) {
+        if (child.hasAttribute('data-page-gap')) {
+          child.style.marginTop = ''
+          child.removeAttribute('data-page-gap')
+        }
+      }
     }
   }, [editorElement, contentHeight])
 
-  return { pageCount }
-}
-
-// ────────────────────────────────────────────────────────────────────
-// PageBreakOverlay — visual separator between pages (Google Docs style)
-// ────────────────────────────────────────────────────────────────────
-
-interface PageBreakOverlayProps {
-  /** Which page this break comes after (1-indexed) */
-  afterPage: number
-  /** Content height per page (dynamic) */
-  contentHeight: number
-}
-
-/**
- * Renders the gap between two pages. This overlay sits on top of the
- * continuous editor content at the boundary where one page ends and
- * the next begins. It masks the content with the canvas background
- * and paints drop-shadows on the edges to create the illusion of two
- * distinct paper sheets separated by a gap.
- */
-function PageBreakOverlay({ afterPage, contentHeight }: PageBreakOverlayProps) {
-  const contentBoundary = afterPage * contentHeight
-
-  return (
-    <div
-      className="page-break-overlay"
-      style={{
-        top: `${contentBoundary}px`,
-      }}
-      aria-hidden="true"
-    >
-      {/* Bottom margin of the ending page — white band with bottom shadow */}
-      <div className="page-break-bottom-shadow" />
-
-      {/* The canvas gap between pages */}
-      <div className="page-break-gap" />
-
-      {/* Top margin of the starting page — white band with top shadow */}
-      <div className="page-break-top-shadow" />
-    </div>
-  )
+  return { pageBreaks, pageCount }
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -226,7 +311,7 @@ interface ModernEditorProps {
 
 export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorProps) {
   const [zoom, setZoom] = useState(100)
-  const proseMirrorRef = useRef<HTMLElement | null>(null)
+  const [proseMirrorEl, setProseMirrorEl] = useState<HTMLElement | null>(null)
   const editorWrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -246,53 +331,53 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
 
   const editor = useEditor({
     extensions,
-    // For Markdown content, pass as markdown so the extension parses it.
-    // For HTML content (or empty), TipTap parses HTML natively.
     content: content || '',
     onUpdate: ({ editor: editorInstance }: { editor: any }) => {
-      // Always save as HTML — lossless round-trip for all formatting
       if (onChangeHTML) {
         onChangeHTML(editorInstance.getHTML())
       }
     },
   })
 
-  // Grab ProseMirror DOM element once editor mounts
+  // Grab ProseMirror DOM element once editor mounts — use state so
+  // the pagination hook re-runs when the element becomes available
   useEffect(() => {
     if (editor) {
-      proseMirrorRef.current = editor.view.dom as HTMLElement
+      setProseMirrorEl(editor.view.dom as HTMLElement)
     }
   }, [editor])
 
   // Expose methods via ref
-  useImperativeHandle(editorRef, () => ({
-    getMarkdown: () => editor?.getMarkdown?.() || '',
-    getHTML: () => editor?.getHTML?.() || '',
-    getJSON: () => editor?.getJSON?.() || { type: 'doc', content: [] },
-    setHTML: (html: string) => {
-      if (editor) {
-        editor.commands.setContent(html)
-      }
-    },
-    appendHTML: (html: string) => {
-      if (editor) {
-        editor.commands.insertContentAt(editor.state.doc.content.size - 1, html)
-      }
-    },
-  }), [editor])
+  useImperativeHandle(
+    editorRef,
+    () => ({
+      getMarkdown: () => editor?.getMarkdown?.() || '',
+      getHTML: () => editor?.getHTML?.() || '',
+      getJSON: () => editor?.getJSON?.() || { type: 'doc', content: [] },
+      setHTML: (html: string) => {
+        if (editor) {
+          editor.commands.setContent(html)
+        }
+      },
+      appendHTML: (html: string) => {
+        if (editor) {
+          editor.commands.insertContentAt(editor.state.doc.content.size - 1, html)
+        }
+      },
+    }),
+    [editor],
+  )
 
   const handleZoomChange = useCallback((newZoom: number) => {
     setZoom(newZoom)
   }, [])
 
-  // Page count tracking (uses dynamic contentHeight)
-  const { pageCount } = usePageCount(proseMirrorRef.current, contentHeight)
+  // ── Pagination — push blocks past page boundaries ──
+  const { pageBreaks, pageCount } = usePaginationGaps(proseMirrorEl, contentHeight)
 
-  // Total continuous content height across all pages
-  const totalContentHeight = pageCount * contentHeight
-  // Each page break overlay adds (MARGIN_BOTTOM + GAP + MARGIN_TOP) of visual height
-  const totalOverlayHeight = (pageCount - 1) * (PAGE.MARGIN_BOTTOM + PAGE.GAP + PAGE.MARGIN_TOP)
-  const totalDocumentHeight = totalContentHeight + PAGE.MARGIN_TOP + PAGE.MARGIN_BOTTOM + totalOverlayHeight
+  // Calculate total document height including all page breaks
+  const totalDocumentHeight =
+    PAGE.MARGIN_TOP + pageCount * contentHeight + pageBreaks.length * PAGE_BREAK_HEIGHT + PAGE.MARGIN_BOTTOM
 
   if (!editor) {
     return null
@@ -322,11 +407,13 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
               minHeight: `${totalDocumentHeight}px`,
             }}
           >
-            {/* Editor content — continuous flow */}
+            {/* Editor content — continuous flow with pagination gaps.
+                The usePaginationGaps hook adds margin-top to block elements
+                that would cross page boundaries, creating natural gaps. */}
             <div
               className="paginated-editor-content"
               style={{
-                minHeight: `${totalContentHeight}px`,
+                minHeight: `${totalDocumentHeight}px`,
                 paddingLeft: `${PAGE.MARGIN_LEFT}px`,
                 paddingRight: `${PAGE.MARGIN_RIGHT}px`,
                 paddingTop: `${PAGE.MARGIN_TOP}px`,
@@ -336,18 +423,21 @@ export function ModernEditor({ content, onChangeHTML, editorRef }: ModernEditorP
               <EditorContent editor={editor} className="prose prose-lg max-w-none" />
             </div>
 
-            {/* Page break overlays — visual separators between pages */}
-            {pageCount > 1 && Array.from({ length: pageCount - 1 }, (_, i) => (
-              <PageBreakOverlay
-                key={i + 1}
-                afterPage={i + 1}
-                contentHeight={contentHeight}
-              />
+            {/* Page break overlays — grey gap + margin bands at each page boundary */}
+            {pageBreaks.map((pb, i) => (
+              <div key={i} className="page-break-overlay" style={{ top: `${pb.top}px` }} aria-hidden="true">
+                {/* Bottom margin of ending page */}
+                <div className="page-break-bottom-margin" />
+                {/* Grey gap between pages */}
+                <div className="page-break-line" />
+                {/* Top margin of starting page */}
+                <div className="page-break-top-margin" />
+              </div>
             ))}
           </div>
 
-          {/* Bottom spacer so the last page has room to scroll */}
-          <div style={{ height: '80px' }} />
+          {/* Bottom spacer so the last page has room to scroll past the FloatingAIBar */}
+          <div style={{ height: '140px' }} />
         </div>
       </div>
     </div>

@@ -21,6 +21,7 @@ import { type IpcResponse, IPC_CHANNELS } from '@/shared/ipc-schema'
 import { redactObject } from '../security/log-redaction'
 import { getCitationService } from '../services/citation-service'
 import { getResearchLogService } from '../services/research-log-service'
+import { getResearchSearchService } from '../services/research-search-service'
 
 /**
  * Generic handler wrapper (same pattern as writer-loop-handlers.ts)
@@ -140,6 +141,22 @@ export function registerResearchHandlers(): void {
       return handleResearchIpc(IPC_CHANNELS.RESEARCH_FACT_CHECK, payload, async () => {
         const result = citationService.factCheck(payload.documentId, payload.sectionId, payload.sectionContent)
         return { success: true, data: result }
+      })
+    },
+  )
+
+  // ── research:webSearch ──
+  ipcMain.handle(
+    IPC_CHANNELS.RESEARCH_WEB_SEARCH,
+    async (_event, payload: { documentId: string; query: string; mode: 'quick' | 'deep' }) => {
+      return handleResearchIpc(IPC_CHANNELS.RESEARCH_WEB_SEARCH, payload, async () => {
+        const service = getResearchSearchService()
+        if (payload.mode === 'quick') {
+          const results = await service.quickSearch(payload.query)
+          return { success: true, data: { results } }
+        }
+        const entry = await service.deepResearch(payload.query, payload.documentId)
+        return { success: true, data: entry }
       })
     },
   )

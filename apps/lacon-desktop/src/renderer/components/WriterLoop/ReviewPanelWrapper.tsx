@@ -12,9 +12,11 @@ import { ReviewPanel as ReviewPanelInner } from './ReviewPanel'
 
 interface ReviewPanelWrapperProps {
   documentId: string | undefined
+  /** Callback to retrieve the current editor content as TipTap JSON */
+  getEditorJSON?: () => any
 }
 
-export function ReviewPanelWrapper({ documentId }: ReviewPanelWrapperProps) {
+export function ReviewPanelWrapper({ documentId, getEditorJSON }: ReviewPanelWrapperProps) {
   const loop = useWriterLoop(documentId)
 
   if (!documentId) {
@@ -25,6 +27,15 @@ export function ReviewPanelWrapper({ documentId }: ReviewPanelWrapperProps) {
     )
   }
 
+  /** Safely get the current document JSON from the editor */
+  const getDocContent = () => {
+    try {
+      return getEditorJSON?.() ?? { type: 'doc', content: [] }
+    } catch {
+      return { type: 'doc', content: [] }
+    }
+  }
+
   return (
     <ReviewPanelInner
       review={loop.review}
@@ -33,14 +44,13 @@ export function ReviewPanelWrapper({ documentId }: ReviewPanelWrapperProps) {
       onAcceptFlag={loop.acceptReviewFlag}
       onRejectFlag={loop.rejectReviewFlag}
       onSurgicalEdit={(paragraphId, instruction) => {
-        // Get current document content from editor - for now pass empty
-        loop.surgicalEdit(paragraphId, instruction, {})
+        loop.surgicalEdit(paragraphId, instruction, getDocContent())
       }}
       onRewriteAll={instruction => {
-        loop.rewriteAll(instruction, {})
+        loop.rewriteAll(instruction, getDocContent())
       }}
       onRunReview={() => {
-        loop.runReview({})
+        loop.runReview(getDocContent())
       }}
     />
   )

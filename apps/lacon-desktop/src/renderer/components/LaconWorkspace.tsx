@@ -32,8 +32,8 @@ import { AIDetectionPanel } from './AIDetectionPanel'
 import { FloatingAIBar } from './FloatingAIBar'
 import { LaconSidebar } from './LaconSidebar'
 import { LaconStatusBar } from './LaconStatusBar'
-import { ModernEditor } from './ModernEditor'
 import type { ModernEditorHandle } from './ModernEditor'
+import { ModernEditor } from './ModernEditor'
 import { NewDocumentDialog } from './NewDocumentDialog'
 import { OnboardingBanner } from './OnboardingBanner'
 import { ProviderSettings } from './ProviderSettings'
@@ -59,9 +59,6 @@ const RPANEL_MIN_WIDTH = 280
 const RPANEL_MAX_WIDTH = 600
 const RPANEL_DEFAULT_WIDTH = 380
 const RPANEL_SNAP_THRESHOLD = 200
-
-
-
 
 export function LaconWorkspace() {
   // Layout state
@@ -108,7 +105,7 @@ export function LaconWorkspace() {
     updateContent: updateProjectContent,
     deleteFile,
     renameFile,
-    refreshFiles,
+    refreshFiles: _refreshFiles,
   } = projectState
 
   // Derive a documentId for writer loop compatibility
@@ -227,7 +224,7 @@ export function LaconWorkspace() {
   // Handle editor content changes — editor emits HTML directly now
   const handleEditorContentChange = useCallback(
     (html: string) => {
-      if (!activeFilePath) return
+      if (!activeFilePath) {return}
       updateProjectContent(html)
     },
     [activeFilePath, updateProjectContent],
@@ -247,7 +244,7 @@ export function LaconWorkspace() {
     }
 
     // Only write once per generation cycle
-    if (contentWrittenRef.current) return
+    if (contentWrittenRef.current) {return}
     contentWrittenRef.current = true
 
     // Collect all section HTML and write to editor
@@ -285,7 +282,7 @@ export function LaconWorkspace() {
       document.body.style.userSelect = 'none'
 
       const handleMouseMove = (ev: MouseEvent) => {
-        if (!isResizingRef.current) return
+        if (!isResizingRef.current) {return}
         const delta = ev.clientX - resizeStartXRef.current
         const newWidth = resizeStartWidthRef.current + delta
 
@@ -324,7 +321,7 @@ export function LaconWorkspace() {
       document.body.style.userSelect = 'none'
 
       const handleMouseMove = (ev: MouseEvent) => {
-        if (!isResizingRightRef.current) return
+        if (!isResizingRightRef.current) {return}
         const delta = resizeRightStartXRef.current - ev.clientX
         const newWidth = resizeRightStartWidthRef.current + delta
 
@@ -352,11 +349,16 @@ export function LaconWorkspace() {
   )
 
   // Derive display title
-  const displayTitle = activeFilePath
-    ? activeFilePath.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') || 'LACON'
-    : project
-      ? project.name
-      : 'LACON'
+  let displayTitle = 'LACON'
+  if (activeFilePath) {
+    displayTitle =
+      activeFilePath
+        .split(/[/\\]/)
+        .pop()
+        ?.replace(/\.[^.]+$/, '') || 'LACON'
+  } else if (project) {
+    displayTitle = project.name
+  }
 
   // Review flag count for badge
   const reviewFlagCount = writerLoop.review?.flags?.length || 0
@@ -369,16 +371,20 @@ export function LaconWorkspace() {
         <aside
           className={cn(
             'lacon-sidebar flex-shrink-0 bg-card overflow-hidden relative',
-            (sidebarOpen || settingsOpen)
-              ? 'border-r border-border'
-              : 'w-0 border-r-0',
+            sidebarOpen || settingsOpen ? 'border-r border-border' : 'w-0 border-r-0',
           )}
-          style={(sidebarOpen || settingsOpen) ? { width: `${settingsOpen ? Math.max(sidebarWidth, 340) : sidebarWidth}px`, transition: isResizingRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)' } : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }}
+          style={
+            sidebarOpen || settingsOpen
+              ? {
+                  width: `${settingsOpen ? Math.max(sidebarWidth, 340) : sidebarWidth}px`,
+                  transition: isResizingRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)',
+                }
+              : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }
+          }
           data-testid="lacon-sidebar"
         >
-          {settingsOpen ? (
-            <ProviderSettings onClose={() => setSettingsOpen(false)} documentId={documentId} />
-          ) : sidebarOpen ? (
+          {settingsOpen ? <ProviderSettings onClose={() => setSettingsOpen(false)} documentId={documentId} /> : null}
+          {!settingsOpen && sidebarOpen ? (
             <LaconSidebar
               project={project}
               files={files}
@@ -434,11 +440,11 @@ export function LaconWorkspace() {
 
               <Separator orientation="vertical" className="h-5 mx-1" />
 
-              <span className="text-sm font-semibold text-foreground tracking-tight">
-                {displayTitle}
-              </span>
+              <span className="text-sm font-semibold text-foreground tracking-tight">{displayTitle}</span>
 
-              {isDirty && <span className="w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes (auto-saving...)" />}
+              {isDirty && (
+                <span className="w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes (auto-saving...)" />
+              )}
             </div>
 
             {/* Right controls */}
@@ -499,7 +505,7 @@ export function LaconWorkspace() {
           )}
 
           {/* Editor area */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-hidden">
             {activeFilePath ? (
               <ModernEditor
                 key={activeFilePath}
@@ -556,11 +562,16 @@ export function LaconWorkspace() {
         <aside
           className={cn(
             'lacon-right-panel flex-shrink-0 bg-card overflow-hidden relative',
-            rightPanelOpen
-              ? 'border-l border-border'
-              : 'w-0 border-l-0',
+            rightPanelOpen ? 'border-l border-border' : 'w-0 border-l-0',
           )}
-          style={rightPanelOpen ? { width: `${rightPanelWidth}px`, transition: isResizingRightRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)' } : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }}
+          style={
+            rightPanelOpen
+              ? {
+                  width: `${rightPanelWidth}px`,
+                  transition: isResizingRightRef.current ? 'none' : 'width 300ms cubic-bezier(0.4,0,0.2,1)',
+                }
+              : { width: 0, transition: 'width 300ms cubic-bezier(0.4,0,0.2,1)' }
+          }
           data-testid="lacon-right-panel"
         >
           {rightPanelOpen && (
@@ -570,18 +581,27 @@ export function LaconWorkspace() {
                 {/* Tab Navigation */}
                 <div className="px-1 pt-1">
                   <TabsList className="w-full grid grid-cols-6 h-9 bg-secondary/50 rounded-lg p-0.5">
-                    <TabsTrigger value="writer" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                    <TabsTrigger
+                      value="writer"
+                      className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                    >
                       <PenLine className="h-3.5 w-3.5" />
                       Writer
                       {writerLoop.stage !== 'idle' && (
                         <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="research" className="text-[11px] font-medium gap-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                    <TabsTrigger
+                      value="research"
+                      className="text-[11px] font-medium gap-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                    >
                       <Search className="h-3.5 w-3.5" />
                       Research
                     </TabsTrigger>
-                    <TabsTrigger value="review" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                    <TabsTrigger
+                      value="review"
+                      className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                    >
                       <MessageSquareText className="h-3.5 w-3.5" />
                       Review
                       {reviewFlagCount > 0 && (
@@ -593,7 +613,10 @@ export function LaconWorkspace() {
                         </Badge>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="detect" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                    <TabsTrigger
+                      value="detect"
+                      className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                    >
                       <ShieldCheck className="h-3.5 w-3.5" />
                       Detect
                       {aiDetection.report && aiDetection.report.overallScore > 50 && (
@@ -605,11 +628,17 @@ export function LaconWorkspace() {
                         </Badge>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="history" className="text-[11px] font-medium gap-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                    <TabsTrigger
+                      value="history"
+                      className="text-[11px] font-medium gap-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                    >
                       <History className="h-3.5 w-3.5" />
                       History
                     </TabsTrigger>
-                    <TabsTrigger value="skills" className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                    <TabsTrigger
+                      value="skills"
+                      className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                    >
                       <Sparkles className="h-3.5 w-3.5" />
                       Skills
                       {(writerLoop.session?.activeSkillIds?.length || 0) > 0 && (
@@ -649,7 +678,10 @@ export function LaconWorkspace() {
                 </TabsContent>
 
                 <TabsContent value="review" className="mt-0 p-0">
-                  <ReviewPanel documentId={documentId} />
+                  <ReviewPanel
+                    documentId={documentId}
+                    getEditorJSON={() => editorRef.current?.getJSON?.() ?? { type: 'doc', content: [] }}
+                  />
                 </TabsContent>
 
                 <TabsContent value="detect" className="mt-0 p-0 h-full">

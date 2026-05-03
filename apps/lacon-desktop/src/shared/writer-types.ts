@@ -626,3 +626,57 @@ export interface UxSetZenModeRequest {
 export interface UxToggleAssistantRequest {
   visible?: boolean
 }
+
+// ─────────────────────────── Web Search Types ───────────────────────────
+
+/** A single web search result from DDG or Wikipedia */
+export interface WebSearchResult {
+  /** Result title */
+  title: string
+  /** Display snippet */
+  snippet: string
+  /** Full URL */
+  url: string
+  /** Source backend */
+  source: 'duckduckgo' | 'wikipedia'
+  /** Relevance score (0–1) */
+  relevanceScore: number
+}
+
+/** Options for web search */
+export interface WebSearchOptions {
+  /** Max results from DDG */
+  maxDDG?: number
+  /** Max results from Wikipedia */
+  maxWiki?: number
+  /** Skip DDG if in cooldown */
+  skipDDG?: boolean
+}
+
+/** Extracted article content from a URL */
+export interface ExtractedArticle {
+  /** Article title */
+  title: string
+  /** Clean text content (truncated) */
+  textContent: string
+  /** Short excerpt/lead */
+  excerpt: string
+  /** Source URL */
+  url: string
+  /** Content length in characters */
+  length: number
+}
+
+/** Research coverage assessment for a section topic */
+export interface ResearchCoverage {
+  /** The topic string that was evaluated */
+  topic: string
+  /** Relevance score (0–1) */
+  score: number
+  /** Coverage tier */
+  coverage: 'covered' | 'partial' | 'uncovered'
+  /** Best matching entry ID (if any) */
+  bestEntryId: string | null
+  /** Whether the best match came from current doc or a sibling */
+  bestSource: 'current' | 'sibling'
+}

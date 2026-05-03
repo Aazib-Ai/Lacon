@@ -236,7 +236,8 @@ const writerLoopAPI = {
   generateSection: (documentId: string, sectionId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GENERATE_SECTION, { documentId, sectionId }),
   generateAll: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GENERATE_ALL, { documentId }),
-  abortGeneration: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ABORT_GENERATION, { documentId }),
+  abortGeneration: (documentId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ABORT_GENERATION, { documentId }),
   getProgress: (documentId: string) => ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GET_PROGRESS, { documentId }),
   acceptGeneration: (documentId: string, sectionId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_ACCEPT_GENERATION, { documentId, sectionId }),
@@ -290,6 +291,8 @@ const researchAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_IMPORT_FILE, { documentId, filePath, fileType }),
   factCheck: (documentId: string, sectionId: string, sectionContent: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_FACT_CHECK, { documentId, sectionId, sectionContent }),
+  webSearch: (documentId: string, query: string, mode: 'quick' | 'deep') =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_WEB_SEARCH, { documentId, query, mode }),
 }
 
 // Citation API (Phase 5 - Writer Harness)
@@ -360,8 +363,7 @@ const updateAPI = {
 // Dialog API
 const dialogAPI = {
   selectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_FOLDER),
-  readFolderFiles: (folderPath: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.DIALOG_READ_FOLDER_FILES, { folderPath }),
+  readFolderFiles: (folderPath: string) => ipcRenderer.invoke(IPC_CHANNELS.DIALOG_READ_FOLDER_FILES, { folderPath }),
 }
 
 // Project API (Folder-based document system)
@@ -413,4 +415,3 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('agent:stream', (event, chunk) => callback(chunk))
   },
 })
-
