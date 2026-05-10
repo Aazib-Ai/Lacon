@@ -35,6 +35,8 @@ export interface ResearchState {
   searching: boolean
   /** Whether a deep research operation is in progress */
   deepResearching: boolean
+  /** Whether a comprehensive auto-research operation is in progress */
+  autoResearching: boolean
   /** Loading flag */
   loading: boolean
   /** Error message */
@@ -50,6 +52,7 @@ const initialState: ResearchState = {
   searchResults: [],
   searching: false,
   deepResearching: false,
+  autoResearching: false,
   loading: false,
   error: null,
 }
@@ -69,6 +72,8 @@ type ResearchAction =
   | { type: 'START_SEARCHING' }
   | { type: 'START_DEEP_RESEARCH' }
   | { type: 'STOP_DEEP_RESEARCH' }
+  | { type: 'START_AUTO_RESEARCH' }
+  | { type: 'STOP_AUTO_RESEARCH' }
   | { type: 'SET_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
 
@@ -117,8 +122,12 @@ function researchReducer(state: ResearchState, action: ResearchAction): Research
       return { ...state, deepResearching: true, error: null }
     case 'STOP_DEEP_RESEARCH':
       return { ...state, deepResearching: false }
+    case 'START_AUTO_RESEARCH':
+      return { ...state, autoResearching: true, error: null }
+    case 'STOP_AUTO_RESEARCH':
+      return { ...state, autoResearching: false }
     case 'SET_ERROR':
-      return { ...state, error: action.error, loading: false, searching: false, deepResearching: false }
+      return { ...state, error: action.error, loading: false, searching: false, deepResearching: false, autoResearching: false }
     case 'CLEAR_ERROR':
       return { ...state, error: null }
     default:
@@ -366,6 +375,26 @@ export function useResearch(documentId: string | undefined) {
     dispatch({ type: 'CLEAR_SEARCH_RESULTS' })
   }, [])
 
+  // ── Auto Research (comprehensive topic research) ──
+
+  const autoResearch = useCallback(
+    async (topic: string) => {
+      if (!documentId) {return}
+      dispatch({ type: 'START_AUTO_RESEARCH' })
+      try {
+        const res = await research().autoResearch(documentId, topic)
+        handleResponse(res, (data: any) => {
+          // data.entries contains all created entries — refresh the full log
+          dispatch({ type: 'STOP_AUTO_RESEARCH' })
+        })
+        await fetchLog()
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId, handleResponse, fetchLog],
+  )
+
   return {
     ...state,
     fetchLog,
@@ -378,6 +407,7 @@ export function useResearch(documentId: string | undefined) {
     factCheck,
     webSearch,
     deepResearch,
+    autoResearch,
     clearSearch,
   }
 }

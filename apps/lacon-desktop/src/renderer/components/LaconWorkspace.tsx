@@ -28,6 +28,8 @@ import { countWords } from '@/renderer/utils/content-analytics'
 
 import { useAIDetection } from '../hooks/useAIDetection'
 import { useProject } from '../hooks/useProject'
+import { useResearch } from '../hooks/useResearch'
+import { useSkills } from '../hooks/useSkills'
 import { useWriterLoop } from '../hooks/useWriterLoop'
 import { AIDetectionPanel } from './AIDetectionPanel'
 import { FloatingAIBar } from './FloatingAIBar'
@@ -124,6 +126,8 @@ export function LaconWorkspace() {
   // Writer harness hooks
   const writerLoop = useWriterLoop(documentId)
   const aiDetection = useAIDetection()
+  const workspaceSkills = useSkills(documentId)
+  const workspaceResearch = useResearch(documentId)
 
   // Editor ref for accessing getMarkdown/getHTML
   const editorRef = useRef<ModernEditorHandle>(null)
@@ -257,9 +261,16 @@ export function LaconWorkspace() {
       setRightPanelOpen(true)
     }
     window.addEventListener('lacon:open-skills-tab', handleOpenSkills)
+    // Listen for custom event from WriterLoopPanel research button
+    const handleOpenResearch = () => {
+      setActiveTab('research')
+      setRightPanelOpen(true)
+    }
+    window.addEventListener('lacon:open-research-tab', handleOpenResearch)
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('lacon:open-skills-tab', handleOpenSkills)
+      window.removeEventListener('lacon:open-research-tab', handleOpenResearch)
     }
   }, [zenMode, saveActiveFile, project])
 
@@ -291,28 +302,65 @@ export function LaconWorkspace() {
 
   // ── Auto-write generated content to editor when generation completes ──
   const contentWrittenRef = useRef(false)
+  const lastWrittenStageRef = useRef<string | null>(null)
 
   useEffect(() => {
     const progress = writerLoop.progress
-    if (!progress || progress.status !== 'complete' || !progress.results?.length) {
-      // Reset the write guard when not in complete state
-      if (progress?.status !== 'complete') {
-        contentWrittenRef.current = false
+    const stage = writerLoop.stage
+
+    console.log(`[LaconWorkspace:ContentWriter] Effect fired — stage=${stage}, progress.status=${progress?.status}, results=${progress?.results?.length ?? 0}, contentWritten=${contentWrittenRef.current}, editorReady=${!!editorRef.current}`)
+
+    // Reset the write guard whenever we leave the 'complete' stage (new cycle starting)
+    if (stage !== 'complete' && stage !== lastWrittenStageRef.current) {
+      if (contentWrittenRef.current) {
+        console.log(`[LaconWorkspace:ContentWriter] Resetting contentWrittenRef (stage changed to ${stage})`)
       }
+      contentWrittenRef.current = false
+      lastWrittenStageRef.current = stage
+    }
+
+    // Safety: if we're in 'complete' stage but have no progress data, re-fetch it
+    if (stage === 'complete' && (!progress || !progress.results?.length) && documentId) {
+      console.log(`[LaconWorkspace:ContentWriter] Stage=complete but no progress results — fetching progress directly`)
+      window.electron?.writerLoop?.getProgress(documentId).then((res: any) => {
+        if (res?.success && res.data?.results?.length > 0) {
+          console.log(`[LaconWorkspace:ContentWriter] Direct progress fetch returned ${res.data.results.length} results — writing now`)
+          const allContent = res.data.results.map((r: any) => r.content).join('\n\n')
+          if (allContent && editorRef.current && !contentWrittenRef.current) {
+            contentWrittenRef.current = true
+            lastWrittenStageRef.current = 'complete'
+            console.log(`[LaconWorkspace:ContentWriter] ✅ Writing ${res.data.results.length} sections (${allContent.length} chars) via direct fetch`)
+            editorRef.current.setHTML(allContent)
+          }
+        }
+      }).catch(() => { /* ignore */ })
+      return
+    }
+
+    if (!progress || progress.status !== 'complete' || !progress.results?.length) {
+      console.log(`[LaconWorkspace:ContentWriter] Early return — progress=${!!progress}, status=${progress?.status}, results=${progress?.results?.length ?? 0}`)
       return
     }
 
     // Only write once per generation cycle
-    if (contentWrittenRef.current) {return}
+    if (contentWrittenRef.current) {
+      console.log(`[LaconWorkspace:ContentWriter] Skipping — already written this cycle`)
+      return
+    }
     contentWrittenRef.current = true
+    lastWrittenStageRef.current = 'complete'
 
     // Collect all section HTML and write to editor
     const allContent = progress.results.map((r: any) => r.content).join('\n\n')
+    console.log(`[LaconWorkspace:ContentWriter] Writing ${progress.results.length} sections to editor (content length: ${allContent.length}, editorRef=${!!editorRef.current})`)
+
     if (allContent && editorRef.current) {
-      console.log(`[LaconWorkspace] Writing ${progress.results.length} sections to editor`)
+      console.log(`[LaconWorkspace:ContentWriter] ✅ Calling editorRef.current.setHTML() with ${allContent.length} chars`)
       editorRef.current.setHTML(allContent)
+    } else {
+      console.error(`[LaconWorkspace:ContentWriter] ❌ FAILED to write — allContent=${!!allContent} (len=${allContent?.length}), editorRef=${!!editorRef.current}`)
     }
-  }, [writerLoop.progress])
+  }, [writerLoop.progress, writerLoop.stage, documentId])
 
   const handleCreateFile = useCallback(
     async (fileName: string) => {
@@ -854,7 +902,23 @@ export function LaconWorkspace() {
               documentId={documentId}
               writerStage={writerLoop.stage}
               onStartPlanning={instruction => {
-                writerLoop.startPlanning(instruction)
+                // Get already-composed skill prompt (auto-composed on activeSkillIds change)
+                const composedSkillPrompt = workspaceSkills.composedSkill?.composedPrompt || ''
+                // Build research context
+                let researchContext: any
+                if (workspaceResearch.entries.length > 0) {
+                  researchContext = {
+                    entries: workspaceResearch.entries.map(entry => ({
+                      id: entry.id,
+                      query: entry.query,
+                      excerpts: entry.excerpts,
+                      sources: entry.sources,
+                      createdAt: entry.createdAt,
+                    })),
+                    summary: workspaceResearch.entries.map(e => `[${e.query}]: ${e.excerpts[0] || ''}`).join('\n'),
+                  }
+                }
+                writerLoop.startPlanning(instruction, composedSkillPrompt, researchContext)
                 setActiveTab('writer')
                 setRightPanelOpen(true)
               }}
@@ -897,12 +961,12 @@ export function LaconWorkspace() {
           data-testid="lacon-right-panel"
         >
           {rightPanelOpen && (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full min-w-0 overflow-hidden w-full">
               {/* ── Panel Header ── */}
               <div className="flex-shrink-0 border-b border-border bg-card">
                 {/* Tab Navigation */}
                 <div className="px-1 pt-1">
-                  <TabsList className="w-full grid grid-cols-6 h-9 bg-secondary/50 rounded-lg p-0.5">
+                  <TabsList className="w-full grid grid-cols-6 h-9 bg-secondary/50 rounded-lg p-0.5 overflow-visible">
                     <TabsTrigger
                       value="writer"
                       className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
@@ -922,14 +986,14 @@ export function LaconWorkspace() {
                     </TabsTrigger>
                     <TabsTrigger
                       value="review"
-                      className="text-[11px] font-medium gap-1.5 relative rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                      className="text-[11px] font-medium gap-1.5 relative overflow-visible rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
                     >
                       <MessageSquareText className="h-3.5 w-3.5" />
                       Review
                       {reviewFlagCount > 0 && (
                         <Badge
-                          variant="destructive"
-                          className="absolute -top-1 -right-1 h-4 min-w-4 text-[10px] p-0 flex items-center justify-center"
+                          variant="secondary"
+                          className="absolute -top-1.5 -right-2 h-4 min-w-4 text-[10px] p-0 flex items-center justify-center z-10 bg-secondary text-foreground font-semibold shadow-sm ring-1 ring-border"
                         >
                           {reviewFlagCount}
                         </Badge>
@@ -991,12 +1055,12 @@ export function LaconWorkspace() {
               </div>
 
               {/* Tab contents */}
-              <ScrollArea className="flex-1">
+              <ScrollArea className="flex-1 min-w-0 overflow-hidden w-full">
                 <TabsContent value="writer" className="mt-0 p-0 h-full">
                   <WriterLoopPanel documentId={documentId} />
                 </TabsContent>
 
-                <TabsContent value="research" className="mt-0 p-0">
+                <TabsContent value="research" forceMount className="mt-0 p-0 overflow-hidden w-full data-[state=inactive]:hidden">
                   <ResearchWorkbench documentId={documentId} />
                 </TabsContent>
 
@@ -1013,12 +1077,181 @@ export function LaconWorkspace() {
                 <TabsContent value="detect" className="mt-0 p-0 h-full">
                   <AIDetectionPanel
                     documentId={documentId}
-                    getEditorText={() => editorRef.current?.getHTML?.() || ''}
+                    getEditorText={() => editorRef.current?.getText?.() || ''}
+                    onReplaceText={(index, newText) => {
+                      const editor = editorRef.current?.getEditor?.()
+                      if (!editor) return
+
+                      // The detection service splits text on \n{2,} (double+ newlines).
+                      // editor.getText() returns text with \n between textblocks.
+                      // We need to match detection paragraphs to editor positions using
+                      // the same splitting logic, then find the character range in the
+                      // full text and map it back to ProseMirror positions.
+
+                      const fullText = editor.getText()
+
+                      // Split the same way the detection service does:
+                      // split on any newlines, merge short fragments (<40 chars)
+                      const rawLines = fullText.split(/\n+/).map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+                      const merged: string[] = []
+                      let mergeBuffer = ''
+                      for (const line of rawLines) {
+                        if (mergeBuffer.length > 0) {
+                          mergeBuffer += '\n' + line
+                          if (mergeBuffer.length >= 60) {
+                            merged.push(mergeBuffer)
+                            mergeBuffer = ''
+                          }
+                        } else if (line.length < 40) {
+                          mergeBuffer = line
+                        } else {
+                          merged.push(line)
+                        }
+                      }
+                      if (mergeBuffer.length > 0) {
+                        if (merged.length > 0) {
+                          merged[merged.length - 1] += '\n' + mergeBuffer
+                        } else {
+                          merged.push(mergeBuffer)
+                        }
+                      }
+
+                      // Map each merged paragraph to its character range in fullText
+                      const paragraphs: { text: string; startChar: number; endChar: number }[] = []
+                      let searchFrom = 0
+                      for (const para of merged) {
+                        // Find the first line of this merged paragraph in fullText
+                        const firstLine = para.split('\n')[0]
+                        const startIdx = fullText.indexOf(firstLine, searchFrom)
+                        if (startIdx === -1) continue
+                        // Find the end by locating the last line
+                        const lastLine = para.split('\n').pop() || firstLine
+                        const lastLineStart = fullText.indexOf(lastLine, startIdx)
+                        const endIdx = lastLineStart + lastLine.length
+                        paragraphs.push({
+                          text: para,
+                          startChar: startIdx,
+                          endChar: endIdx,
+                        })
+                        searchFrom = endIdx
+                      }
+
+                      // Filter the same way detection does (skip < 20 chars)
+                      const filtered = paragraphs.filter(p => p.text.length >= 20)
+
+                      if (index < 0 || index >= filtered.length) {
+                        console.warn(`[Detection] Paragraph index ${index} out of range (${filtered.length} paragraphs)`)
+                        return
+                      }
+
+                      const target = filtered[index]
+
+                      // Map character positions to ProseMirror positions
+                      // editor.getText() returns text where each textblock boundary = 1 char (\n)
+                      // In ProseMirror, each textblock boundary = 2 positions (close + open tags)
+                      // We walk the doc to build a char-to-pos mapping
+                      let charOffset = 0
+                      const charToPos: { charStart: number; charEnd: number; posFrom: number; posTo: number }[] = []
+
+                      editor.state.doc.descendants((node: any, pos: number) => {
+                        if (node.isTextblock) {
+                          const nodeText = node.textContent
+                          const from = pos + 1 // inside the node (after opening tag)
+                          const to = pos + node.nodeSize - 1 // before closing tag
+                          charToPos.push({
+                            charStart: charOffset,
+                            charEnd: charOffset + nodeText.length,
+                            posFrom: from,
+                            posTo: to,
+                          })
+                          charOffset += nodeText.length + 1 // +1 for the \n between blocks
+                        }
+                      })
+
+                      // Find which textblocks overlap with our target character range
+                      const overlapping = charToPos.filter(
+                        b => b.charEnd > target.startChar && b.charStart < target.endChar
+                      )
+
+                      if (overlapping.length === 0) {
+                        console.warn(`[Detection] No textblocks found for paragraph ${index}`)
+                        return
+                      }
+
+                      // Replace the full range spanning all overlapping textblocks
+                      const replaceFrom = overlapping[0].posFrom
+                      const replaceTo = overlapping[overlapping.length - 1].posTo
+
+                      // Build replacement content: split the new text by single newlines
+                      // to create proper paragraph nodes
+                      const newParagraphs = newText.split(/\n/).filter(s => s.trim().length > 0)
+
+                      if (newParagraphs.length <= 1) {
+                        // Single paragraph — simple replacement
+                        editor.chain().focus()
+                          .setTextSelection({ from: replaceFrom, to: replaceTo })
+                          .deleteSelection()
+                          .insertContent(newText.trim())
+                          .run()
+                      } else {
+                        // Multiple paragraphs — create proper block structure
+                        const content = newParagraphs.map(p => ({
+                          type: 'paragraph',
+                          content: [{ type: 'text', text: p.trim() }],
+                        }))
+
+                        editor.chain().focus()
+                          .setTextSelection({ from: replaceFrom, to: replaceTo })
+                          .deleteSelection()
+                          .insertContent(content)
+                          .run()
+                      }
+                    }}
+                    onReplaceFullText={(newText) => {
+                      const editor = editorRef.current?.getEditor?.()
+                      if (!editor) return
+
+                      // Build proper ProseMirror content from the rewritten document
+                      // Split on newlines to create paragraph nodes
+                      const paragraphs = newText.split(/\n+/).filter(s => s.trim().length > 0)
+
+                      const content = paragraphs.map(p => ({
+                        type: 'paragraph' as const,
+                        content: [{ type: 'text' as const, text: p.trim() }],
+                      }))
+
+                      // Replace entire document content atomically
+                      editor.chain().focus()
+                        .setContent({ type: 'doc', content })
+                        .run()
+
+                      console.log(`[Detection] Replaced full document: ${paragraphs.length} paragraphs`)
+                    }}
                   />
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-0 p-0">
-                  <VersionHistory documentId={documentId} />
+                  <VersionHistory
+                    documentId={documentId || ''}
+                    getCurrentContent={() => editorRef.current?.getEditor?.()?.getJSON?.() ?? undefined}
+                    onRestore={(content) => {
+                      const editor = editorRef.current?.getEditor?.()
+                      if (!editor) return
+                      try {
+                        // If content is a ProseMirror JSON doc, set it directly
+                        if (content && typeof content === 'object' && content.type === 'doc') {
+                          editor.commands.setContent(content)
+                        } else if (typeof content === 'string') {
+                          // If it's HTML, set as HTML
+                          editor.commands.setContent(content)
+                        } else {
+                          console.warn('[VersionHistory] Unknown content format, skipping restore')
+                        }
+                      } catch (err) {
+                        console.error('[VersionHistory] Failed to restore content:', err)
+                      }
+                    }}
+                  />
                 </TabsContent>
 
                 <TabsContent value="skills" className="mt-0 p-0 h-full">

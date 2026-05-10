@@ -8,7 +8,7 @@
 // ─────────────────────────── Automation Levels ───────────────────────────
 
 /** How much user involvement the writer loop requires */
-export type AutomationLevel = 'auto' | 'supervised' | 'manual'
+export type AutomationLevel = 'auto' | 'manual'
 
 // ─────────────────────────── Skill Types ───────────────────────────
 

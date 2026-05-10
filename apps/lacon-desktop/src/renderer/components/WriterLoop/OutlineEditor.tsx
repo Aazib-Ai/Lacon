@@ -8,7 +8,7 @@
 
 import React, { useCallback, useState } from 'react'
 
-import type { OutlineSection, OutlineSubsection, SectionProgress, WriterLoopStage, WriterOutline } from '../../../shared/writer-types'
+import type { AutomationLevel, OutlineSection, OutlineSubsection, SectionProgress, WriterLoopStage, WriterOutline } from '../../../shared/writer-types'
 import { cn } from '../../lib/utils'
 
 // ─────────────────────────── Props ───────────────────────────
@@ -25,6 +25,10 @@ interface OutlineEditorProps {
     retryFn: (() => void) | null
   } | null
   progress?: SectionProgress | null
+  /** Agentic pre-flight steps to show during planning */
+  preflightSteps?: Array<{ id: number; type: string; tool?: string; message: string; timestamp: string }>
+  /** Whether pre-flight is currently running */
+  preflightRunning?: boolean
   onUpdateSection: (sectionId: string, updates: Partial<OutlineSection>) => void
   onAddSection: (section?: Partial<OutlineSection>) => void
   onRemoveSection: (sectionId: string) => void
@@ -35,6 +39,14 @@ interface OutlineEditorProps {
   onReset: () => void
   onAbort?: () => void
   onClearError?: () => void
+  /** Current automation level (auto vs manual) */
+  automationLevel?: AutomationLevel
+  /** Callback to generate a single section (manual mode) */
+  onGenerateSection?: (sectionId: string) => void
+  /** Controlled instruction value (lifted from parent to survive tab switches) */
+  editingInstruction?: string
+  /** Callback when instruction changes (controlled mode) */
+  onEditingInstructionChange?: (value: string) => void
 }
 
 // ─────────────────────────── Error Banner ───────────────────────────
@@ -88,10 +100,29 @@ function ErrorBanner({
   )
 }
 
-// ─────────────────────────── Loading Indicator ───────────────────────────
+// ─────────────────────────── Outline Generating View ───────────────────────────
 
-function LoadingIndicator({ label }: { label: string }) {
+const outlineGenMessages = [
+  'Reading your prompt…',
+  'Analyzing your writing goals…',
+  'Selecting the best approach…',
+  'Researching relevant skills…',
+  'Structuring your outline…',
+  'Organizing sections & key points…',
+  'Estimating word counts…',
+  'Finalizing your outline…',
+]
+
+const outlineGenSteps = [
+  { id: 'analyze', label: 'Analyzing prompt', icon: '🔍', durationHint: 3 },
+  { id: 'skills', label: 'Selecting writing skills', icon: '✨', durationHint: 6 },
+  { id: 'structure', label: 'Structuring outline', icon: '📐', durationHint: 12 },
+  { id: 'finalize', label: 'Finalizing sections', icon: '✅', durationHint: 20 },
+]
+
+function OutlineGeneratingView({ label, preflightSteps }: { label: string; preflightSteps?: OutlineEditorProps['preflightSteps'] }) {
   const [elapsed, setElapsed] = useState(0)
+  const [messageIdx, setMessageIdx] = useState(0)
 
   React.useEffect(() => {
     const start = Date.now()
@@ -101,22 +132,169 @@ function LoadingIndicator({ label }: { label: string }) {
     return () => clearInterval(timer)
   }, [])
 
+  // Rotate messages every 4 seconds
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setMessageIdx(prev => (prev + 1) % outlineGenMessages.length)
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const hasSteps = preflightSteps && preflightSteps.length > 0
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[200px] gap-4 text-muted-foreground" id="outline-editor-loading">
-      <div className="w-8 h-8 border-3 border-border border-t-primary rounded-full animate-spin" />
-      <p className="text-sm font-medium text-foreground m-0">{label}</p>
-      {elapsed > 3 && (
-        <p className="text-xs text-muted-foreground m-0 tabular-nums">
-          {elapsed}s elapsed…{elapsed > 15 ? ' This is taking longer than usual.' : ''}
-        </p>
+    <div className="flex flex-col gap-0 p-6 animate-in fade-in duration-500" id="outline-editor-loading">
+      {/* ── Header ── */}
+      <div className="flex flex-col items-center text-center gap-3 mb-6">
+        <div className="relative w-14 h-14 flex items-center justify-center">
+          {/* Outer pulsing ring */}
+          <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-pulse" />
+          {/* Inner spinning ring */}
+          <div className="absolute inset-1 rounded-xl border-2 border-transparent border-t-primary border-r-primary/40 animate-spin" style={{ animationDuration: '1.2s' }} />
+          {/* Center icon */}
+          <span className="relative text-xl z-10">📝</span>
+        </div>
+        <div>
+          <h3 className="text-base font-bold m-0 text-foreground">Generating Your Outline</h3>
+          <p
+            className="text-sm text-muted-foreground m-0 mt-1 transition-opacity duration-500"
+            key={messageIdx}
+            style={{ animation: 'fadeInUp 0.5s ease-out' }}
+          >
+            {outlineGenMessages[messageIdx]}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Step Timeline ── */}
+      <div className="flex flex-col gap-0 mb-6">
+        {outlineGenSteps.map((step, idx) => {
+          const isActive = elapsed >= step.durationHint && elapsed < (outlineGenSteps[idx + 1]?.durationHint ?? 999)
+          const isComplete = outlineGenSteps[idx + 1] ? elapsed >= outlineGenSteps[idx + 1].durationHint : false
+          const isPending = elapsed < step.durationHint
+
+          return (
+            <div key={step.id} className="flex items-stretch gap-3">
+              {/* Vertical connector line + dot */}
+              <div className="flex flex-col items-center w-6 flex-shrink-0">
+                <div
+                  className={cn(
+                    'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 flex-shrink-0',
+                    isComplete && 'bg-primary/15 text-primary',
+                    isActive && 'bg-primary/10 text-primary ring-2 ring-primary/30 ring-offset-1 ring-offset-background',
+                    isPending && 'bg-muted text-muted-foreground/40',
+                  )}
+                >
+                  {isComplete ? '✓' : isActive ? (
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+                  ) : (
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                  )}
+                </div>
+                {idx < outlineGenSteps.length - 1 && (
+                  <div
+                    className={cn(
+                      'w-0.5 flex-1 min-h-[16px] transition-colors duration-500',
+                      isComplete ? 'bg-primary/30' : 'bg-border',
+                    )}
+                  />
+                )}
+              </div>
+              {/* Step content */}
+              <div
+                className={cn(
+                  'flex items-center gap-2 pb-3 transition-all duration-500',
+                  isPending && 'opacity-40',
+                  isActive && 'opacity-100',
+                  isComplete && 'opacity-70',
+                )}
+              >
+                <span className="text-sm">{step.icon}</span>
+                <span className={cn(
+                  'text-sm font-medium',
+                  isActive && 'text-foreground',
+                  isComplete && 'text-muted-foreground',
+                  isPending && 'text-muted-foreground/60',
+                )}>
+                  {step.label}
+                </span>
+                {isActive && (
+                  <div className="flex gap-0.5 ml-1">
+                    <div className="w-1 h-1 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1 h-1 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1 h-1 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Agentic pre-flight steps (real data from backend) ── */}
+      {hasSteps && (
+        <div className="flex flex-col gap-1.5 mb-5">
+          <div className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
+            AI Agent Activity
+          </div>
+          {preflightSteps!.map(step => (
+            <div
+              key={step.id}
+              className={cn(
+                'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs animate-in fade-in slide-in-from-left-2 duration-300',
+                step.type === 'tool-call' && 'bg-primary/5 border border-primary/10',
+                step.type === 'tool-result' && 'bg-muted/50',
+                step.type === 'thinking' && 'text-muted-foreground',
+                step.type === 'ready' && 'bg-green-500/5 border border-green-500/15 text-green-600',
+              )}
+            >
+              <span className="flex-1 leading-snug">{step.message}</span>
+            </div>
+          ))}
+        </div>
       )}
-      {elapsed > 30 && (
-        <p className="text-xs text-muted-foreground m-0 px-3 py-2 bg-muted/50 rounded-lg border border-border">
-          If this takes too long, check your provider connection in Settings.
-        </p>
-      )}
+
+      {/* ── Skeleton Preview (shows what the outline will look like) ── */}
+      <div className="flex flex-col gap-2 mb-5">
+        <div className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          Preview
+        </div>
+        {[1, 2, 3].map(i => (
+          <div
+            key={i}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-card/50 animate-pulse"
+            style={{ animationDelay: `${i * 200}ms`, animationDuration: '1.8s' }}
+          >
+            <div className="w-7 h-7 rounded-lg bg-muted flex-shrink-0" />
+            <div className="flex-1 flex flex-col gap-1.5">
+              <div className="h-3.5 rounded-md bg-muted/80" style={{ width: `${70 - i * 12}%` }} />
+              <div className="h-2.5 rounded-md bg-muted/50" style={{ width: `${50 - i * 8}%` }} />
+            </div>
+            <div className="w-10 h-3 rounded bg-muted/40 flex-shrink-0" />
+          </div>
+        ))}
+      </div>
+
+      {/* ── Footer: elapsed + tip ── */}
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
+        <span className="tabular-nums font-medium">{formatElapsedLoading(elapsed)}</span>
+        <span className="text-muted-foreground/40">·</span>
+        <span>
+          {elapsed > 30
+            ? 'This is taking longer than usual — check your provider in Settings.'
+            : elapsed > 15
+              ? 'Still working — complex topics take a bit longer.'
+              : 'AI is crafting your document structure…'}
+        </span>
+      </div>
     </div>
   )
+}
+
+function formatElapsedLoading(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
 // ─────────────────────────── Stage Badge ───────────────────────────
@@ -309,6 +487,8 @@ export function OutlineEditor({
   error,
   errorMeta,
   progress,
+  preflightSteps,
+  preflightRunning,
   onUpdateSection,
   onAddSection,
   onRemoveSection,
@@ -319,8 +499,15 @@ export function OutlineEditor({
   onReset,
   onAbort,
   onClearError,
+  automationLevel,
+  onGenerateSection,
+  editingInstruction: controlledInstruction,
+  onEditingInstructionChange,
 }: OutlineEditorProps) {
-  const [editingInstruction, setEditingInstruction] = useState('')
+  // Support controlled mode (parent owns state) or local state (backward-compat)
+  const [localInstruction, setLocalInstruction] = useState('')
+  const editingInstruction = controlledInstruction !== undefined ? controlledInstruction : localInstruction
+  const setEditingInstruction = onEditingInstructionChange || setLocalInstruction
   const isEditable = stage === 'awaiting-outline-approval'
 
   // ── Error State (standalone — no outline present) ──
@@ -356,13 +543,16 @@ export function OutlineEditor({
   }
 
   // ── Empty State ──
-  if (!outline && stage === 'idle') {
+  // Also catch stale 'planning' stage (e.g. app restarted mid-planning) — treat as idle
+  if (!outline && (stage === 'idle' || stage === 'planning') && !loading && !preflightRunning) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[320px] text-center gap-3 p-6" id="outline-editor-empty">
          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-lg font-bold text-muted-foreground mb-2">W</div>
         <h3 className="text-xl font-semibold m-0 text-foreground">Start Writing</h3>
         <p className="text-sm text-muted-foreground m-0 mb-2 max-w-[360px]">
-          Enter your writing instruction below to generate a structured outline.
+          {automationLevel === 'auto'
+            ? 'Enter your writing instruction and AI will write it directly.'
+            : 'Enter your writing instruction below to generate a structured outline.'}
         </p>
         <div className="flex flex-col gap-2 w-full max-w-md">
           <textarea
@@ -384,25 +574,112 @@ export function OutlineEditor({
               }
             }}
           >
-             {loading ? 'Generating…' : 'Generate Outline'}
+             {loading ? 'Generating…' : automationLevel === 'auto' ? 'Write' : 'Generate Outline'}
           </button>
         </div>
       </div>
     )
   }
 
-  // ── Loading State ──
-  if (loading && !outline) {
-    return <LoadingIndicator label="Generating outline…" />
+  // ── Loading State (active planning in progress) ──
+  // Only show when explicitly loading (user-triggered) or preflightRunning (active backend work)
+  if (!outline && (loading || preflightRunning)) {
+    const label = preflightRunning ? 'AI is analyzing your request…' : 'Generating outline…'
+    return <OutlineGeneratingView label={label} preflightSteps={preflightSteps} />
   }
 
   if (!outline) {return null}
 
-  // ── Generating State: Show progress view ──
+  // ── Generating State ──
   if (stage === 'generating' && outline) {
+    // Manual mode: show per-section generation controls
+    if (automationLevel === 'manual') {
+      return (
+        <div className="flex flex-col gap-4 p-6" id="outline-editor">
+          {/* Error during generation */}
+          {error && (
+            <ErrorBanner error={error} errorMeta={errorMeta} onDismiss={onClearError} />
+          )}
+
+          {/* Header */}
+          <div className="pb-3 border-b border-border">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold m-0 text-foreground">{outline.title}</h2>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[0.7rem] font-semibold uppercase tracking-wide border border-border text-muted-foreground">
+                Manual Mode — Write Section by Section
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 m-0">
+              Click "Write" on each section to generate it. Review each section before moving to the next.
+            </p>
+          </div>
+
+          {/* Sections with per-section controls */}
+          <div className="flex flex-col gap-2">
+            {outline.sections.map((section, idx) => {
+              const isCompleted = progress?.results?.some(r => r.sectionId === section.id)
+              const isCurrent = progress?.currentSectionId === section.id
+
+              return (
+                <div
+                  key={section.id}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3 rounded-xl border transition-all',
+                    isCompleted && 'bg-muted/30 border-border',
+                    isCurrent && 'bg-primary/5 border-primary/20',
+                    !isCompleted && !isCurrent && 'bg-card border-border hover:border-muted-foreground/30',
+                  )}
+                >
+                  {/* Status icon */}
+                  <div className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-muted text-xs font-bold">
+                    {isCompleted ? '✓' : isCurrent ? (
+                      <div className="w-3.5 h-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      idx + 1
+                    )}
+                  </div>
+
+                  {/* Section info */}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-semibold text-foreground">{section.title}</span>
+                    <span className="text-xs text-muted-foreground ml-2">~{section.estimatedWords}w</span>
+                  </div>
+
+                  {/* Action button */}
+                  {isCompleted ? (
+                    <span className="text-xs text-muted-foreground font-medium">Done</span>
+                  ) : isCurrent ? (
+                    <span className="text-xs text-primary font-medium">Writing…</span>
+                  ) : (
+                    <button
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground text-background hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      disabled={loading || isCurrent}
+                      onClick={() => onGenerateSection?.(section.id)}
+                    >
+                      Write
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Reset button */}
+          <div className="flex gap-2 mt-2 pt-3 border-t border-border">
+            <button
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-muted-foreground border border-border hover:text-foreground hover:bg-muted transition-all"
+              onClick={onReset}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    // Auto mode: show auto-progress view
     return (
       <div className="flex flex-col h-full" id="outline-editor">
-        {/* Error during generation */}
         {error && (
           <div className="px-6 pt-4">
             <ErrorBanner error={error} errorMeta={errorMeta} onDismiss={onClearError} />
@@ -418,7 +695,7 @@ export function OutlineEditor({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6" id="outline-editor">
+    <div className="flex flex-col gap-4 p-6 animate-in fade-in slide-in-from-bottom-2 duration-500" id="outline-editor">
       {/* ── Header ── */}
       <div className="pb-3 border-b border-border">
         <div className="flex items-center gap-3 flex-wrap">
@@ -500,7 +777,7 @@ export function OutlineEditor({
         <button
           id="outline-reset-btn"
            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-muted-foreground border border-border hover:text-foreground hover:bg-muted transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-           disabled={loading || stage === 'idle'}
+           disabled={loading}
            onClick={onReset}
          >
            Reset

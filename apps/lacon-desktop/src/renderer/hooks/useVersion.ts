@@ -260,6 +260,23 @@ export function useVersion(documentId: string | undefined) {
     [handleResponse],
   )
 
+  // ── Manual Snapshot ──
+
+  const createManualSnapshot = useCallback(
+    async (content: any) => {
+      if (!documentId) { return }
+      dispatch({ type: 'START_LOADING' })
+      try {
+        const res = await versionApi().createSnapshot(documentId, 'manual', content)
+        handleResponse(res)
+        await fetchSnapshots()
+      } catch (err: any) {
+        dispatch({ type: 'SET_ERROR', error: err.message })
+      }
+    },
+    [documentId, handleResponse, fetchSnapshots],
+  )
+
   // Fetch UX state on mount
   useEffect(() => {
     fetchZenMode()
@@ -274,6 +291,7 @@ export function useVersion(documentId: string | undefined) {
     confirmRestore,
     addMilestoneLabel,
     deleteSnapshot,
+    createManualSnapshot,
     toggleZenMode,
     toggleAssistant,
   }

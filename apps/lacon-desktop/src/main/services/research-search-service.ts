@@ -323,6 +323,109 @@ export class ResearchSearchService {
   }
 
   /**
+   * Use the LLM to generate sub-topic research queries for comprehensive coverage.
+   * Returns an array of specific research queries derived from the main topic.
+   */
+  async generateSubTopicQueries(topic: string, count: number = 3): Promise<string[]> {
+    const pm = getProviderManager()
+    const providers = pm.listProviders()
+    const provider = providers.find(p => p.enabled)
+
+    if (!provider) {
+      console.log('[Research] No LLM provider for sub-topic generation, using fallback queries')
+      // Fallback: generate basic variations
+      return [
+        `${topic} history and origins`,
+        `${topic} key concepts and beliefs`,
+        `${topic} modern significance`,
+      ].slice(0, count)
+    }
+
+    try {
+      const response = await pm.chatCompletion(
+        provider.id,
+        {
+          model: provider.defaultModel || 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a research assistant. Given a topic, generate ${count} specific research queries that would help write a comprehensive article. Each query should target a different aspect or angle of the topic (e.g., history, key ideas, modern relevance, controversies, notable figures).
+
+Respond ONLY with a JSON array of strings. No markdown, no explanation.
+Example: ["topic history and origins", "topic key principles", "topic modern impact"]`,
+            },
+            {
+              role: 'user',
+              content: `Topic: "${topic}"`,
+            },
+          ],
+          temperature: 0.4,
+          maxTokens: 300,
+        },
+        'sub-topic-generation',
+      )
+
+      const content = response.choices?.[0]?.message?.content?.trim()
+      if (content) {
+        let cleaned = content
+        if (cleaned.startsWith('```')) {
+          cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim()
+        }
+        const parsed = JSON.parse(cleaned)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log(`[Research] Generated ${parsed.length} sub-topic queries for "${topic}"`)
+          return parsed.slice(0, count).map(String)
+        }
+      }
+    } catch (err: any) {
+      console.warn('[Research] Sub-topic generation failed, using fallback:', err.message)
+    }
+
+    // Fallback
+    return [
+      `${topic} history and origins`,
+      `${topic} key concepts and beliefs`,
+      `${topic} modern significance`,
+    ].slice(0, count)
+  }
+
+  /**
+   * Comprehensive auto-research: deep research the main topic + LLM-generated sub-topics.
+   * Returns all created research entries.
+   */
+  async autoResearch(
+    topic: string,
+    documentId: string,
+    onProgress?: (step: { message: string; current: number; total: number }) => void,
+  ): Promise<ResearchLogEntry[]> {
+    const entries: ResearchLogEntry[] = []
+
+    // Step 1: Generate sub-topic queries
+    onProgress?.({ message: `Generating research angles for "${topic}"...`, current: 0, total: 1 })
+    const subTopics = await this.generateSubTopicQueries(topic, 3)
+    const allQueries = [topic, ...subTopics]
+    const total = allQueries.length
+
+    // Step 2: Deep research each query sequentially
+    for (let i = 0; i < allQueries.length; i++) {
+      const query = allQueries[i]
+      onProgress?.({ message: `Researching: "${query}"`, current: i + 1, total })
+
+      try {
+        const entry = await this.deepResearch(query, documentId)
+        entries.push(entry)
+        console.log(`[Research] Auto-research ${i + 1}/${total}: "${query}" — ${entry.sources.length} sources`)
+      } catch (err: any) {
+        console.warn(`[Research] Auto-research failed for "${query}":`, err.message)
+        // Continue with remaining queries
+      }
+    }
+
+    console.log(`[Research] Auto-research complete: ${entries.length}/${total} queries succeeded`)
+    return entries
+  }
+
+  /**
    * Use the user's configured LLM to summarize research sources.
    * Model-agnostic — works with any provider (OpenAI, Anthropic, Gemini, local, etc).
    */

@@ -462,7 +462,7 @@ export function registerWriterLoopHandlers(): void {
                     headingNodes.push({ id, text: extractNodeText(node) })
                   }
                   if (node.type === 'paragraph' || node.type === 'heading') {
-                    autoIdx++
+                    autoIdx += 1
                   }
                 }
               }
@@ -521,7 +521,21 @@ export function registerWriterLoopHandlers(): void {
     },
   )
 
-  console.log('[IPC] Writer loop handlers registered (Phases 2-4)')
+  // ── Agentic Pre-flight IPC ──
+
+  // ── writerLoop:getPreflight ──
+  ipcMain.handle(
+    IPC_CHANNELS.WRITER_LOOP_GET_PREFLIGHT,
+    async (_event, payload: { documentId: string }) => {
+      return handleWriterIpc(IPC_CHANNELS.WRITER_LOOP_GET_PREFLIGHT, payload, async () => {
+        const loop = getWriterLoop(payload.documentId)
+        const result = loop.getPreflightResult()
+        return { success: true, data: result }
+      })
+    },
+  )
+
+  console.log('[IPC] Writer loop handlers registered (Phases 2-4 + Agentic Pre-flight)')
 }
 
 /**

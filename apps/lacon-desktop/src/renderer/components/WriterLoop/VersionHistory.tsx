@@ -14,6 +14,8 @@ interface VersionHistoryProps {
   documentId: string
   currentContent?: any
   onRestore?: (content: any) => void
+  /** Optional getter for fresh editor content at restore time */
+  getCurrentContent?: () => any
 }
 
 const TRIGGER_LABELS: Record<SnapshotTrigger, { icon: string; label: string }> = {
@@ -139,7 +141,7 @@ const SnapshotCard: React.FC<SnapshotCardProps> = ({
 
 // ── Main Component ──
 
-export const VersionHistory: React.FC<VersionHistoryProps> = ({ documentId, currentContent, onRestore }) => {
+export const VersionHistory: React.FC<VersionHistoryProps> = ({ documentId, currentContent, onRestore, getCurrentContent }) => {
   const {
     snapshots,
     confirmingRestore,
@@ -150,13 +152,21 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({ documentId, curr
     confirmRestore,
     addMilestoneLabel,
     deleteSnapshot,
+    createManualSnapshot,
   } = useVersion(documentId)
 
   const [milestoneInput, setMilestoneInput] = useState<{ id: string; value: string } | null>(null)
 
   const handleRestore = async () => {
-    const result = await confirmRestore(currentContent)
-    if (result && onRestore) {onRestore(result.content)}
+    // Use the getter for fresh content, fallback to static prop
+    const content = getCurrentContent ? getCurrentContent() : currentContent
+    const result = await confirmRestore(content)
+    if (result && onRestore) { onRestore(result.content) }
+  }
+
+  const handleCreateManualSnapshot = async () => {
+    const content = getCurrentContent ? getCurrentContent() : currentContent
+    await createManualSnapshot(content)
   }
 
   const handleAddMilestone = async (snapshotId: string) => {
@@ -167,13 +177,21 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({ documentId, curr
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-border">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 m-0">
           📜 Version History{' '}
           <span className="text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
             {snapshots.length}
           </span>
         </h3>
+        <button
+          className="px-2.5 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+          onClick={handleCreateManualSnapshot}
+          disabled={loading || !documentId}
+          title="Save a manual snapshot of the current document"
+        >
+          📌 Snapshot
+        </button>
       </div>
 
       {error && (

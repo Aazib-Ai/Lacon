@@ -20,6 +20,8 @@ import { SelectionPersist } from '../extensions/SelectionPersist'
 
 /** Fixed document width matching US Letter (8.5 in at 96 dpi) */
 const DOC_WIDTH = 816
+/** Minimum document height matching US Letter (11 in at 96 dpi) */
+const DOC_MIN_HEIGHT = 1056
 const DOC_PADDING_X = 115
 const DOC_PADDING_Y = 96
 
@@ -175,7 +177,7 @@ export function ModernEditor({ content, onChangeHTML, editorRef, onRefine, onCre
           >
             <div
               className="paginated-document"
-              style={{ width: `${DOC_WIDTH}px` }}
+              style={{ width: `${DOC_WIDTH}px`, minHeight: `${DOC_MIN_HEIGHT}px` }}
             >
               <div
                 className="paginated-editor-content"

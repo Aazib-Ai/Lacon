@@ -100,7 +100,7 @@ async function ensureLaconSidecar(projectPath: string): Promise<void> {
           version: 1,
           provider: '',
           model: '',
-          automationLevel: 'supervised',
+          automationLevel: 'manual',
         },
         null,
         2,
@@ -152,7 +152,7 @@ async function ensureDocumentContext(projectPath: string, fileName: string): Pro
         {
           documentId: fileName,
           stage: 'idle',
-          automationLevel: 'supervised',
+          automationLevel: 'manual',
           activeSkillIds: [],
           wordTarget: 0,
           modelConfig: { providerId: '', modelId: '' },

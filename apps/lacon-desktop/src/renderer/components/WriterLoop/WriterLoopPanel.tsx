@@ -3,12 +3,17 @@
  *
  * Container component that wires the useWriterLoop hook to the OutlineEditor.
  * Shows session config bar (word target, automation level, stage) + OutlineEditor.
+ *
+ * Owns the `editingInstruction` state so it survives tab switches.
+ * Composes active skills and research context before passing to startPlanning.
  */
 
-import React, { useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 
-import type { AutomationLevel } from '../../../shared/writer-types'
+import type { AutomationLevel, ResearchContext } from '../../../shared/writer-types'
 import { cn } from '../../lib/utils'
+import { useResearch } from '../../hooks/useResearch'
+import { useSkills } from '../../hooks/useSkills'
 import { useWriterLoop } from '../../hooks/useWriterLoop'
 import { OutlineEditor } from './OutlineEditor'
 
@@ -18,12 +23,40 @@ interface WriterLoopPanelProps {
 
 export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
   const loop = useWriterLoop(documentId)
+  const skills = useSkills(documentId)
+  const research = useResearch(documentId)
+
+  // Lifted instruction state — persists across tab switches
+  const [editingInstruction, setEditingInstruction] = useState('')
 
   const handleRegenerate = useCallback(
     (instruction: string) => {
-      loop.startPlanning(instruction)
+      // 1. Get already-composed skill prompt (auto-composed on activeSkillIds change)
+      const composedSkillPrompt = skills.composedSkill?.composedPrompt || ''
+
+      // 2. Build research context from current entries
+      let researchContext: ResearchContext | undefined
+      if (research.entries.length > 0) {
+        researchContext = {
+          entries: research.entries.map(entry => ({
+            id: entry.id,
+            query: entry.query,
+            excerpts: entry.excerpts,
+            sources: entry.sources,
+            createdAt: entry.createdAt,
+          })),
+          summary: research.entries.map(e => `[${e.query}]: ${e.excerpts[0] || ''}`).join('\n'),
+        }
+      }
+
+      // 3. Pass everything to startPlanning
+      console.log(
+        `[WriterLoopPanel] startPlanning with skills=${skills.activeSkillIds.length}, ` +
+        `research=${research.entries.length}, composedPrompt=${composedSkillPrompt.length} chars`
+      )
+      loop.startPlanning(instruction, composedSkillPrompt, researchContext)
     },
-    [loop],
+    [loop, skills, research],
   )
 
   const handleApprove = useCallback(() => {
@@ -32,6 +65,7 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
 
   const handleReset = useCallback(() => {
     loop.reset()
+    setEditingInstruction('') // Clear instruction on reset
   }, [loop])
 
   if (!documentId) {
@@ -50,6 +84,12 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
         onUpdateConfig={loop.updateConfig}
         onPause={loop.pause}
         onReset={loop.reset}
+        activeSkillNames={
+          skills.activeSkillIds
+            .map(id => skills.skills.find(s => s.id === id)?.name)
+            .filter(Boolean) as string[]
+        }
+        researchEntryCount={research.entries.length}
       />
 
       {/* ── Outline Editor ── */}
@@ -60,6 +100,8 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
         error={loop.error}
         errorMeta={loop.errorMeta}
         progress={loop.progress}
+        preflightSteps={loop.preflightSteps}
+        preflightRunning={loop.preflightRunning}
         onUpdateSection={loop.updateSection}
         onAddSection={loop.addSection}
         onRemoveSection={loop.removeSection}
@@ -72,6 +114,10 @@ export function WriterLoopPanel({ documentId }: WriterLoopPanelProps) {
         onClearError={() => {
           loop.fetchState()
         }}
+        automationLevel={loop.session?.automationLevel}
+        onGenerateSection={loop.generateSection}
+        editingInstruction={editingInstruction}
+        onEditingInstructionChange={setEditingInstruction}
       />
     </div>
   )
@@ -84,6 +130,10 @@ interface SessionConfigBarProps {
   onUpdateConfig: (config: any) => void
   onPause: () => void
   onReset: () => void
+  /** Names of active skills for visual feedback */
+  activeSkillNames?: string[]
+  /** Number of research entries for visual feedback */
+  researchEntryCount?: number
 }
 
 const stageColorMap: Record<string, string> = {
@@ -93,10 +143,17 @@ const stageColorMap: Record<string, string> = {
   reviewing: 'text-primary',
 }
 
-function SessionConfigBar({ session, onUpdateConfig, onPause: _onPause, onReset: _onReset }: SessionConfigBarProps) {
+function SessionConfigBar({
+  session,
+  onUpdateConfig,
+  onPause: _onPause,
+  onReset: _onReset,
+  activeSkillNames = [],
+  researchEntryCount = 0,
+}: SessionConfigBarProps) {
   if (!session) {return null}
 
-  const automationOptions: AutomationLevel[] = ['auto', 'supervised', 'manual']
+  const automationOptions: AutomationLevel[] = ['auto', 'manual']
 
   return (
     <div
@@ -144,7 +201,7 @@ function SessionConfigBar({ session, onUpdateConfig, onPause: _onPause, onReset:
         <span className="text-muted-foreground text-[0.65rem]">words</span>
       </div>
 
-      {/* Skills count — clickable to open Skills tab */}
+      {/* Skills — show names when active, otherwise just count */}
       <div className="flex items-center gap-1.5">
         <span className="text-muted-foreground font-medium uppercase tracking-wider text-[0.625rem]">Skills</span>
         <button
@@ -153,16 +210,40 @@ function SessionConfigBar({ session, onUpdateConfig, onPause: _onPause, onReset:
             window.dispatchEvent(new CustomEvent('lacon:open-skills-tab'))
           }}
           className={cn(
-            'font-semibold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer',
-            (session.activeSkillIds?.length || 0) > 0
+            'font-semibold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1',
+            activeSkillNames.length > 0
               ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20'
               : 'text-foreground hover:bg-secondary',
           )}
-          title="Open Skills Library"
+          title={
+            activeSkillNames.length > 0
+              ? `Active: ${activeSkillNames.join(', ')}`
+              : 'Open Skills Library'
+          }
         >
-          ✨ {session.activeSkillIds?.length || 0}
+          ✨ {activeSkillNames.length > 0
+            ? activeSkillNames.map(name => (
+                <span key={name} className="truncate max-w-[60px] inline-block align-middle">{name}</span>
+              )).reduce((prev: any, curr: any, i: number) => [prev, <span key={`sep-${i}`} className="text-amber-400/50 mx-0.5">·</span>, curr] as any)
+            : '0'
+          }
         </button>
       </div>
+
+      {/* Research entry count */}
+      {researchEntryCount > 0 && (
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('lacon:open-research-tab'))
+            }}
+            className="font-semibold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 flex items-center gap-1"
+            title={`${researchEntryCount} research entries attached`}
+          >
+            🔬 {researchEntryCount}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

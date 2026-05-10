@@ -21,7 +21,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { basename, extname, join } from 'path'
+import { basename, join } from 'path'
 
 import type { ProjectWorkspace, WriterSession } from '../../shared/writer-types'
 
@@ -42,7 +42,7 @@ function docNameFromFile(documentId: string): string {
 function createDefaultSession(documentId: string): WriterSession {
   return {
     documentId,
-    automationLevel: 'supervised',
+    automationLevel: 'manual',
     activeSkillIds: [],
     wordTarget: 0,
     stage: 'idle',
@@ -218,10 +218,10 @@ export function getProjectWorkspaceService(): ProjectWorkspaceService {
 export function getActiveProjectPath(): string | null {
   try {
     const { app } = require('electron')
-    const { readFileSync } = require('fs')
-    const { join } = require('path')
-    const settingsPath = join(app.getPath('userData'), 'lacon-project-settings.json')
-    const data = readFileSync(settingsPath, 'utf-8')
+    const fsModule = require('fs')
+    const pathModule = require('path')
+    const settingsPath = pathModule.join(app.getPath('userData'), 'lacon-project-settings.json')
+    const data = fsModule.readFileSync(settingsPath, 'utf-8')
     const settings = JSON.parse(data)
     return settings.activeProjectPath || null
   } catch {

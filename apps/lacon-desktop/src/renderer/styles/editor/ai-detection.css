@@ -7,6 +7,47 @@
   animation: gaugeAppear 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+/* ─── Detection Action Cards ─── */
+.detection-action-card {
+  transform: translateY(0);
+  will-change: transform, box-shadow;
+}
+
+.detection-action-card:hover {
+  transform: translateY(-1px);
+}
+
+.detection-action-card:active {
+  transform: translateY(0);
+}
+
+/* Stagger entrance animation for idle state cards */
+#ai-detection-panel .detection-action-card:nth-child(1) {
+  animation: cardSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: 0.05s;
+}
+
+#ai-detection-panel .detection-action-card:nth-child(2) {
+  animation: cardSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: 0.1s;
+}
+
+#ai-detection-panel .detection-action-card:nth-child(3) {
+  animation: cardSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: 0.15s;
+}
+
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Editor paragraph flagging */
 [data-ai-flagged="true"] {
   position: relative;

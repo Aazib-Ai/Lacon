@@ -1,10 +1,10 @@
 /**
  * AI Detection & Humanization — Shared Types
  *
- * Type definitions for the 3-layer detection pipeline:
- *   Layer 1: Heuristic (statistical analysis)
+ * Type definitions for the detection pipeline:
+ *   Layer 1: Heuristic (statistical analysis, local, no key needed)
  *   Layer 2: LLM-as-Judge (ProviderManager)
- *   Layer 3: Transformers.js ML (Web Worker)
+ *   Layer 3: External API (Sapling.ai / Winston AI — BYOK)
  */
 
 // ─────────────────────────── Score Levels ───────────────────────────
@@ -35,7 +35,7 @@ export interface DetectionReport {
   overallScore: number // 0-100
   level: AIScoreLevel
   paragraphs: ParagraphAnalysis[]
-  source: 'heuristic' | 'llm' | 'ml' | 'combined'
+  source: 'heuristic' | 'llm' | 'sapling' | 'winston' | 'combined'
   analyzedAt: string
   tokenUsage?: { inputTokens: number; outputTokens: number; estimatedCost?: number }
 }
@@ -56,76 +56,35 @@ export interface HeuristicMetrics {
 export type HumanizeStyle = 'conversational' | 'academic' | 'professional'
 
 export interface HumanizeRequest {
-  paragraphs: { index: number; text: string }[]
+  paragraphs: HumanizeParagraphInput[]
   style?: HumanizeStyle
   preserveMeaning: boolean
+}
+
+export interface HumanizeParagraphInput {
+  index: number
+  text: string
+  tells?: string[]       // AI patterns detected (e.g. "uniform sentence length")
+  suggestions?: string[] // specific fix suggestions
+  aiScore?: number       // 0-100 detection score
 }
 
 export interface HumanizeParagraphResult {
   index: number
   original: string
   rewritten: string
+  wordCountOriginal?: number
+  wordCountRewritten?: number
 }
 
 export interface HumanizeResult {
+  /** Full rewritten document text (when using document-level humanization) */
+  rewrittenFullText?: string
   paragraphs: HumanizeParagraphResult[]
   tokenUsage: { inputTokens: number; outputTokens: number; estimatedCost?: number }
 }
 
-// ─────────────────────────── ML Verification (Web Worker) ───────────────────────────
 
-export interface MLSentenceResult {
-  text: string
-  aiProbability: number
-  label: string // 'LABEL_0' (human) or 'LABEL_1' (AI)
-}
-
-export interface MLVerificationResult {
-  overallScore: number
-  sentences: MLSentenceResult[]
-  modelId: string
-  inferenceTimeMs: number
-}
-
-// ─────────────────────────── Worker Messages ───────────────────────────
-
-export interface WorkerInitMessage {
-  type: 'init'
-}
-
-export interface WorkerClassifyMessage {
-  type: 'classify'
-  sentences: string[]
-}
-
-export type WorkerInboundMessage = WorkerInitMessage | WorkerClassifyMessage
-
-export interface WorkerReadyMessage {
-  type: 'ready'
-}
-
-export interface WorkerProgressMessage {
-  type: 'progress'
-  message: string
-  percent?: number
-}
-
-export interface WorkerResultMessage {
-  type: 'result'
-  data: MLSentenceResult[]
-  inferenceTimeMs: number
-}
-
-export interface WorkerErrorMessage {
-  type: 'error'
-  error: string
-}
-
-export type WorkerOutboundMessage =
-  | WorkerReadyMessage
-  | WorkerProgressMessage
-  | WorkerResultMessage
-  | WorkerErrorMessage
 
 // ─────────────────────────── IPC Request / Response ───────────────────────────
 
@@ -139,7 +98,9 @@ export interface DetectLLMAnalyzeRequest {
 }
 
 export interface DetectLLMHumanizeRequest {
-  paragraphs: { index: number; text: string }[]
+  /** The full document text — used for document-level humanization */
+  fullText?: string
+  paragraphs: HumanizeParagraphInput[]
   style?: HumanizeStyle
   providerId?: string
 }
@@ -149,27 +110,55 @@ export interface DetectFullPipelineRequest {
   providerId?: string
 }
 
+// ─────────────────────────── Detection API (External Providers) ───────────────────────────
+
+export type DetectionApiProvider = 'sapling' | 'winston'
+
+export interface DetectionApiConfig {
+  provider: DetectionApiProvider
+  apiKeyId: string
+  label: string
+}
+
+export interface DetectApiAnalyzeRequest {
+  text: string
+  provider: DetectionApiProvider
+}
+
+export interface DetectSetApiKeyRequest {
+  provider: DetectionApiProvider
+  apiKey: string
+  label?: string
+}
+
+export interface DetectGetApiKeyRequest {
+  provider: DetectionApiProvider
+}
+
+export interface DetectDeleteApiKeyRequest {
+  provider: DetectionApiProvider
+}
+
+export interface DetectTestApiKeyRequest {
+  provider: DetectionApiProvider
+  apiKey: string
+}
+
 // ─────────────────────────── Detection State (for hook) ───────────────────────────
 
-export type DetectionPhase = 'idle' | 'heuristic' | 'llm-analyzing' | 'llm-humanizing' | 'ml-verifying' | 'complete'
+export type DetectionPhase = 'idle' | 'heuristic' | 'llm-analyzing' | 'llm-humanizing' | 'api-analyzing' | 'complete'
 
 export interface DetectionState {
   phase: DetectionPhase
   report: DetectionReport | null
-  mlResult: MLVerificationResult | null
   humanizeResult: HumanizeResult | null
-  mlModelReady: boolean
-  mlModelLoading: boolean
   error: string | null
 }
 
 export const INITIAL_DETECTION_STATE: DetectionState = {
   phase: 'idle',
   report: null,
-  mlResult: null,
   humanizeResult: null,
-  mlModelReady: false,
-  mlModelLoading: false,
   error: null,
 }
 

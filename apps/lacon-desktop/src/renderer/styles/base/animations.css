@@ -166,3 +166,17 @@
   background-size: 200% 100%;
   animation: shimmer 2s linear infinite;
 }
+
+/* ─── Outline Generation ─── */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

@@ -176,9 +176,9 @@ export class VersionService {
   }
 
   /**
-   * Create a new snapshot (used internally for safety snapshots).
+   * Create a new snapshot.
    */
-  private createSnapshot(documentId: string, trigger: SnapshotTrigger, content: any, label?: string): VersionSnapshot {
+  createSnapshot(documentId: string, trigger: SnapshotTrigger, content: any, label?: string): VersionSnapshot {
     const snapshotsDir = getProjectWorkspaceService().getSnapshotsPath(documentId, requireProjectPath())
 
     const snapshot: VersionSnapshot = {

@@ -194,5 +194,17 @@ export function registerResearchHandlers(): void {
     })
   })
 
+  // ── research:autoResearch ──
+  ipcMain.handle(
+    IPC_CHANNELS.RESEARCH_AUTO_RESEARCH,
+    async (_event, payload: { documentId: string; topic: string }) => {
+      return handleResearchIpc(IPC_CHANNELS.RESEARCH_AUTO_RESEARCH, payload, async () => {
+        const service = getResearchSearchService()
+        const entries = await service.autoResearch(payload.topic, payload.documentId)
+        return { success: true, data: { entries } }
+      })
+    },
+  )
+
   console.log('[IPC] Research & citation handlers registered (Phase 5)')
 }

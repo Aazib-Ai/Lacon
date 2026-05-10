@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from 'crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
 import type {
@@ -269,6 +269,40 @@ export class Reviewer {
   }
 
   /**
+   * Resolve the provider ID and model ID for LLM calls.
+   * Checks session.modelConfig first, then falls back to enabledProvider.defaultModel.
+   */
+  private resolveModel(): { providerId: string; modelId: string } | null {
+    const pm = getProviderManager()
+    const providers = pm.listProviders()
+
+    // Check session modelConfig first
+    try {
+      const projectPath = getActiveProjectPath()
+      if (projectPath) {
+        const ws = getProjectWorkspaceService()
+        const session = ws.getSession(this.documentId, projectPath)
+        if (session.modelConfig?.providerId && session.modelConfig?.modelId) {
+          const provider = providers.find(p => p.id === session.modelConfig.providerId)
+          if (provider) {
+            return { providerId: session.modelConfig.providerId, modelId: session.modelConfig.modelId }
+          }
+        }
+      }
+    } catch {
+      // Fall through to default
+    }
+
+    // Fall back to first enabled provider
+    const enabledProvider = providers.find(p => p.enabled)
+    if (enabledProvider) {
+      return { providerId: enabledProvider.id, modelId: enabledProvider.defaultModel || 'gpt-4o-mini' }
+    }
+
+    return null
+  }
+
+  /**
    * Run an AI-powered review pass on generated content.
    * Falls back to heuristic checks if no LLM provider is available.
    */
@@ -289,18 +323,17 @@ export class Reviewer {
     // Try LLM-powered review
     try {
       const pm = getProviderManager()
-      const providers = pm.listProviders()
-      const enabledProvider = providers.find(p => p.enabled)
+      const resolved = this.resolveModel()
 
-      if (enabledProvider) {
-        const modelId = enabledProvider.defaultModel || 'gpt-4o-mini'
-        console.log(`[Reviewer] Running AI review pass #${this.passCount} (provider: ${enabledProvider.id}, model: ${modelId})`)
+      if (resolved) {
+        const { providerId, modelId } = resolved
+        console.log(`[Reviewer] Running AI review pass #${this.passCount} (provider: ${providerId}, model: ${modelId})`)
 
         const systemPrompt = buildReviewSystemPrompt(outline, generationResults)
         const userMessage = `Here is the CURRENT DOCUMENT CONTENT to review:\n\n${content}`
 
         const response = await pm.chatCompletion(
-          enabledProvider.id,
+          providerId,
           {
             model: modelId,
             messages: [
@@ -525,15 +558,14 @@ export class Reviewer {
     // Try LLM-powered edit
     try {
       const pm = getProviderManager()
-      const providers = pm.listProviders()
-      const enabledProvider = providers.find(p => p.enabled)
+      const resolved = this.resolveModel()
 
-      if (enabledProvider) {
-        const modelId = enabledProvider.defaultModel || 'gpt-4o-mini'
+      if (resolved) {
+        const { providerId, modelId } = resolved
         console.log(`[Reviewer] Surgical edit via LLM for paragraph ${paragraphId}`)
 
         const response = await pm.chatCompletion(
-          enabledProvider.id,
+          providerId,
           {
             model: modelId,
             messages: [
@@ -604,15 +636,14 @@ export class Reviewer {
     // Try LLM-powered rewrite
     try {
       const pm = getProviderManager()
-      const providers = pm.listProviders()
-      const enabledProvider = providers.find(p => p.enabled)
+      const resolved = this.resolveModel()
 
-      if (enabledProvider) {
-        const modelId = enabledProvider.defaultModel || 'gpt-4o-mini'
+      if (resolved) {
+        const { providerId, modelId } = resolved
         console.log(`[Reviewer] Full rewrite via LLM`)
 
         const response = await pm.chatCompletion(
-          enabledProvider.id,
+          providerId,
           {
             model: modelId,
             messages: [

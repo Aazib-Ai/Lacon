@@ -1,33 +1,37 @@
 /**
- * useAIDetection — React hook for the 3-layer AI detection pipeline
+ * useAIDetection — React hook for the AI detection pipeline
  *
- * Manages state for heuristic (L1), LLM (L2), and ML (L3) analysis.
- * L3 runs in a Web Worker for non-blocking ML inference.
+ * Manages state for heuristic (L1), LLM (L2), and external API (L3) analysis.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import type {
   DetectionReport,
   DetectionPhase,
   HumanizeResult,
   HumanizeStyle,
-  MLVerificationResult,
-  MLSentenceResult,
-  WorkerOutboundMessage,
+  DetectionApiProvider,
 } from '../../shared/detection-types'
-import { AI_SCORE_THRESHOLD, scoreToLevel } from '../../shared/detection-types'
+import { AI_SCORE_THRESHOLD } from '../../shared/detection-types'
+
+interface ApiKeyStatus {
+  exists: boolean
+  label?: string
+  provider: DetectionApiProvider
+  createdAt?: number
+}
 
 interface UseAIDetectionReturn {
   // State
   phase: DetectionPhase
   report: DetectionReport | null
-  mlResult: MLVerificationResult | null
   humanizeResult: HumanizeResult | null
-  mlModelReady: boolean
-  mlModelLoading: boolean
-  mlProgress: string
   error: string | null
+
+  // API key state
+  saplingKey: ApiKeyStatus | null
+  winstonKey: ApiKeyStatus | null
 
   // Layer 1: Heuristic (instant)
   quickScan: (text: string) => Promise<void>
@@ -35,42 +39,50 @@ interface UseAIDetectionReturn {
   // Layer 2: LLM Analysis
   deepAnalyze: (text: string) => Promise<void>
 
-  // Layer 2: Humanize
-  humanize: (paragraphs: { index: number; text: string }[], style?: HumanizeStyle) => Promise<void>
+  // Layer 3: External API (Sapling / Winston)
+  apiAnalyze: (text: string, provider: DetectionApiProvider) => Promise<void>
 
-  // Layer 3: ML Verification
-  initMLModel: () => void
-  verifyWithML: (text: string) => Promise<void>
+  // Layer 2: Humanize
+  humanize: (paragraphs: { index: number; text: string; tells?: string[]; suggestions?: string[]; aiScore?: number }[], style?: HumanizeStyle, fullText?: string) => Promise<void>
 
   // Full pipeline
   runFullPipeline: (text: string) => Promise<void>
 
+  // API Key management
+  refreshApiKeys: () => Promise<void>
+
   // Utils
   reset: () => void
+  clearHumanizeResult: () => void
   flaggedParagraphCount: number
 }
 
 export function useAIDetection(): UseAIDetectionReturn {
   const [phase, setPhase] = useState<DetectionPhase>('idle')
   const [report, setReport] = useState<DetectionReport | null>(null)
-  const [mlResult, setMlResult] = useState<MLVerificationResult | null>(null)
   const [humanizeResult, setHumanizeResult] = useState<HumanizeResult | null>(null)
-  const [mlModelReady, setMlModelReady] = useState(false)
-  const [mlModelLoading, setMlModelLoading] = useState(false)
-  const [mlProgress, setMlProgress] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [saplingKey, setSaplingKey] = useState<ApiKeyStatus | null>(null)
+  const [winstonKey, setWinstonKey] = useState<ApiKeyStatus | null>(null)
 
-  const workerRef = useRef<Worker | null>(null)
-  const mlResolveRef = useRef<((result: MLVerificationResult) => void) | null>(null)
-  const mlRejectRef = useRef<((error: Error) => void) | null>(null)
+  // ─── Load API key status on mount ───
 
-  // Cleanup worker on unmount
-  useEffect(() => {
-    return () => {
-      workerRef.current?.terminate()
-      workerRef.current = null
+  const refreshApiKeys = useCallback(async () => {
+    try {
+      const [sapRes, winRes] = await Promise.all([
+        (window as any).electron.detection.getApiKey({ provider: 'sapling' }),
+        (window as any).electron.detection.getApiKey({ provider: 'winston' }),
+      ])
+      if (sapRes?.success) setSaplingKey(sapRes.data)
+      if (winRes?.success) setWinstonKey(winRes.data)
+    } catch (err) {
+      console.error('Failed to load detection API keys:', err)
     }
   }, [])
+
+  useEffect(() => {
+    refreshApiKeys()
+  }, [refreshApiKeys])
 
   // ─── Layer 1: Heuristic ───
 
@@ -110,16 +122,37 @@ export function useAIDetection(): UseAIDetectionReturn {
     }
   }, [])
 
+  // ─── Layer 3: External API Analysis ───
+
+  const apiAnalyze = useCallback(async (text: string, provider: DetectionApiProvider) => {
+    try {
+      setPhase('api-analyzing')
+      setError(null)
+      const result = await (window as any).electron.detection.apiAnalyze({ text, provider })
+      if (result.success) {
+        setReport(result.data)
+      } else {
+        setError(result.error?.message || result.error?.details || `${provider} API analysis failed`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'API analysis failed')
+    } finally {
+      setPhase('complete')
+    }
+  }, [])
+
   // ─── Layer 2: Humanize ───
 
   const humanize = useCallback(async (
-    paragraphs: { index: number; text: string }[],
+    paragraphs: { index: number; text: string; tells?: string[]; suggestions?: string[]; aiScore?: number }[],
     style?: HumanizeStyle,
+    fullText?: string,
   ) => {
     try {
       setPhase('llm-humanizing')
       setError(null)
       const result = await (window as any).electron.detection.llmHumanize({
+        fullText,
         paragraphs,
         style: style || 'conversational',
       })
@@ -134,89 +167,6 @@ export function useAIDetection(): UseAIDetectionReturn {
       setPhase('complete')
     }
   }, [])
-
-  // ─── Layer 3: ML Model ───
-
-  const initMLModel = useCallback(() => {
-    if (workerRef.current || mlModelReady) return
-
-    setMlModelLoading(true)
-    setMlProgress('Starting model download...')
-
-    try {
-      const worker = new Worker(
-        new URL('../workers/ai-detection-worker.ts', import.meta.url),
-        { type: 'module' },
-      )
-
-      worker.onmessage = (event: MessageEvent<WorkerOutboundMessage>) => {
-        const msg = event.data
-
-        if (msg.type === 'ready') {
-          setMlModelReady(true)
-          setMlModelLoading(false)
-          setMlProgress('')
-        } else if (msg.type === 'progress') {
-          setMlProgress(msg.message)
-        } else if (msg.type === 'result') {
-          const data = msg.data as MLSentenceResult[]
-          const avgScore = data.length > 0
-            ? Math.round(data.reduce((s, r) => s + r.aiProbability, 0) / data.length)
-            : 0
-
-          const result: MLVerificationResult = {
-            overallScore: avgScore,
-            sentences: data,
-            modelId: 'roberta-base-openai-detector',
-            inferenceTimeMs: msg.inferenceTimeMs,
-          }
-          setMlResult(result)
-          setPhase('complete')
-          mlResolveRef.current?.(result)
-          mlResolveRef.current = null
-        } else if (msg.type === 'error') {
-          const errorMsg = msg.error
-          setError(errorMsg)
-          setMlModelLoading(false)
-          setPhase('complete')
-          mlRejectRef.current?.(new Error(errorMsg))
-          mlRejectRef.current = null
-        }
-      }
-
-      worker.onerror = (err) => {
-        setError(`Worker error: ${err.message}`)
-        setMlModelLoading(false)
-      }
-
-      workerRef.current = worker
-      worker.postMessage({ type: 'init' })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start ML worker')
-      setMlModelLoading(false)
-    }
-  }, [mlModelReady])
-
-  const verifyWithML = useCallback(async (text: string) => {
-    if (!workerRef.current || !mlModelReady) {
-      setError('ML model not loaded. Click "Load Model" first.')
-      return
-    }
-
-    setPhase('ml-verifying')
-    setError(null)
-
-    // Split text into sentences
-    const sentences = text
-      .split(/(?<=[.!?])\s+/)
-      .filter(s => s.trim().length > 10)
-
-    return new Promise<void>((resolve, reject) => {
-      mlResolveRef.current = () => resolve()
-      mlRejectRef.current = (err) => reject(err)
-      workerRef.current!.postMessage({ type: 'classify', sentences })
-    })
-  }, [mlModelReady])
 
   // ─── Full Pipeline ───
 
@@ -252,9 +202,13 @@ export function useAIDetection(): UseAIDetectionReturn {
   const reset = useCallback(() => {
     setPhase('idle')
     setReport(null)
-    setMlResult(null)
     setHumanizeResult(null)
     setError(null)
+  }, [])
+
+  const clearHumanizeResult = useCallback(() => {
+    setHumanizeResult(null)
+    setPhase('complete')
   }, [])
 
   const flaggedParagraphCount = report
@@ -264,19 +218,18 @@ export function useAIDetection(): UseAIDetectionReturn {
   return {
     phase,
     report,
-    mlResult,
     humanizeResult,
-    mlModelReady,
-    mlModelLoading,
-    mlProgress,
     error,
+    saplingKey,
+    winstonKey,
     quickScan,
     deepAnalyze,
+    apiAnalyze,
     humanize,
-    initMLModel,
-    verifyWithML,
     runFullPipeline,
+    refreshApiKeys,
     reset,
+    clearHumanizeResult,
     flaggedParagraphCount,
   }
 }

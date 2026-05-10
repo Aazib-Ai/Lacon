@@ -263,6 +263,9 @@ const writerLoopAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_REWRITE_ALL, { documentId, instruction, documentContent }),
   loadReview: (documentId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_LOAD_REVIEW, { documentId }),
+  // Agentic Pre-flight
+  getPreflight: (documentId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITER_LOOP_GET_PREFLIGHT, { documentId }),
 }
 
 // Research API (Phase 5 - Writer Harness)
@@ -296,6 +299,8 @@ const researchAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_FACT_CHECK, { documentId, sectionId, sectionContent }),
   webSearch: (documentId: string, query: string, mode: 'quick' | 'deep') =>
     ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_WEB_SEARCH, { documentId, query, mode }),
+  autoResearch: (documentId: string, topic: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_AUTO_RESEARCH, { documentId, topic }),
 }
 
 // Citation API (Phase 5 - Writer Harness)
@@ -318,6 +323,8 @@ const versionAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.VERSION_ADD_MILESTONE, { documentId, snapshotId, label }),
   deleteSnapshot: (documentId: string, snapshotId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.VERSION_DELETE_SNAPSHOT, { documentId, snapshotId }),
+  createSnapshot: (documentId: string, trigger: string, content: any, label?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.VERSION_CREATE_SNAPSHOT, { documentId, trigger, content, label }),
 }
 
 // UX API (Phase 6 - Writer Harness)
@@ -389,6 +396,12 @@ const detectionAPI = {
   llmAnalyze: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_LLM_ANALYZE, payload),
   llmHumanize: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_LLM_HUMANIZE, payload),
   fullPipeline: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_FULL_PIPELINE, payload),
+  // External API detection (Sapling / Winston)
+  apiAnalyze: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_API_ANALYZE, payload),
+  setApiKey: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_SET_API_KEY, payload),
+  getApiKey: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_GET_API_KEY, payload),
+  deleteApiKey: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_DELETE_API_KEY, payload),
+  testApiKey: (payload: any) => ipcRenderer.invoke(IPC_CHANNELS.DETECT_TEST_API_KEY, payload),
 }
 
 // Slides API (Presentation Generator)

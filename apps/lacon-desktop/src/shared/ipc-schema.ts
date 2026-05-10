@@ -203,6 +203,9 @@ export const IPC_CHANNELS = {
   WRITER_LOOP_REWRITE_ALL: 'writerLoop:rewriteAll',
   WRITER_LOOP_LOAD_REVIEW: 'writerLoop:loadReview',
 
+  // Writer Harness: Agentic Pre-flight (Phase 7+)
+  WRITER_LOOP_GET_PREFLIGHT: 'writerLoop:getPreflight',
+
   // Writer Harness: Research operations (Phase 5)
   RESEARCH_GET_LOG: 'research:getLog',
   RESEARCH_ADD_ENTRY: 'research:addEntry',
@@ -212,6 +215,7 @@ export const IPC_CHANNELS = {
   RESEARCH_IMPORT_FILE: 'research:importFile',
   RESEARCH_FACT_CHECK: 'research:factCheck',
   RESEARCH_WEB_SEARCH: 'research:webSearch',
+  RESEARCH_AUTO_RESEARCH: 'research:autoResearch',
 
   // Writer Harness: Citation operations (Phase 5)
   CITATION_FORMAT: 'citation:format',
@@ -224,6 +228,7 @@ export const IPC_CHANNELS = {
   VERSION_RESTORE_SNAPSHOT: 'version:restoreSnapshot',
   VERSION_ADD_MILESTONE: 'version:addMilestone',
   VERSION_DELETE_SNAPSHOT: 'version:deleteSnapshot',
+  VERSION_CREATE_SNAPSHOT: 'version:createSnapshot',
 
   // Writer Harness: UX operations (Phase 6)
   UX_SET_ZEN_MODE: 'ux:setZenMode',
@@ -266,6 +271,13 @@ export const IPC_CHANNELS = {
   DETECT_LLM_ANALYZE: 'detect:llmAnalyze',
   DETECT_LLM_HUMANIZE: 'detect:llmHumanize',
   DETECT_FULL_PIPELINE: 'detect:fullPipeline',
+
+  // AI Detection — External API (Sapling / Winston)
+  DETECT_API_ANALYZE: 'detect:apiAnalyze',
+  DETECT_SET_API_KEY: 'detect:setApiKey',
+  DETECT_GET_API_KEY: 'detect:getApiKey',
+  DETECT_DELETE_API_KEY: 'detect:deleteApiKey',
+  DETECT_TEST_API_KEY: 'detect:testApiKey',
 
   // Slides operations (Presentation Generator)
   SLIDES_GENERATE: 'slides:generate',

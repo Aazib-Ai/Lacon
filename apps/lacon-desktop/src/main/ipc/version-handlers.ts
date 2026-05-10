@@ -108,6 +108,22 @@ export function registerVersionHandlers(): void {
     },
   )
 
+  // ── version:createSnapshot ──
+  ipcMain.handle(
+    IPC_CHANNELS.VERSION_CREATE_SNAPSHOT,
+    async (_event, payload: { documentId: string; trigger: string; content: any; label?: string }) => {
+      return handleVersionIpc(IPC_CHANNELS.VERSION_CREATE_SNAPSHOT, payload, async () => {
+        const snapshot = versionService.createSnapshot(
+          payload.documentId,
+          (payload.trigger as any) || 'manual',
+          payload.content,
+          payload.label || `Manual snapshot — ${new Date().toLocaleString()}`,
+        )
+        return { success: true, data: snapshot }
+      })
+    },
+  )
+
   // ── ux:setZenMode ──
   ipcMain.handle(IPC_CHANNELS.UX_SET_ZEN_MODE, async (_event, payload: { enabled: boolean }) => {
     return handleVersionIpc(IPC_CHANNELS.UX_SET_ZEN_MODE, payload, async () => {

@@ -1,0 +1,12 @@
+# graphify ignore - skip heavy/irrelevant directories
+node_modules/
+dist/
+.git/
+.turbo/
+.changeset/
+*.min.js
+*.min.css
+*.map
+package-dist-artifacts.tar
+pnpm-lock.yaml
+graphify-out/

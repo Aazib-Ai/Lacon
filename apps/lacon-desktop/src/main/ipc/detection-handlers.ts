@@ -1,7 +1,7 @@
 /**
  * AI Detection IPC Handlers
  *
- * Bridge between renderer process and AIDetectionService.
+ * Bridge between renderer process and AIDetectionService + DetectionApiService.
  * Follows the exact pattern established in handlers.ts.
  */
 
@@ -12,17 +12,24 @@ import type {
   DetectLLMAnalyzeRequest,
   DetectLLMHumanizeRequest,
   DetectFullPipelineRequest,
+  DetectApiAnalyzeRequest,
+  DetectSetApiKeyRequest,
+  DetectGetApiKeyRequest,
+  DetectDeleteApiKeyRequest,
+  DetectTestApiKeyRequest,
 } from '../../shared/detection-types'
 import { scoreToLevel } from '../../shared/detection-types'
 import type { IpcResponse } from '../../shared/ipc-schema'
 import { IPC_CHANNELS } from '../../shared/ipc-schema'
 import { getAIDetectionService } from '../services/ai-detection-service'
+import { getDetectionApiService } from '../services/detection-api-service'
 
 /**
  * Register AI detection IPC handlers
  */
 export function registerDetectionHandlers(): void {
   const service = getAIDetectionService()
+  const apiService = getDetectionApiService()
 
   // Layer 1: Heuristic analysis (instant)
   ipcMain.handle(IPC_CHANNELS.DETECT_HEURISTIC, async (_event, payload: DetectHeuristicRequest) => {
@@ -111,7 +118,67 @@ export function registerDetectionHandlers(): void {
     })
   })
 
-  console.log('[IPC] AI Detection handlers registered')
+  // ─── External API Detection (Sapling / Winston) ───
+
+  // Analyze text via external detection API
+  ipcMain.handle(IPC_CHANNELS.DETECT_API_ANALYZE, async (_event, payload: DetectApiAnalyzeRequest) => {
+    return handleDetection('detect:apiAnalyze', payload, async () => {
+      if (!payload?.text || typeof payload.text !== 'string') {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'Text is required' } }
+      }
+      if (!payload?.provider) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'Provider is required' } }
+      }
+      const report = await apiService.analyze(payload.text, payload.provider)
+      return { success: true, data: report }
+    })
+  })
+
+  // Store an API key for a detection provider
+  ipcMain.handle(IPC_CHANNELS.DETECT_SET_API_KEY, async (_event, payload: DetectSetApiKeyRequest) => {
+    return handleDetection('detect:setApiKey', payload, async () => {
+      if (!payload?.provider || !payload?.apiKey) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'Provider and API key are required' } }
+      }
+      await apiService.setApiKey(payload.provider, payload.apiKey, payload.label)
+      return { success: true, data: true }
+    })
+  })
+
+  // Get stored key metadata (never returns the actual secret)
+  ipcMain.handle(IPC_CHANNELS.DETECT_GET_API_KEY, async (_event, payload: DetectGetApiKeyRequest) => {
+    return handleDetection('detect:getApiKey', payload, async () => {
+      if (!payload?.provider) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'Provider is required' } }
+      }
+      const meta = await apiService.getApiKeyMeta(payload.provider)
+      return { success: true, data: meta }
+    })
+  })
+
+  // Delete a stored API key
+  ipcMain.handle(IPC_CHANNELS.DETECT_DELETE_API_KEY, async (_event, payload: DetectDeleteApiKeyRequest) => {
+    return handleDetection('detect:deleteApiKey', payload, async () => {
+      if (!payload?.provider) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'Provider is required' } }
+      }
+      const deleted = await apiService.deleteApiKey(payload.provider)
+      return { success: true, data: deleted }
+    })
+  })
+
+  // Test an API key before saving
+  ipcMain.handle(IPC_CHANNELS.DETECT_TEST_API_KEY, async (_event, payload: DetectTestApiKeyRequest) => {
+    return handleDetection('detect:testApiKey', payload, async () => {
+      if (!payload?.provider || !payload?.apiKey) {
+        return { success: false, error: { code: 'INVALID_INPUT', message: 'Provider and API key are required' } }
+      }
+      const result = await apiService.testApiKey(payload.provider, payload.apiKey)
+      return { success: true, data: result }
+    })
+  })
+
+  console.log('[IPC] AI Detection handlers registered (heuristic + LLM + API)')
 }
 
 /**

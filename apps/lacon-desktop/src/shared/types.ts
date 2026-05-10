@@ -187,6 +187,8 @@ export interface WriterLoopAPI {
   surgicalEdit: (documentId: string, paragraphId: string, instruction: string, fullDocumentContent: any, originalText?: string) => Promise<any>
   rewriteAll: (documentId: string, instruction: string, documentContent: any) => Promise<any>
   loadReview: (documentId: string) => Promise<any>
+  // Agentic Pre-flight
+  getPreflight: (documentId: string) => Promise<any>
 }
 
 // Research API (Phase 5 - Writer Harness)

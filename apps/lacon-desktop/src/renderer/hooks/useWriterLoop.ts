@@ -44,6 +44,10 @@ export interface WriterLoopState {
   reviewPassCount: number
   /** Phase 4: Whether more auto-passes are available */
   canAutoPass: boolean
+  /** Agentic pre-flight steps (real-time progress) */
+  preflightSteps: Array<{ id: number; type: string; tool?: string; message: string; timestamp: string }>
+  /** Whether pre-flight is currently running */
+  preflightRunning: boolean
 }
 
 const initialState: WriterLoopState = {
@@ -56,6 +60,8 @@ const initialState: WriterLoopState = {
   review: null,
   reviewPassCount: 0,
   canAutoPass: true,
+  preflightSteps: [],
+  preflightRunning: false,
 }
 
 // ─────────────────────────── Reducer ───────────────────────────
@@ -69,6 +75,9 @@ type Action =
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_PROGRESS'; progress: SectionProgress }
   | { type: 'SET_REVIEW'; review: ReviewResult | null; passCount: number; canAutoPass: boolean }
+  | { type: 'ADD_PREFLIGHT_STEP'; step: WriterLoopState['preflightSteps'][0] }
+  | { type: 'SET_PREFLIGHT_RUNNING'; running: boolean }
+  | { type: 'CLEAR_PREFLIGHT' }
 
 function reducer(state: WriterLoopState, action: Action): WriterLoopState {
   switch (action.type) {
@@ -105,6 +114,23 @@ function reducer(state: WriterLoopState, action: Action): WriterLoopState {
         loading: false,
         error: null,
         errorMeta: null,
+      }
+    case 'ADD_PREFLIGHT_STEP':
+      return {
+        ...state,
+        preflightSteps: [...state.preflightSteps, action.step],
+      }
+    case 'SET_PREFLIGHT_RUNNING':
+      return {
+        ...state,
+        preflightRunning: action.running,
+        ...(action.running ? { preflightSteps: [] } : {}),
+      }
+    case 'CLEAR_PREFLIGHT':
+      return {
+        ...state,
+        preflightSteps: [],
+        preflightRunning: false,
       }
     default:
       return state
@@ -175,19 +201,39 @@ export function useWriterLoop(documentId: string | undefined) {
     dispatch({ type: 'START_LOADING' })
     try {
       const res = await writerLoop().getState(documentId)
-      handleResponse(res, data => {
-        dispatch({ type: 'SET_STATE', session: data.session, outline: data.outline })
-
-        // Also fetch progress if we're in a stage that has generation data
-        const stage = data.session?.stage
-        if (stage === 'generating' || stage === 'reviewing') {
-          writerLoop().getProgress(documentId).then(progressRes => {
-            if (progressRes?.success && mountedRef.current) {
-              dispatch({ type: 'SET_PROGRESS', progress: progressRes.data })
-            }
-          }).catch(() => { /* ignore */ })
+      if (!res?.success || !mountedRef.current) {
+        if (res?.error) {
+          dispatch({ type: 'SET_ERROR', error: res.error.message || 'Unknown error' })
         }
-      })
+        return
+      }
+
+      const data = res.data
+      console.log(`[useWriterLoop:fetchState] Backend returned — stage=${data.session?.stage}, outline=${!!data.outline}, outlineSections=${data.outline?.sections?.length}`)
+
+      // Fetch progress BEFORE dispatching state so both arrive in the same render
+      const stage = data.session?.stage
+      let progressData = null
+      if (stage === 'generating' || stage === 'reviewing' || stage === 'complete') {
+        try {
+          console.log(`[useWriterLoop:fetchState] Fetching progress (stage=${stage})`)
+          const progressRes = await writerLoop().getProgress(documentId)
+          if (progressRes?.success && mountedRef.current) {
+            progressData = progressRes.data
+            console.log(`[useWriterLoop:fetchState] Progress fetched — status=${progressData?.status}, results=${progressData?.results?.length}`)
+          }
+        } catch {
+          // Progress is non-critical
+        }
+      }
+
+      // Dispatch state + progress together so they arrive in the same React batch
+      if (mountedRef.current) {
+        dispatch({ type: 'SET_STATE', session: data.session, outline: data.outline })
+        if (progressData) {
+          dispatch({ type: 'SET_PROGRESS', progress: progressData })
+        }
+      }
     } catch (err: any) {
       dispatch({ type: 'SET_ERROR', error: err.message })
     }
@@ -233,19 +279,35 @@ export function useWriterLoop(documentId: string | undefined) {
         return
       }
       dispatch({ type: 'START_LOADING' })
+      dispatch({ type: 'SET_PREFLIGHT_RUNNING', running: true })
       const retryFn = () => startPlanning(instruction, composedSkillPrompt, researchContext)
       try {
         const res = await withTimeout(
           writerLoop().startPlanning(documentId, instruction, composedSkillPrompt, researchContext),
-          60000,
+          180000, // 3 minutes — pre-flight + outline generation
           'Outline generation',
         )
+        dispatch({ type: 'SET_PREFLIGHT_RUNNING', running: false })
         handleResponse(res, outline => {
           dispatch({ type: 'SET_OUTLINE', outline })
         })
+
+        // Fetch preflight results (steps for display)
+        try {
+          const preflightRes = await writerLoop().getPreflight(documentId)
+          if (preflightRes?.success && preflightRes.data?.steps) {
+            for (const step of preflightRes.data.steps) {
+              dispatch({ type: 'ADD_PREFLIGHT_STEP', step })
+            }
+          }
+        } catch {
+          // Preflight data optional — ignore errors
+        }
+
         // Refresh session
         await fetchState()
       } catch (err: any) {
+        dispatch({ type: 'SET_PREFLIGHT_RUNNING', running: false })
         dispatch({
           type: 'SET_ERROR',
           error: err.message || 'Planning failed. Please try again.',
@@ -431,7 +493,18 @@ export function useWriterLoop(documentId: string | undefined) {
     try {
       const res = await writerLoop().reset(documentId)
       handleResponse(res, session => {
-        dispatch({ type: 'SET_SESSION', session })
+        // Clear everything: outline, progress, review, preflight — return to idle "Start Writing" view
+        dispatch({ type: 'SET_STATE', session, outline: null })
+        dispatch({ type: 'SET_PROGRESS', progress: {
+          totalSections: 0,
+          completedSections: 0,
+          currentSectionId: null,
+          currentSectionTitle: null,
+          results: [],
+          status: 'idle',
+        } as any })
+        dispatch({ type: 'SET_REVIEW', review: null, passCount: 0, canAutoPass: true })
+        dispatch({ type: 'CLEAR_PREFLIGHT' })
       })
     } catch (err: any) {
       dispatch({ type: 'SET_ERROR', error: err.message })
@@ -567,8 +640,11 @@ export function useWriterLoop(documentId: string | undefined) {
     const stage = state.session?.stage
     if (stage !== 'generating' || !documentId) {
       generationTriggeredRef.current = false
+      console.log(`[useWriterLoop:Poll] Exiting poll effect — stage=${stage}, documentId=${!!documentId}`)
       return
     }
+
+    console.log(`[useWriterLoop:Poll] Starting poll effect — stage=${stage}`)
 
     // Auto-recovery: if we're in 'generating' stage but no generation is active,
     // trigger generateAll(). This handles process restarts and stuck states.
@@ -578,15 +654,18 @@ export function useWriterLoop(documentId: string | undefined) {
         const res = await writerLoop().getProgress(documentId)
         if (res?.success && mountedRef.current) {
           dispatch({ type: 'SET_PROGRESS', progress: res.data })
+          console.log(`[useWriterLoop:Poll] Kickstart check — progress status=${res.data?.status}, completed=${res.data?.completedSections}, results=${res.data?.results?.length}`)
 
-          // If progress is idle (no generation running), auto-start
-          if (res.data?.status === 'idle' || (!res.data?.status && res.data?.completedSections === 0)) {
-            console.log('[useWriterLoop] Auto-triggering generateAll (recovery)')
-            generationTriggeredRef.current = true
-            writerLoop().generateAll(documentId).catch(() => {
-              // Fire-and-forget — errors handled by progress polling
-            })
-          }
+           // If progress is idle (no generation running), auto-start ONLY in auto mode
+           // In manual mode, the user triggers sections individually
+           const isAutoMode = state.session?.automationLevel === 'auto'
+           if (isAutoMode && (res.data?.status === 'idle' || (!res.data?.status && res.data?.completedSections === 0))) {
+             console.log('[useWriterLoop:Poll] Auto-triggering generateAll (recovery)')
+             generationTriggeredRef.current = true
+             writerLoop().generateAll(documentId).catch(() => {
+               // Fire-and-forget — errors handled by progress polling
+             })
+           }
         }
       } catch {
         // Ignore
@@ -600,10 +679,12 @@ export function useWriterLoop(documentId: string | undefined) {
       try {
         const res = await writerLoop().getProgress(documentId)
         if (res?.success && mountedRef.current) {
+          console.log(`[useWriterLoop:Poll] Progress polled — status=${res.data?.status}, completed=${res.data?.completedSections}/${res.data?.totalSections}, results=${res.data?.results?.length}`)
           dispatch({ type: 'SET_PROGRESS', progress: res.data })
 
           // If generation completed, refresh the full state
           if (res.data?.status === 'complete') {
+            console.log(`[useWriterLoop:Poll] ✅ Generation COMPLETE detected — calling fetchState() + dispatching event`)
             generationTriggeredRef.current = false
             await fetchState()
             // Notify all hook instances so content gets written to editor
@@ -615,7 +696,10 @@ export function useWriterLoop(documentId: string | undefined) {
       }
     }, 2000)
 
-    return () => clearInterval(pollInterval)
+    return () => {
+      console.log(`[useWriterLoop:Poll] Clearing poll interval`)
+      clearInterval(pollInterval)
+    }
   }, [state.session?.stage, documentId, fetchState])
 
   const acceptGeneration = useCallback(
