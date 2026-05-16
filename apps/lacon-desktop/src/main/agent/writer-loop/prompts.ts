@@ -78,9 +78,10 @@ export function buildOutlineSystemPrompt(composedSkillPrompt: string, wordTarget
     ? `\n\nThe writer has configured the following writing style/skill guidance. Use this to shape the outline structure, tone, and section focus:\n\n${composedSkillPrompt}`
     : ''
 
-  const wordNote = wordTarget && wordTarget > 0
-    ? `\nThe target word count is approximately ${wordTarget} words. Distribute words across sections proportionally based on their importance and depth.`
-    : '\nNo specific word count target has been set. Estimate appropriate word counts based on topic complexity.'
+  const wordNote =
+    wordTarget && wordTarget > 0
+      ? `\nThe target word count is approximately ${wordTarget} words. Distribute words across sections proportionally based on their importance and depth.`
+      : '\nNo specific word count target has been set. Estimate appropriate word counts based on topic complexity.'
 
   return `You are an expert writing planner working inside LACON, a professional desktop writing editor.
 
@@ -165,10 +166,16 @@ export function buildSectionSystemPrompt(
 ): string {
   const researchBlock = researchContext
     ? `
-Research material available for this section:
+Research material available for this section (sources are numbered for citation):
 ${researchContext}
 
-Use this research to ground your writing in facts. Reference specific data and findings where relevant. Do NOT fabricate information.
+CITATION RULES:
+- When you reference a specific fact, statistic, date, quote, or claim from the research above, cite it inline using the source number in superscript format: <sup>[1]</sup>, <sup>[2]</sup>, etc.
+- Place the citation immediately after the relevant sentence or claim, before the period. Example: "The global AI market reached $150 billion in 2023<sup>[1]</sup>."
+- Every factual claim that comes from the research MUST have a citation. Do NOT fabricate citations for sources not listed above.
+- If multiple sources support the same claim, cite them together: <sup>[1][3]</sup>
+- Do NOT include a References section — that will be added automatically.
+- Do NOT fabricate information. Only cite facts that appear in the research excerpts above.
 `
     : ''
 

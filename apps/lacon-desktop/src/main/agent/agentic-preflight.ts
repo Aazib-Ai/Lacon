@@ -11,16 +11,12 @@
  * Falls back gracefully if no provider is configured.
  */
 
-import type {
-  ResearchContext,
-  ResearchLogEntry,
-  SkillListItem,
-} from '../../shared/writer-types'
+import type { ResearchContext, ResearchLogEntry, SkillListItem } from '../../shared/writer-types'
 import { getProviderManager } from '../providers/provider-manager'
+import { getActiveProjectPath, getProjectWorkspaceService } from '../services/project-workspace-service'
 import { getResearchLogService } from '../services/research-log-service'
 import { getResearchSearchService } from '../services/research-search-service'
 import { getSkillService } from '../services/skill-service'
-import { getActiveProjectPath, getProjectWorkspaceService } from '../services/project-workspace-service'
 
 // ─────────────────────────── Types ───────────────────────────
 
@@ -71,51 +67,18 @@ export interface PreflightInput {
 
 // ─────────────────────────── Constants ───────────────────────────
 
-const MAX_ITERATIONS = 5
-const PREFLIGHT_TIMEOUT_MS = 120_000 // 2 minutes total max
-
-// ─────────────────────────── Research Intent Detection ───────────────────────────
-
-/**
- * Patterns that indicate the user explicitly wants research done on a topic.
- * Each pattern captures the topic in group 1.
- */
-const RESEARCH_PATTERNS: RegExp[] = [
-  /research\s+(?:about|on|into)\s+(.+?)(?:\s+and\s+(?:write|create|draft|compose|produce)|[.]|$)/i,
-  /write\s+(?:an?\s+)?(?:article|paper|report|essay|piece|blog\s*post)\s+(?:about|on|regarding)\s+(.+?)(?:\s*[.]|$)/i,
-  /investigate\s+(.+?)(?:\s+and\s+|[.]|$)/i,
-  /deep\s+dive\s+(?:into|on)\s+(.+?)(?:\s+and\s+|[.]|$)/i,
-  /explore\s+(?:the\s+topic\s+(?:of\s+)?)?(.+?)(?:\s+and\s+(?:write|create)|[.]|$)/i,
-  /comprehensive\s+(?:article|paper|report|guide)\s+(?:about|on)\s+(.+?)(?:\s*[.]|$)/i,
-  /(?:write|create)\s+(?:about|on)\s+(.+?)(?:\s+(?:based|using)\s+(?:on\s+)?research|[.]|$)/i,
-]
-
-/**
- * Detect whether the user's instruction implies a research phase.
- * Returns the detected topic if found.
- */
-function detectResearchIntent(instruction: string): { detected: boolean; topic: string | null } {
-  const trimmed = instruction.trim()
-  for (const pattern of RESEARCH_PATTERNS) {
-    const match = trimmed.match(pattern)
-    if (match && match[1]) {
-      const topic = match[1].trim().replace(/[.,;:!?]+$/, '').trim()
-      if (topic.length >= 2 && topic.length <= 200) {
-        return { detected: true, topic }
-      }
-    }
-  }
-  return { detected: false, topic: null }
-}
+const MAX_ITERATIONS = 8
+const PREFLIGHT_TIMEOUT_MS = 150_000 // 2.5 minutes total max
 
 // ─────────────────────────── Tool Manifest ───────────────────────────
 
 /**
  * System prompt that teaches the LLM about available tools.
- * Uses a portable JSON function-calling format (not OpenAI-specific).
+ * The LLM is the SOLE decision-maker — no keyword/regex pre-processing.
+ * It decides intelligently what tools to use based on the user's instruction.
  */
 function buildPreflightSystemPrompt(): string {
-  return `You are an intelligent writing assistant preparing to help the user write a document. Before generating an outline, you should analyze the user's request and gather any necessary context.
+  return `You are an intelligent AI writing agent preparing to help the user write a document. You must analyze the request and autonomously decide what preparation is needed BEFORE generating an outline.
 
 You have access to the following tools. To use a tool, respond with a JSON block:
 
@@ -128,43 +91,86 @@ You have access to the following tools. To use a tool, respond with a JSON block
 ### search_web
 Search the internet for relevant articles and information on a topic.
 Args: {"query": "search query string"}
-Use when: The topic requires factual information, statistics, recent events, or domain knowledge you should verify.
 
-### deep_research
+### deep_research  
 Perform deep research: search, extract full articles, and create an AI summary. More thorough than search_web.
-Args: {"query": "research topic or URL"}
-Use when: The topic is complex and needs comprehensive background research. You can also pass a URL to extract content directly.
+Args: {"query": "research topic or question"}
 
 ### get_existing_research
-Check what research materials the user has already uploaded or gathered (PDFs, notes, web research, imported files).
+Check what research materials the user has already gathered (PDFs, notes, web research).
 Args: {}
-Use when: Always check this first — the user may have already provided relevant materials that should inform the writing.
 
 ### list_available_skills
 List all available writing skills (genre guides, style rules, structural templates).
 Args: {}
-Use when: You want to see what specialized writing guidance is available before writing.
 
 ### select_skills
-Auto-activate writing skills that match this task. Skills provide genre-specific rules (e.g., essay structure, story elements, technical writing conventions).
+Activate writing skills that match this task. Skills provide genre-specific rules.
 Args: {"skill_ids": ["skill-id-1", "skill-id-2"]}
-Use when: You found skills that match the user's writing task and the user hasn't already selected them.
 
 ### ready_to_plan
 Signal that you have gathered enough context and are ready to generate the outline.
-Args: {"enriched_instruction": "The original instruction enriched with your research insights and context"}
-Use when: You have all the context you need and are ready to proceed.
+Args: {"enriched_instruction": "The original instruction enriched with your research insights"}
+
+## Decision Framework
+
+Follow this process for EVERY request:
+
+**Step 1: Assess the request**
+- What type of writing is this? (article, story, essay, report, blog post, etc.)
+- Does this topic require factual information from external sources?
+- Is this creative/personal writing or factual/informational writing?
+
+**Step 2: Check existing resources**
+- ALWAYS call \`get_existing_research\` first — the user may have already gathered materials.
+- ALWAYS call \`list_available_skills\` — there may be genre-specific skills that improve quality.
+
+**Step 3: Research if needed**
+You MUST call \`deep_research\` if ANY of these are true:
+- The user mentions "research", "researched", "research-based", "fact-based", "evidence-based", or similar
+- The topic requires factual claims, statistics, dates, or verifiable information
+- The topic is about a real-world subject (history, science, technology, current events, etc.)
+- Writing an article, report, paper, or informational piece about a specific topic
+- You are not confident you have accurate, up-to-date information on the topic
+
+You should NOT research if:
+- The user is writing fiction, poetry, or a personal narrative
+- The topic is purely creative or opinion-based
+- The user explicitly says no research is needed
+
+When researching, break complex topics into 2-3 focused queries for better coverage.
+
+**Step 4: Select skills if appropriate**
+After seeing the skills list, select any that match the writing type. Examples:
+- "Write a short story" → select the 'story' skill
+- "Write a research paper" → select the 'academic' skill  
+- No matching skill? That's fine — don't force it.
+
+**Step 5: Signal ready**
+Call \`ready_to_plan\` with an enriched version of the instruction that includes any key findings from your research.
 
 ## Rules
+1. You are the SOLE decision-maker. Think carefully about what the user needs.
+2. Be thorough but efficient — max ${MAX_ITERATIONS} turns.
+3. Keep your reasoning brief (1-2 sentences), then make tool calls.
+4. You MUST end by calling \`ready_to_plan\`.
+5. You can call MULTIPLE tools in a single turn by including multiple tool_call blocks.
 
-1. You MUST call \`get_existing_research\` first to check if the user has already uploaded relevant materials.
-2. You MUST call \`list_available_skills\` to check if a matching writing skill should be auto-activated.
-3. Only call \`search_web\` or \`deep_research\` if the topic genuinely requires external information (e.g., factual claims, statistics, current events). Creative writing or personal essays typically don't need web research.
-4. You MUST end by calling \`ready_to_plan\` with an enriched version of the user's instruction.
-5. Keep your reasoning brief. Focus on tool calls, not lengthy explanations.
-6. You can make multiple tool calls across multiple turns, but be efficient (max ${MAX_ITERATIONS} turns).
+## Example
 
-Respond with your reasoning first (1-2 sentences), then the tool call.`
+User: "Write a researched article about the history of quantum computing"
+
+Your response should look like:
+
+This is a factual article about a real-world topic that requires research. Let me check for existing materials first.
+
+\`\`\`tool_call
+{"tool": "get_existing_research", "args": {}}
+\`\`\`
+
+\`\`\`tool_call
+{"tool": "list_available_skills", "args": {}}
+\`\`\``
 }
 
 // ─────────────────────────── Tool Executor ───────────────────────────
@@ -182,7 +188,7 @@ async function executeTool(
   switch (toolCall.tool) {
     case 'search_web': {
       const query = toolCall.args.query
-      if (!query) return { result: 'Error: query argument is required' }
+      if (!query) {return { result: 'Error: query argument is required' }}
       try {
         const results = await getResearchSearchService().quickSearch(query)
         if (results.length === 0) {
@@ -200,7 +206,7 @@ async function executeTool(
 
     case 'deep_research': {
       const query = toolCall.args.query
-      if (!query) return { result: 'Error: query argument is required' }
+      if (!query) {return { result: 'Error: query argument is required' }}
       try {
         const entry = await getResearchSearchService().deepResearch(query, documentId)
         const excerptPreview = entry.excerpts.slice(0, 2).join('\n\n')
@@ -216,7 +222,10 @@ async function executeTool(
       try {
         const log = getResearchLogService().getLog(documentId)
         if (log.entries.length === 0) {
-          return { result: 'No existing research found. The user has not uploaded any materials or conducted prior research for this document.' }
+          return {
+            result:
+              'No existing research found. The user has not uploaded any materials or conducted prior research for this document.',
+          }
         }
         const summary = log.entries
           .map((e: ResearchLogEntry) => {
@@ -243,7 +252,9 @@ async function executeTool(
         const list = skills
           .map((s: SkillListItem) => `• ${s.id}: "${s.name}" — ${s.description} [tags: ${s.tags.join(', ')}]`)
           .join('\n')
-        return { result: `Available writing skills (${skills.length}):\n\n${list}\n\nUse select_skills to activate relevant ones.` }
+        return {
+          result: `Available writing skills (${skills.length}):\n\n${list}\n\nUse select_skills to activate relevant ones.`,
+        }
       } catch (err: any) {
         return { result: `Could not list skills: ${err.message}` }
       }
@@ -274,7 +285,9 @@ async function executeTool(
     }
 
     default:
-      return { result: `Unknown tool: ${toolCall.tool}. Available: search_web, deep_research, get_existing_research, list_available_skills, select_skills, ready_to_plan` }
+      return {
+        result: `Unknown tool: ${toolCall.tool}. Available: search_web, deep_research, get_existing_research, list_available_skills, select_skills, ready_to_plan`,
+      }
   }
 }
 
@@ -287,24 +300,61 @@ async function executeTool(
 function parseToolCalls(text: string): AgentToolCall[] {
   const calls: AgentToolCall[] = []
 
-  // Pattern 1: ```tool_call\n{...}\n```
-  const blockPattern = /```tool_call\s*\n?([\s\S]*?)```/g
-  let match: RegExpExecArray | null = blockPattern.exec(text)
+  // Pattern 0: <longcat_tool_call>tool_call\n{...}\n</tool_call> (openrouter/owl-alpha format)
+  // This model wraps tool calls in XML-style tags
+  const xmlTagPattern = /<(?:longcat_)?tool_call>\s*(?:tool_call)?\s*\n?([\s\S]*?)<\/tool_call>/g
+  let match: RegExpExecArray | null = xmlTagPattern.exec(text)
   while (match !== null) {
     try {
-      const parsed = JSON.parse(match[1].trim())
+      const jsonStr = match[1].trim()
+      const parsed = JSON.parse(jsonStr)
       if (parsed.tool) {
         calls.push({ tool: parsed.tool, args: parsed.args || {} })
       }
     } catch {
-      // Malformed JSON — skip
+      // Malformed JSON inside XML tags — skip
     }
-    match = blockPattern.exec(text)
+    match = xmlTagPattern.exec(text)
   }
 
-  // Pattern 2: Inline JSON (fallback) — {"tool": "...", "args": {...}}
+  // Pattern 1: ```tool_call\n{...}\n```
   if (calls.length === 0) {
-    const inlinePattern = /\{[\s\n]*"tool"\s*:\s*"(\w+)"[\s\S]*?\}/g
+    const blockPattern = /```tool_call\s*\n?([\s\S]*?)```/g
+    match = blockPattern.exec(text)
+    while (match !== null) {
+      try {
+        const parsed = JSON.parse(match[1].trim())
+        if (parsed.tool) {
+          calls.push({ tool: parsed.tool, args: parsed.args || {} })
+        }
+      } catch {
+        // Malformed JSON — skip
+      }
+      match = blockPattern.exec(text)
+    }
+  }
+
+  // Pattern 2: ```json\n{...}\n``` (some models use ```json instead of ```tool_call)
+  if (calls.length === 0) {
+    const jsonBlockPattern = /```(?:json)?\s*\n?([\s\S]*?)```/g
+    match = jsonBlockPattern.exec(text)
+    while (match !== null) {
+      try {
+        const parsed = JSON.parse(match[1].trim())
+        if (parsed.tool) {
+          calls.push({ tool: parsed.tool, args: parsed.args || {} })
+        }
+      } catch {
+        // Not valid JSON — skip
+      }
+      match = jsonBlockPattern.exec(text)
+    }
+  }
+
+  // Pattern 3: Inline JSON — {"tool": "...", "args": {...}} with proper nested brace handling
+  if (calls.length === 0) {
+    // Find all JSON objects that have a "tool" key, handling nested braces
+    const inlinePattern = /\{\s*"tool"\s*:\s*"(\w+)"\s*,\s*"args"\s*:\s*(\{[^}]*\})\s*\}/g
     match = inlinePattern.exec(text)
     while (match !== null) {
       try {
@@ -313,9 +363,31 @@ function parseToolCalls(text: string): AgentToolCall[] {
           calls.push({ tool: parsed.tool, args: parsed.args || {} })
         }
       } catch {
-        // Malformed — skip
+        // Try just the tool name + args separately
+        try {
+          const args = JSON.parse(match[2])
+          calls.push({ tool: match[1], args })
+        } catch {
+          calls.push({ tool: match[1], args: {} })
+        }
       }
       match = inlinePattern.exec(text)
+    }
+  }
+
+  // Pattern 4: Function-call style — tool_name({...}) or tool_name: {...}
+  if (calls.length === 0) {
+    const funcPattern =
+      /\b(search_web|deep_research|get_existing_research|list_available_skills|select_skills|ready_to_plan)\s*[:(]\s*(\{[^}]*\})/g
+    match = funcPattern.exec(text)
+    while (match !== null) {
+      try {
+        const args = JSON.parse(match[2])
+        calls.push({ tool: match[1], args: args || {} })
+      } catch {
+        calls.push({ tool: match[1], args: {} })
+      }
+      match = funcPattern.exec(text)
     }
   }
 
@@ -394,134 +466,24 @@ export async function runAgenticPreflight(input: PreflightInput): Promise<Prefli
 
   emitStep({
     type: 'thinking',
-    message: '🤔 Analyzing your request and checking available resources...',
+    message: '🤔 Analyzing your request and deciding what preparation is needed...',
   })
 
-  // ── Keyword-based auto-skill selection (fallback for when LLM doesn't select skills) ──
-  // This runs deterministically before the LLM loop to ensure obvious skill matches are caught
-  if (!composedSkillPrompt) {
-    const lowerInstruction = instruction.toLowerCase()
-    const SKILL_KEYWORD_MAP: Record<string, string[]> = {
-      'story': ['story', 'fiction', 'narrative', 'short story', 'tale', 'fable', 'fairy tale', 'novella', 'creative writing', 'write a story', 'once upon'],
-      'essay': ['essay', 'argumentative', 'persuasive essay', 'expository', 'thesis'],
-      'academic': ['academic', 'research paper', 'dissertation', 'scholarly', 'journal article', 'peer review', 'citation'],
-      'newsletter': ['newsletter', 'email blast', 'subscriber', 'weekly update', 'monthly digest'],
-      'script': ['script', 'screenplay', 'dialogue', 'scene', 'act 1', 'act 2', 'stage direction'],
-    }
-
-    const matchedSkillIds: string[] = []
-    for (const [skillId, keywords] of Object.entries(SKILL_KEYWORD_MAP)) {
-      if (keywords.some(kw => lowerInstruction.includes(kw))) {
-        matchedSkillIds.push(skillId)
-      }
-    }
-
-    if (matchedSkillIds.length > 0) {
-      // Verify these skills actually exist before auto-selecting
-      try {
-        const projectPath = getActiveProjectPath()
-        const availableSkills = getSkillService().listSkills(projectPath || undefined)
-        const validIds = matchedSkillIds.filter(id => availableSkills.some(s => s.id === id))
-
-        if (validIds.length > 0) {
-          autoSelectedSkillIds = validIds.slice(0, 3) // max 3 skills
-          const composed = getSkillService().composeSkills(autoSelectedSkillIds, projectPath || undefined)
-          finalSkillPrompt = composed.composedPrompt
-
-          emitStep({
-            type: 'tool-call',
-            tool: 'select_skills',
-            args: { skill_ids: autoSelectedSkillIds },
-            message: `✨ Auto-detected writing type — activating skill${autoSelectedSkillIds.length > 1 ? 's' : ''}: ${autoSelectedSkillIds.join(', ')}`,
-          })
-
-          console.log(`[Preflight] Keyword-based auto-selected skills: ${autoSelectedSkillIds.join(', ')}`)
-        }
-      } catch (err: any) {
-        console.warn('[Preflight] Keyword skill auto-selection failed:', err.message)
-      }
-    }
-  }
-
-  // ── Research-Intent Detection (forced auto-research before LLM loop) ──
-  // When the user explicitly asks to research a topic, we don't leave it to the LLM's discretion.
-  // We force deep research immediately to ensure comprehensive coverage.
-  const researchIntent = detectResearchIntent(instruction)
-  if (researchIntent.detected && researchIntent.topic) {
-    emitStep({
-      type: 'tool-call',
-      tool: 'deep_research',
-      args: { query: researchIntent.topic },
-      message: `🔬 Research intent detected — auto-researching: "${researchIntent.topic}"`,
-    })
-
-    try {
-      const researchService = getResearchSearchService()
-      const entries = await researchService.autoResearch(
-        researchIntent.topic,
-        documentId,
-        (progress) => {
-          emitStep({
-            type: 'tool-result',
-            tool: 'deep_research',
-            result: progress.message,
-            message: `🔬 ${progress.message} (${progress.current}/${progress.total})`,
-          })
-        },
-      )
-
-      // Update final research context from the log
-      try {
-        const log = getResearchLogService().getLog(documentId)
-        if (log.entries.length > 0) {
-          finalResearch = {
-            entries: log.entries.map(e => ({
-              id: e.id,
-              query: e.query,
-              sources: e.sources,
-              excerpts: e.excerpts,
-              createdAt: e.createdAt,
-            })),
-            summary: log.summary,
-          }
-        }
-      } catch {
-        // Keep existing research context
-      }
-
-      emitStep({
-        type: 'tool-result',
-        tool: 'deep_research',
-        result: `${entries.length} research entries created`,
-        message: `📊 Auto-research complete: ${entries.length} entries with ${entries.reduce((sum, e) => sum + e.sources.length, 0)} total sources`,
-      })
-
-      console.log(`[Preflight] Research-intent auto-research complete: ${entries.length} entries for "${researchIntent.topic}"`)
-    } catch (err: any) {
-      console.warn('[Preflight] Research-intent auto-research failed:', err.message)
-      emitStep({
-        type: 'tool-result',
-        tool: 'deep_research',
-        result: `Failed: ${err.message}`,
-        message: `⚠️ Auto-research failed: ${err.message}. Will try via LLM loop.`,
-      })
-    }
-  }
-
   // Build conversation history for multi-turn tool calling
-  const skillStatusMsg = finalSkillPrompt
-    ? `Writing skills are already active (auto-detected or user-selected): ${autoSelectedSkillIds.join(', ')}. No need to call list_available_skills or select_skills.\n\n`
-    : 'The user has NOT selected any writing skills.\n\n'
-
+  // Do NOT pre-judge skills or research — let the LLM decide everything
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: buildPreflightSystemPrompt() },
     {
       role: 'user',
-      content: `The user wants to write about:\n\n"${instruction}"\n\n${skillStatusMsg}${
-        existingResearch && existingResearch.entries.length > 0
-          ? `There are ${existingResearch.entries.length} existing research entries available.\n`
+      content: `The user wants to write:\n\n"${instruction}"\n\n${
+        composedSkillPrompt
+          ? 'The user has already selected writing skills manually. You can skip list_available_skills/select_skills.\n\n'
           : ''
-      }Please analyze this request. Start by checking existing research${!finalSkillPrompt ? ' and available skills' : ''}, then decide if web research is needed.`,
+      }${
+        existingResearch && existingResearch.entries.length > 0
+          ? `There are ${existingResearch.entries.length} existing research entries available. Check them with get_existing_research.\n`
+          : ''
+      }Analyze this request. Start by checking existing research and available skills, then decide if web research is needed based on the topic.`,
     },
   ]
 
@@ -571,7 +533,9 @@ export async function runAgenticPreflight(input: PreflightInput): Promise<Prefli
     }
 
     // Parse tool calls from LLM response
+    console.log(`[Preflight] LLM response (iteration ${iteration}): ${llmResponse.slice(0, 300)}...`)
     const toolCalls = parseToolCalls(llmResponse)
+    console.log(`[Preflight] Parsed ${toolCalls.length} tool calls: ${toolCalls.map(t => t.tool).join(', ') || 'none'}`)
 
     if (toolCalls.length === 0) {
       // LLM responded without tool calls — treat as "ready to plan"

@@ -127,7 +127,14 @@ function researchReducer(state: ResearchState, action: ResearchAction): Research
     case 'STOP_AUTO_RESEARCH':
       return { ...state, autoResearching: false }
     case 'SET_ERROR':
-      return { ...state, error: action.error, loading: false, searching: false, deepResearching: false, autoResearching: false }
+      return {
+        ...state,
+        error: action.error,
+        loading: false,
+        searching: false,
+        deepResearching: false,
+        autoResearching: false,
+      }
     case 'CLEAR_ERROR':
       return { ...state, error: null }
     default:
@@ -195,6 +202,15 @@ export function useResearch(documentId: string | undefined) {
   // Auto-fetch on mount / documentId change
   useEffect(() => {
     fetchLog()
+  }, [fetchLog])
+
+  // Listen for external refresh requests (e.g., after preflight adds entries)
+  useEffect(() => {
+    const handler = () => {
+      fetchLog()
+    }
+    window.addEventListener('lacon:research-updated', handler)
+    return () => window.removeEventListener('lacon:research-updated', handler)
   }, [fetchLog])
 
   // ── Entry Operations ──
@@ -338,7 +354,9 @@ export function useResearch(documentId: string | undefined) {
 
   const webSearch = useCallback(
     async (query: string) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       dispatch({ type: 'START_SEARCHING' })
       try {
         const res = await research().webSearch(documentId, query, 'quick')
@@ -354,7 +372,9 @@ export function useResearch(documentId: string | undefined) {
 
   const deepResearch = useCallback(
     async (query: string) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       dispatch({ type: 'START_DEEP_RESEARCH' })
       try {
         const res = await research().webSearch(documentId, query, 'deep')
@@ -379,12 +399,14 @@ export function useResearch(documentId: string | undefined) {
 
   const autoResearch = useCallback(
     async (topic: string) => {
-      if (!documentId) {return}
+      if (!documentId) {
+        return
+      }
       dispatch({ type: 'START_AUTO_RESEARCH' })
       try {
         const res = await research().autoResearch(documentId, topic)
-        handleResponse(res, (data: any) => {
-          // data.entries contains all created entries — refresh the full log
+        handleResponse(res, (_data: any) => {
+          // _data.entries contains all created entries — refresh the full log
           dispatch({ type: 'STOP_AUTO_RESEARCH' })
         })
         await fetchLog()

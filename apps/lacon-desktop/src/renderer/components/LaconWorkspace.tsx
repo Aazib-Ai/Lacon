@@ -26,6 +26,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/renderer/lib/utils'
 import { countWords } from '@/renderer/utils/content-analytics'
 
+import type { SlideDeck } from '../../shared/slides-types'
 import { useAIDetection } from '../hooks/useAIDetection'
 import { useProject } from '../hooks/useProject'
 import { useResearch } from '../hooks/useResearch'
@@ -43,9 +44,11 @@ import { ProviderSettings } from './ProviderSettings'
 import { type RefineAction } from './RefineBar'
 import type { SelectedParagraphData } from './RefineButton'
 import { getSelectedParagraphData } from './RefineButton'
-import { RefineDiffOverlay, type RefineDiffData } from './RefineDiffOverlay'
-import { ReviewDiffOverlay, type ReviewDiffItem } from './ReviewDiffOverlay'
+import { type RefineDiffData,RefineDiffOverlay } from './RefineDiffOverlay'
+import { type ReviewDiffItem,ReviewDiffOverlay } from './ReviewDiffOverlay'
 import { SkillsLibraryPanel } from './SkillsLibraryPanel'
+import { SlideEditor } from './SlideEditor'
+import { SlidesGeneratorDialog } from './SlidesGeneratorDialog'
 import { Badge } from './ui/Badge'
 import { Button } from './ui/Button'
 import { ScrollArea } from './ui/ScrollArea'
@@ -55,9 +58,6 @@ import { ResearchWorkbench } from './WriterLoop/ResearchWorkbench'
 import { ReviewPanelWrapper as ReviewPanel } from './WriterLoop/ReviewPanelWrapper'
 import { VersionHistory } from './WriterLoop/VersionHistory'
 import { WriterLoopPanel } from './WriterLoop/WriterLoopPanel'
-import type { SlideDeck } from '../../shared/slides-types'
-import { SlidesGeneratorDialog } from './SlidesGeneratorDialog'
-import { SlideEditor } from './SlideEditor'
 
 /** Sidebar resize constraints */
 const SIDEBAR_MIN_WIDTH = 200
@@ -155,13 +155,16 @@ export function LaconWorkspace() {
       return
     }
     const electron = (window as any).electron
-    electron.slides.load(activeFilePath).then((result: any) => {
-      if (result?.success && result.data) {
-        setSlideDeck(result.data)
-      } else {
-        setSlideDeck(null)
-      }
-    }).catch(() => setSlideDeck(null))
+    electron.slides
+      .load(activeFilePath)
+      .then((result: any) => {
+        if (result?.success && result.data) {
+          setSlideDeck(result.data)
+        } else {
+          setSlideDeck(null)
+        }
+      })
+      .catch(() => setSlideDeck(null))
   }, [activeFilePath])
 
   // Dark mode
@@ -274,10 +277,32 @@ export function LaconWorkspace() {
     }
   }, [zenMode, saveActiveFile, project])
 
+  // ── Refresh research log when switching TO the research tab ──
+  // Dispatch event so ALL useResearch instances refresh (including ResearchWorkbench's own hook).
+  useEffect(() => {
+    if (activeTab === 'research') {
+      window.dispatchEvent(new Event('lacon:research-updated'))
+    }
+  }, [activeTab])
+
+  // ── Refresh research log when preflight completes ──
+  // After the agentic preflight finishes its research, the new entries
+  // need to be visible in both the writer tab badge AND the research panel.
+  const prevPreflightRunning = useRef(false)
+  useEffect(() => {
+    if (prevPreflightRunning.current && !writerLoop.preflightRunning) {
+      // Preflight just finished — refresh ALL research hook instances
+      window.dispatchEvent(new Event('lacon:research-updated'))
+    }
+    prevPreflightRunning.current = writerLoop.preflightRunning
+  }, [writerLoop.preflightRunning])
+
   // Handle editor content changes — editor emits HTML directly now
   const handleEditorContentChange = useCallback(
     (html: string) => {
-      if (!activeFilePath) {return}
+      if (!activeFilePath) {
+        return
+      }
       updateProjectContent(html)
       // Update word count from the editor's plain text
       const text = editorRef.current?.getText?.() || ''
@@ -308,7 +333,9 @@ export function LaconWorkspace() {
     const progress = writerLoop.progress
     const stage = writerLoop.stage
 
-    console.log(`[LaconWorkspace:ContentWriter] Effect fired — stage=${stage}, progress.status=${progress?.status}, results=${progress?.results?.length ?? 0}, contentWritten=${contentWrittenRef.current}, editorReady=${!!editorRef.current}`)
+    console.log(
+      `[LaconWorkspace:ContentWriter] Effect fired — stage=${stage}, progress.status=${progress?.status}, results=${progress?.results?.length ?? 0}, contentWritten=${contentWrittenRef.current}, editorReady=${!!editorRef.current}`,
+    )
 
     // Reset the write guard whenever we leave the 'complete' stage (new cycle starting)
     if (stage !== 'complete' && stage !== lastWrittenStageRef.current) {
@@ -322,23 +349,34 @@ export function LaconWorkspace() {
     // Safety: if we're in 'complete' stage but have no progress data, re-fetch it
     if (stage === 'complete' && (!progress || !progress.results?.length) && documentId) {
       console.log(`[LaconWorkspace:ContentWriter] Stage=complete but no progress results — fetching progress directly`)
-      window.electron?.writerLoop?.getProgress(documentId).then((res: any) => {
-        if (res?.success && res.data?.results?.length > 0) {
-          console.log(`[LaconWorkspace:ContentWriter] Direct progress fetch returned ${res.data.results.length} results — writing now`)
-          const allContent = res.data.results.map((r: any) => r.content).join('\n\n')
-          if (allContent && editorRef.current && !contentWrittenRef.current) {
-            contentWrittenRef.current = true
-            lastWrittenStageRef.current = 'complete'
-            console.log(`[LaconWorkspace:ContentWriter] ✅ Writing ${res.data.results.length} sections (${allContent.length} chars) via direct fetch`)
-            editorRef.current.setHTML(allContent)
+      window.electron?.writerLoop
+        ?.getProgress(documentId)
+        .then((res: any) => {
+          if (res?.success && res.data?.results?.length > 0) {
+            console.log(
+              `[LaconWorkspace:ContentWriter] Direct progress fetch returned ${res.data.results.length} results — writing now`,
+            )
+            const allContent = res.data.results.map((r: any) => r.content).join('\n\n')
+            if (allContent && editorRef.current && !contentWrittenRef.current) {
+              contentWrittenRef.current = true
+              lastWrittenStageRef.current = 'complete'
+              console.log(
+                `[LaconWorkspace:ContentWriter] ✅ Writing ${res.data.results.length} sections (${allContent.length} chars) via direct fetch`,
+              )
+              editorRef.current.setHTML(allContent)
+            }
           }
-        }
-      }).catch(() => { /* ignore */ })
+        })
+        .catch(() => {
+          /* ignore */
+        })
       return
     }
 
     if (!progress || progress.status !== 'complete' || !progress.results?.length) {
-      console.log(`[LaconWorkspace:ContentWriter] Early return — progress=${!!progress}, status=${progress?.status}, results=${progress?.results?.length ?? 0}`)
+      console.log(
+        `[LaconWorkspace:ContentWriter] Early return — progress=${!!progress}, status=${progress?.status}, results=${progress?.results?.length ?? 0}`,
+      )
       return
     }
 
@@ -352,13 +390,19 @@ export function LaconWorkspace() {
 
     // Collect all section HTML and write to editor
     const allContent = progress.results.map((r: any) => r.content).join('\n\n')
-    console.log(`[LaconWorkspace:ContentWriter] Writing ${progress.results.length} sections to editor (content length: ${allContent.length}, editorRef=${!!editorRef.current})`)
+    console.log(
+      `[LaconWorkspace:ContentWriter] Writing ${progress.results.length} sections to editor (content length: ${allContent.length}, editorRef=${!!editorRef.current})`,
+    )
 
     if (allContent && editorRef.current) {
-      console.log(`[LaconWorkspace:ContentWriter] ✅ Calling editorRef.current.setHTML() with ${allContent.length} chars`)
+      console.log(
+        `[LaconWorkspace:ContentWriter] ✅ Calling editorRef.current.setHTML() with ${allContent.length} chars`,
+      )
       editorRef.current.setHTML(allContent)
     } else {
-      console.error(`[LaconWorkspace:ContentWriter] ❌ FAILED to write — allContent=${!!allContent} (len=${allContent?.length}), editorRef=${!!editorRef.current}`)
+      console.error(
+        `[LaconWorkspace:ContentWriter] ❌ FAILED to write — allContent=${!!allContent} (len=${allContent?.length}), editorRef=${!!editorRef.current}`,
+      )
     }
   }, [writerLoop.progress, writerLoop.stage, documentId])
 
@@ -386,7 +430,7 @@ export function LaconWorkspace() {
 
   useEffect(() => {
     const editor = editorRef.current?.getEditor?.()
-    if (!editor) return
+    if (!editor) {return}
 
     const handleSelectionUpdate = () => {
       // Clear any pending update
@@ -426,7 +470,7 @@ export function LaconWorkspace() {
 
   const handleRefineAction = useCallback(
     async (action: RefineAction, instruction: string) => {
-      if (!documentId || !refineParagraphData) return
+      if (!documentId || !refineParagraphData) {return}
       setRefineLoading(true)
 
       try {
@@ -476,95 +520,92 @@ export function LaconWorkspace() {
    * 3. Find the revised text in the editor and highlight it
    * 4. Add to reviewDiffs for the overlay
    */
-  const handleReviewDiffReady = useCallback(
-    (data: { flagId: string; originalText: string; revisedText: string }) => {
-      const editor = editorRef.current?.getEditor?.()
-      if (!editor) return
+  const handleReviewDiffReady = useCallback((data: { flagId: string; originalText: string; revisedText: string }) => {
+    const editor = editorRef.current?.getEditor?.()
+    if (!editor) {return}
 
-      // 1. Save undo snapshot before first edit in this batch
-      if (!reviewUndoSnapshotRef.current) {
-        reviewUndoSnapshotRef.current = editor.getHTML()
-      }
+    // 1. Save undo snapshot before first edit in this batch
+    if (!reviewUndoSnapshotRef.current) {
+      reviewUndoSnapshotRef.current = editor.getHTML()
+    }
 
-      // 2. Find the paragraph/textblock that contains the original text
-      const searchNeedle = data.originalText.slice(0, 80)
-      let targetBlockPos = -1
-      let targetBlockEnd = -1
+    // 2. Find the paragraph/textblock that contains the original text
+    const searchNeedle = data.originalText.slice(0, 80)
+    let targetBlockPos = -1
+    let targetBlockEnd = -1
 
-      editor.state.doc.descendants((node: any, pos: number) => {
-        if (targetBlockPos !== -1) return false
-        if (node.isTextblock) {
-          const blockText = node.textContent
-          if (blockText.includes(searchNeedle)) {
-            targetBlockPos = pos
-            targetBlockEnd = pos + node.nodeSize
-            return false
-          }
+    editor.state.doc.descendants((node: any, pos: number) => {
+      if (targetBlockPos !== -1) {return false}
+      if (node.isTextblock) {
+        const blockText = node.textContent
+        if (blockText.includes(searchNeedle)) {
+          targetBlockPos = pos
+          targetBlockEnd = pos + node.nodeSize
+          return false
         }
-        return undefined
-      })
+      }
+      return undefined
+    })
 
-      if (targetBlockPos === -1) return
+    if (targetBlockPos === -1) {return}
 
-      // 3. Replace the paragraph's text content with the revised text
-      const contentFrom = targetBlockPos + 1
-      const contentTo = targetBlockEnd - 1
+    // 3. Replace the paragraph's text content with the revised text
+    const contentFrom = targetBlockPos + 1
+    const contentTo = targetBlockEnd - 1
 
+    try {
+      editor
+        .chain()
+        .focus()
+        .setTextSelection({ from: contentFrom, to: contentTo })
+        .deleteSelection()
+        .insertContent(data.revisedText)
+        .run()
+    } catch {
+      return
+    }
+
+    // 4. Re-find the inserted text and highlight it
+    let highlightFrom = -1
+    let highlightTo = -1
+    const revisedNeedle = data.revisedText.slice(0, 80)
+
+    editor.state.doc.descendants((node: any, pos: number) => {
+      if (highlightFrom !== -1) {return false}
+      if (node.isTextblock) {
+        const blockText = node.textContent
+        if (blockText.includes(revisedNeedle)) {
+          highlightFrom = pos + 1
+          highlightTo = pos + 1 + blockText.length
+          return false
+        }
+      }
+      return undefined
+    })
+
+    if (highlightFrom !== -1 && highlightTo !== -1) {
       try {
         editor
           .chain()
-          .focus()
-          .setTextSelection({ from: contentFrom, to: contentTo })
-          .deleteSelection()
-          .insertContent(data.revisedText)
+          .setTextSelection({ from: highlightFrom, to: highlightTo })
+          .setHighlight({ color: 'review-pending' })
           .run()
       } catch {
-        return
+        // Highlight is non-critical
       }
+    }
 
-      // 4. Re-find the inserted text and highlight it
-      let highlightFrom = -1
-      let highlightTo = -1
-      const revisedNeedle = data.revisedText.slice(0, 80)
+    // 5. Add to diffs for overlay display
+    const newDiff: ReviewDiffItem = {
+      flagId: data.flagId,
+      originalText: data.originalText,
+      revisedText: data.revisedText,
+      from: highlightFrom,
+      to: highlightTo,
+    }
 
-      editor.state.doc.descendants((node: any, pos: number) => {
-        if (highlightFrom !== -1) return false
-        if (node.isTextblock) {
-          const blockText = node.textContent
-          if (blockText.includes(revisedNeedle)) {
-            highlightFrom = pos + 1
-            highlightTo = pos + 1 + blockText.length
-            return false
-          }
-        }
-        return undefined
-      })
-
-      if (highlightFrom !== -1 && highlightTo !== -1) {
-        try {
-          editor
-            .chain()
-            .setTextSelection({ from: highlightFrom, to: highlightTo })
-            .setHighlight({ color: 'review-pending' })
-            .run()
-        } catch {
-          // Highlight is non-critical
-        }
-      }
-
-      // 5. Add to diffs for overlay display
-      const newDiff: ReviewDiffItem = {
-        flagId: data.flagId,
-        originalText: data.originalText,
-        revisedText: data.revisedText,
-        from: highlightFrom,
-        to: highlightTo,
-      }
-
-      setReviewDiffs(prev => [...prev, newDiff])
-    },
-    [],
-  )
+    setReviewDiffs(prev => [...prev, newDiff])
+  }, [])
 
   /** Accept All: keep the applied changes, just remove highlights */
   const handleReviewAcceptAll = useCallback(() => {
@@ -574,11 +615,7 @@ export function LaconWorkspace() {
       for (const diff of reviewDiffs) {
         if (diff.from !== -1 && diff.to !== -1) {
           try {
-            editor
-              .chain()
-              .setTextSelection({ from: diff.from, to: diff.to })
-              .unsetHighlight()
-              .run()
+            editor.chain().setTextSelection({ from: diff.from, to: diff.to }).unsetHighlight().run()
           } catch {
             // Positions may have shifted
           }
@@ -611,7 +648,9 @@ export function LaconWorkspace() {
       document.body.style.userSelect = 'none'
 
       const handleMouseMove = (ev: MouseEvent) => {
-        if (!isResizingRef.current) {return}
+        if (!isResizingRef.current) {
+          return
+        }
         const delta = ev.clientX - resizeStartXRef.current
         const newWidth = resizeStartWidthRef.current + delta
 
@@ -650,7 +689,9 @@ export function LaconWorkspace() {
       document.body.style.userSelect = 'none'
 
       const handleMouseMove = (ev: MouseEvent) => {
-        if (!isResizingRightRef.current) {return}
+        if (!isResizingRightRef.current) {
+          return
+        }
         const delta = resizeRightStartXRef.current - ev.clientX
         const newWidth = resizeRightStartWidthRef.current + delta
 
@@ -682,7 +723,7 @@ export function LaconWorkspace() {
   if (activeFilePath) {
     displayTitle =
       activeFilePath
-        .split(/[/\\]/)
+        .split(/[\\/]/) // eslint-disable-line no-useless-escape
         .pop()
         ?.replace(/\.[^.]+$/, '') || 'LACON'
   } else if (project) {
@@ -835,7 +876,7 @@ export function LaconWorkspace() {
 
           {/* Editor area */}
           <div className="flex-1 overflow-hidden">
-            {slidesEditorOpen ? (
+            {slidesEditorOpen && (
               <SlideEditor
                 deck={slideDeck}
                 documentId={activeFilePath || ''}
@@ -843,7 +884,8 @@ export function LaconWorkspace() {
                 onRequestGenerate={() => setSlidesDialogOpen(true)}
                 onClose={() => setSlidesEditorOpen(false)}
               />
-            ) : activeFilePath ? (
+            )}
+            {!slidesEditorOpen && activeFilePath && (
               <ModernEditor
                 key={activeFilePath}
                 content={activeFileContent || ''}
@@ -858,7 +900,8 @@ export function LaconWorkspace() {
                   }
                 }}
               />
-            ) : (
+            )}
+            {!slidesEditorOpen && !activeFilePath && (
               /* ── No file open empty state ── */
               <div className="flex-1 flex flex-col items-center justify-center h-full text-center px-8">
                 <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mb-6">
@@ -901,6 +944,8 @@ export function LaconWorkspace() {
             <FloatingAIBar
               documentId={documentId}
               writerStage={writerLoop.stage}
+              preflightSteps={writerLoop.preflightSteps}
+              preflightRunning={writerLoop.preflightRunning}
               onStartPlanning={instruction => {
                 // Get already-composed skill prompt (auto-composed on activeSkillIds change)
                 const composedSkillPrompt = workspaceSkills.composedSkill?.composedPrompt || ''
@@ -961,7 +1006,11 @@ export function LaconWorkspace() {
           data-testid="lacon-right-panel"
         >
           {rightPanelOpen && (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full min-w-0 overflow-hidden w-full">
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="flex flex-col h-full min-w-0 overflow-hidden w-full"
+            >
               {/* ── Panel Header ── */}
               <div className="flex-shrink-0 border-b border-border bg-card">
                 {/* Tab Navigation */}
@@ -1060,11 +1109,15 @@ export function LaconWorkspace() {
                   <WriterLoopPanel documentId={documentId} />
                 </TabsContent>
 
-                <TabsContent value="research" forceMount className="mt-0 p-0 overflow-hidden w-full data-[state=inactive]:hidden">
+                <TabsContent
+                  value="research"
+                  forceMount
+                  className="mt-0 p-0 overflow-hidden w-full data-[state=inactive]:hidden"
+                >
                   <ResearchWorkbench documentId={documentId} />
                 </TabsContent>
 
-                <TabsContent value="review" className="mt-0 p-0">
+                <TabsContent value="review" forceMount className="mt-0 p-0 data-[state=inactive]:hidden">
                   <ReviewPanel
                     documentId={documentId}
                     getEditorJSON={() => editorRef.current?.getJSON?.() ?? { type: 'doc', content: [] }}
@@ -1080,7 +1133,7 @@ export function LaconWorkspace() {
                     getEditorText={() => editorRef.current?.getText?.() || ''}
                     onReplaceText={(index, newText) => {
                       const editor = editorRef.current?.getEditor?.()
-                      if (!editor) return
+                      if (!editor) {return}
 
                       // The detection service splits text on \n{2,} (double+ newlines).
                       // editor.getText() returns text with \n between textblocks.
@@ -1092,12 +1145,15 @@ export function LaconWorkspace() {
 
                       // Split the same way the detection service does:
                       // split on any newlines, merge short fragments (<40 chars)
-                      const rawLines = fullText.split(/\n+/).map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+                      const rawLines = fullText
+                        .split(/\n+/)
+                        .map((l: string) => l.trim())
+                        .filter((l: string) => l.length > 0)
                       const merged: string[] = []
                       let mergeBuffer = ''
                       for (const line of rawLines) {
                         if (mergeBuffer.length > 0) {
-                          mergeBuffer += '\n' + line
+                          mergeBuffer += `\n${  line}`
                           if (mergeBuffer.length >= 60) {
                             merged.push(mergeBuffer)
                             mergeBuffer = ''
@@ -1110,7 +1166,7 @@ export function LaconWorkspace() {
                       }
                       if (mergeBuffer.length > 0) {
                         if (merged.length > 0) {
-                          merged[merged.length - 1] += '\n' + mergeBuffer
+                          merged[merged.length - 1] += `\n${  mergeBuffer}`
                         } else {
                           merged.push(mergeBuffer)
                         }
@@ -1123,7 +1179,7 @@ export function LaconWorkspace() {
                         // Find the first line of this merged paragraph in fullText
                         const firstLine = para.split('\n')[0]
                         const startIdx = fullText.indexOf(firstLine, searchFrom)
-                        if (startIdx === -1) continue
+                        if (startIdx === -1) {continue}
                         // Find the end by locating the last line
                         const lastLine = para.split('\n').pop() || firstLine
                         const lastLineStart = fullText.indexOf(lastLine, startIdx)
@@ -1140,7 +1196,9 @@ export function LaconWorkspace() {
                       const filtered = paragraphs.filter(p => p.text.length >= 20)
 
                       if (index < 0 || index >= filtered.length) {
-                        console.warn(`[Detection] Paragraph index ${index} out of range (${filtered.length} paragraphs)`)
+                        console.warn(
+                          `[Detection] Paragraph index ${index} out of range (${filtered.length} paragraphs)`,
+                        )
                         return
                       }
 
@@ -1170,7 +1228,7 @@ export function LaconWorkspace() {
 
                       // Find which textblocks overlap with our target character range
                       const overlapping = charToPos.filter(
-                        b => b.charEnd > target.startChar && b.charStart < target.endChar
+                        b => b.charEnd > target.startChar && b.charStart < target.endChar,
                       )
 
                       if (overlapping.length === 0) {
@@ -1188,7 +1246,9 @@ export function LaconWorkspace() {
 
                       if (newParagraphs.length <= 1) {
                         // Single paragraph — simple replacement
-                        editor.chain().focus()
+                        editor
+                          .chain()
+                          .focus()
                           .setTextSelection({ from: replaceFrom, to: replaceTo })
                           .deleteSelection()
                           .insertContent(newText.trim())
@@ -1200,16 +1260,18 @@ export function LaconWorkspace() {
                           content: [{ type: 'text', text: p.trim() }],
                         }))
 
-                        editor.chain().focus()
+                        editor
+                          .chain()
+                          .focus()
                           .setTextSelection({ from: replaceFrom, to: replaceTo })
                           .deleteSelection()
                           .insertContent(content)
                           .run()
                       }
                     }}
-                    onReplaceFullText={(newText) => {
+                    onReplaceFullText={newText => {
                       const editor = editorRef.current?.getEditor?.()
-                      if (!editor) return
+                      if (!editor) {return}
 
                       // Build proper ProseMirror content from the rewritten document
                       // Split on newlines to create paragraph nodes
@@ -1221,9 +1283,7 @@ export function LaconWorkspace() {
                       }))
 
                       // Replace entire document content atomically
-                      editor.chain().focus()
-                        .setContent({ type: 'doc', content })
-                        .run()
+                      editor.chain().focus().setContent({ type: 'doc', content }).run()
 
                       console.log(`[Detection] Replaced full document: ${paragraphs.length} paragraphs`)
                     }}
@@ -1234,9 +1294,9 @@ export function LaconWorkspace() {
                   <VersionHistory
                     documentId={documentId || ''}
                     getCurrentContent={() => editorRef.current?.getEditor?.()?.getJSON?.() ?? undefined}
-                    onRestore={(content) => {
+                    onRestore={content => {
                       const editor = editorRef.current?.getEditor?.()
-                      if (!editor) return
+                      if (!editor) {return}
                       try {
                         // If content is a ProseMirror JSON doc, set it directly
                         if (content && typeof content === 'object' && content.type === 'doc') {
@@ -1291,10 +1351,17 @@ export function LaconWorkspace() {
       <SlidesGeneratorDialog
         open={slidesDialogOpen}
         onClose={() => setSlidesDialogOpen(false)}
-        documentTitle={activeFilePath ? activeFilePath.split(/[\/\\]/).pop()?.replace(/\.[^.]+$/, '') || 'Untitled' : 'Untitled'}
+        documentTitle={
+          activeFilePath
+            ? activeFilePath
+                .split(/[/\\]/)
+                .pop()
+                ?.replace(/\.[^.]+$/, '') || 'Untitled'
+            : 'Untitled'
+        }
         documentContent={editorRef.current?.getText?.() || ''}
         documentId={activeFilePath || ''}
-        onGenerated={(deck) => {
+        onGenerated={deck => {
           setSlideDeck(deck)
           setSlidesEditorOpen(true)
         }}

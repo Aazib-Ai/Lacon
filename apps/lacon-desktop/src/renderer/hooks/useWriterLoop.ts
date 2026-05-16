@@ -84,7 +84,14 @@ function reducer(state: WriterLoopState, action: Action): WriterLoopState {
     case 'START_LOADING':
       return { ...state, loading: true, error: null, errorMeta: null }
     case 'SET_STATE':
-      return { ...state, session: action.session, outline: action.outline, loading: false, error: null, errorMeta: null }
+      return {
+        ...state,
+        session: action.session,
+        outline: action.outline,
+        loading: false,
+        error: null,
+        errorMeta: null,
+      }
     case 'SET_SESSION':
       return { ...state, session: action.session, loading: false, error: null, errorMeta: null }
     case 'SET_OUTLINE':
@@ -163,7 +170,11 @@ export function useWriterLoop(documentId: string | undefined) {
   const withTimeout = <T>(promise: Promise<T>, timeoutMs = 60000, label = 'Operation'): Promise<T> => {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
-        reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s. Check your API key and provider settings.`))
+        reject(
+          new Error(
+            `${label} timed out after ${Math.round(timeoutMs / 1000)}s. Check your API key and provider settings.`,
+          ),
+        )
       }, timeoutMs)
       promise
         .then(result => {
@@ -209,7 +220,9 @@ export function useWriterLoop(documentId: string | undefined) {
       }
 
       const data = res.data
-      console.log(`[useWriterLoop:fetchState] Backend returned — stage=${data.session?.stage}, outline=${!!data.outline}, outlineSections=${data.outline?.sections?.length}`)
+      console.log(
+        `[useWriterLoop:fetchState] Backend returned — stage=${data.session?.stage}, outline=${!!data.outline}, outlineSections=${data.outline?.sections?.length}`,
+      )
 
       // Fetch progress BEFORE dispatching state so both arrive in the same render
       const stage = data.session?.stage
@@ -220,7 +233,9 @@ export function useWriterLoop(documentId: string | undefined) {
           const progressRes = await writerLoop().getProgress(documentId)
           if (progressRes?.success && mountedRef.current) {
             progressData = progressRes.data
-            console.log(`[useWriterLoop:fetchState] Progress fetched — status=${progressData?.status}, results=${progressData?.results?.length}`)
+            console.log(
+              `[useWriterLoop:fetchState] Progress fetched — status=${progressData?.status}, results=${progressData?.results?.length}`,
+            )
           }
         } catch {
           // Progress is non-critical
@@ -246,17 +261,22 @@ export function useWriterLoop(documentId: string | undefined) {
 
   // Auto-load persisted reviews from disk when documentId changes
   useEffect(() => {
-    if (!documentId) return
-    writerLoop().loadReview(documentId).then((res: any) => {
-      if (res?.success && res.data?.result && mountedRef.current) {
-        dispatch({
-          type: 'SET_REVIEW',
-          review: res.data.result,
-          passCount: res.data.passCount,
-          canAutoPass: res.data.canAutoPass,
-        })
-      }
-    }).catch(() => { /* ignore — no persisted review */ })
+    if (!documentId) {return}
+    writerLoop()
+      .loadReview(documentId)
+      .then((res: any) => {
+        if (res?.success && res.data?.result && mountedRef.current) {
+          dispatch({
+            type: 'SET_REVIEW',
+            review: res.data.result,
+            passCount: res.data.passCount,
+            canAutoPass: res.data.canAutoPass,
+          })
+        }
+      })
+      .catch(() => {
+        /* ignore — no persisted review */
+      })
   }, [documentId])
 
   // Listen for generation-stopped events (fired by any hook instance after abort)
@@ -284,7 +304,7 @@ export function useWriterLoop(documentId: string | undefined) {
       try {
         const res = await withTimeout(
           writerLoop().startPlanning(documentId, instruction, composedSkillPrompt, researchContext),
-          180000, // 3 minutes — pre-flight + outline generation
+          360000, // 6 minutes — pre-flight (up to 150s) + outline generation (free models are slow)
           'Outline generation',
         )
         dispatch({ type: 'SET_PREFLIGHT_RUNNING', running: false })
@@ -495,14 +515,17 @@ export function useWriterLoop(documentId: string | undefined) {
       handleResponse(res, session => {
         // Clear everything: outline, progress, review, preflight — return to idle "Start Writing" view
         dispatch({ type: 'SET_STATE', session, outline: null })
-        dispatch({ type: 'SET_PROGRESS', progress: {
-          totalSections: 0,
-          completedSections: 0,
-          currentSectionId: null,
-          currentSectionTitle: null,
-          results: [],
-          status: 'idle',
-        } as any })
+        dispatch({
+          type: 'SET_PROGRESS',
+          progress: {
+            totalSections: 0,
+            completedSections: 0,
+            currentSectionId: null,
+            currentSectionTitle: null,
+            results: [],
+            status: 'idle',
+          } as any,
+        })
         dispatch({ type: 'SET_REVIEW', review: null, passCount: 0, canAutoPass: true })
         dispatch({ type: 'CLEAR_PREFLIGHT' })
       })
@@ -538,11 +561,7 @@ export function useWriterLoop(documentId: string | undefined) {
       dispatch({ type: 'START_LOADING' })
       const retryFn = () => generateSection(sectionId)
       try {
-        const res = await withTimeout(
-          writerLoop().generateSection(documentId, sectionId),
-          90000,
-          'Section generation',
-        )
+        const res = await withTimeout(writerLoop().generateSection(documentId, sectionId), 90000, 'Section generation')
         handleResponse(res)
         // Refresh progress
         const progressRes = await writerLoop().getProgress(documentId)
@@ -601,7 +620,9 @@ export function useWriterLoop(documentId: string | undefined) {
       generationTriggeredRef.current = false
 
       // Wait a moment for the backend generateAll loop to finalize
-      await new Promise(resolve => { setTimeout(resolve, 500) })
+      await new Promise(resolve => {
+        setTimeout(resolve, 500)
+      })
 
       // Refresh state (stage will have transitioned out of generating)
       await fetchState()
@@ -649,23 +670,27 @@ export function useWriterLoop(documentId: string | undefined) {
     // Auto-recovery: if we're in 'generating' stage but no generation is active,
     // trigger generateAll(). This handles process restarts and stuck states.
     const kickstartIfNeeded = async () => {
-      if (generationTriggeredRef.current) return
+      if (generationTriggeredRef.current) {return}
       try {
         const res = await writerLoop().getProgress(documentId)
         if (res?.success && mountedRef.current) {
           dispatch({ type: 'SET_PROGRESS', progress: res.data })
-          console.log(`[useWriterLoop:Poll] Kickstart check — progress status=${res.data?.status}, completed=${res.data?.completedSections}, results=${res.data?.results?.length}`)
+          console.log(
+            `[useWriterLoop:Poll] Kickstart check — progress status=${res.data?.status}, completed=${res.data?.completedSections}, results=${res.data?.results?.length}`,
+          )
 
-           // If progress is idle (no generation running), auto-start ONLY in auto mode
-           // In manual mode, the user triggers sections individually
-           const isAutoMode = state.session?.automationLevel === 'auto'
-           if (isAutoMode && (res.data?.status === 'idle' || (!res.data?.status && res.data?.completedSections === 0))) {
-             console.log('[useWriterLoop:Poll] Auto-triggering generateAll (recovery)')
-             generationTriggeredRef.current = true
-             writerLoop().generateAll(documentId).catch(() => {
-               // Fire-and-forget — errors handled by progress polling
-             })
-           }
+          // If progress is idle (no generation running), auto-start ONLY in auto mode
+          // In manual mode, the user triggers sections individually
+          const isAutoMode = state.session?.automationLevel === 'auto'
+          if (isAutoMode && (res.data?.status === 'idle' || (!res.data?.status && res.data?.completedSections === 0))) {
+            console.log('[useWriterLoop:Poll] Auto-triggering generateAll (recovery)')
+            generationTriggeredRef.current = true
+            writerLoop()
+              .generateAll(documentId)
+              .catch(() => {
+                // Fire-and-forget — errors handled by progress polling
+              })
+          }
         }
       } catch {
         // Ignore
@@ -675,16 +700,20 @@ export function useWriterLoop(documentId: string | undefined) {
     kickstartIfNeeded()
 
     const pollInterval = setInterval(async () => {
-      if (!mountedRef.current) return
+      if (!mountedRef.current) {return}
       try {
         const res = await writerLoop().getProgress(documentId)
         if (res?.success && mountedRef.current) {
-          console.log(`[useWriterLoop:Poll] Progress polled — status=${res.data?.status}, completed=${res.data?.completedSections}/${res.data?.totalSections}, results=${res.data?.results?.length}`)
+          console.log(
+            `[useWriterLoop:Poll] Progress polled — status=${res.data?.status}, completed=${res.data?.completedSections}/${res.data?.totalSections}, results=${res.data?.results?.length}`,
+          )
           dispatch({ type: 'SET_PROGRESS', progress: res.data })
 
           // If generation completed, refresh the full state
           if (res.data?.status === 'complete') {
-            console.log(`[useWriterLoop:Poll] ✅ Generation COMPLETE detected — calling fetchState() + dispatching event`)
+            console.log(
+              `[useWriterLoop:Poll] ✅ Generation COMPLETE detected — calling fetchState() + dispatching event`,
+            )
             generationTriggeredRef.current = false
             await fetchState()
             // Notify all hook instances so content gets written to editor
@@ -741,22 +770,38 @@ export function useWriterLoop(documentId: string | undefined) {
       dispatch({ type: 'START_LOADING' })
       const retryFn = () => runReview(documentContent)
       try {
-        const res = await withTimeout(
-          writerLoop().runReview(documentId, documentContent),
-          90000,
-          'Review',
-        )
-        handleResponse(res)
-        // Refresh review state
-        const reviewRes = await writerLoop().getReview(documentId)
-        handleResponse(reviewRes, data => {
+        const res = await withTimeout(writerLoop().runReview(documentId, documentContent), 90000, 'Review')
+
+        // The runReview IPC returns the ReviewResult directly in res.data
+        // Use it immediately so we don't depend on a second IPC round-trip
+        if (res?.success && res.data && mountedRef.current) {
+          console.log(`[useWriterLoop:runReview] Review complete — ${res.data.flags?.length || 0} flags found`)
           dispatch({
             type: 'SET_REVIEW',
-            review: data.result,
-            passCount: data.passCount,
-            canAutoPass: data.canAutoPass,
+            review: res.data,
+            passCount: res.data.passNumber || 1,
+            canAutoPass: (res.data.passNumber || 1) < 3,
           })
-        })
+        } else if (!res?.success) {
+          console.warn('[useWriterLoop:runReview] IPC returned failure:', res?.error?.message)
+          dispatch({ type: 'SET_ERROR', error: res?.error?.message || 'Review failed' })
+        }
+
+        // Also refresh from getReview to pick up accurate passCount/canAutoPass
+        try {
+          const reviewRes = await writerLoop().getReview(documentId)
+          if (reviewRes?.success && reviewRes.data?.result && mountedRef.current) {
+            dispatch({
+              type: 'SET_REVIEW',
+              review: reviewRes.data.result,
+              passCount: reviewRes.data.passCount,
+              canAutoPass: reviewRes.data.canAutoPass,
+            })
+          }
+        } catch {
+          // getReview is non-critical — we already have the result from runReview
+        }
+
         await fetchState()
       } catch (err: any) {
         dispatch({

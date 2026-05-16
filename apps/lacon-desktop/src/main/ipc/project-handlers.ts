@@ -9,12 +9,24 @@ import { basename, dirname, extname, join, normalize, relative, sep } from 'path
 
 import { IPC_CHANNELS } from '@/shared/ipc-schema'
 
+import { getProjectWorkspaceService } from '../services/project-workspace-service'
+
 /** Writer-friendly text file extensions */
 const WRITER_EXTENSIONS = new Set([
   '.lacon',
-  '.md', '.markdown', '.txt', '.rst', '.rtf', '.tex', '.bib',
-  '.json', '.yaml', '.yml', '.csv',
-  '.html', '.htm',
+  '.md',
+  '.markdown',
+  '.txt',
+  '.rst',
+  '.rtf',
+  '.tex',
+  '.bib',
+  '.json',
+  '.yaml',
+  '.yml',
+  '.csv',
+  '.html',
+  '.htm',
 ])
 
 /** Settings file for persisting active project */
@@ -65,7 +77,7 @@ function isPathWithinProject(filePath: string, projectPath: string): boolean {
   const normalizedFile = normalize(filePath)
   const normalizedProject = normalize(projectPath)
   const rel = relative(normalizedProject, normalizedFile)
-  return !rel.startsWith('..') && !rel.includes('..' + sep)
+  return !rel.startsWith('..') && !rel.includes(`..${  sep}`)
 }
 
 /**
@@ -74,11 +86,7 @@ function isPathWithinProject(filePath: string, projectPath: string): boolean {
  */
 async function ensureLaconSidecar(projectPath: string): Promise<void> {
   const laconDir = join(projectPath, '.lacon')
-  const dirs = [
-    laconDir,
-    join(laconDir, 'skills'),
-    join(laconDir, 'documents'),
-  ]
+  const dirs = [laconDir, join(laconDir, 'skills'), join(laconDir, 'documents')]
 
   for (const dir of dirs) {
     try {
@@ -127,11 +135,7 @@ async function ensureDocumentContext(projectPath: string, fileName: string): Pro
   const docName = basename(fileName, extname(fileName))
   const docDir = join(projectPath, '.lacon', 'documents', docName)
 
-  const dirs = [
-    docDir,
-    join(docDir, 'reviews'),
-    join(docDir, 'snapshots'),
-  ]
+  const dirs = [docDir, join(docDir, 'reviews'), join(docDir, 'snapshots')]
 
   for (const dir of dirs) {
     try {
@@ -170,7 +174,6 @@ async function ensureDocumentContext(projectPath: string, fileName: string): Pro
  * Register project-related IPC handlers
  */
 export function registerProjectHandlers(): void {
-
   // Open native folder picker and set as active project
   ipcMain.handle(IPC_CHANNELS.PROJECT_OPEN_FOLDER, async () => {
     try {
@@ -240,18 +243,18 @@ export function registerProjectHandlers(): void {
       const files: ProjectFileInfo[] = []
 
       for (const entry of entries) {
-        if (!entry.isFile()) continue
+        if (!entry.isFile()) {continue}
         // Skip hidden files
-        if (entry.name.startsWith('.')) continue
+        if (entry.name.startsWith('.')) {continue}
 
         const ext = extname(entry.name).toLowerCase()
-        if (!WRITER_EXTENSIONS.has(ext) && ext !== '') continue
+        if (!WRITER_EXTENSIONS.has(ext) && ext !== '') {continue}
 
         const filePath = join(projectPath, entry.name)
         try {
           const fileStat = await fs.stat(filePath)
           // Skip files larger than 10MB
-          if (fileStat.size > 10 * 1024 * 1024) continue
+          if (fileStat.size > 10 * 1024 * 1024) {continue}
 
           files.push({
             name: entry.name,
@@ -362,7 +365,7 @@ export function registerProjectHandlers(): void {
 
       // Auto-append .lacon if no extension
       if (!extname(fileName)) {
-        fileName = fileName + '.lacon'
+        fileName += '.lacon'
       }
 
       const filePath = join(settings.activeProjectPath, fileName)
@@ -427,6 +430,16 @@ export function registerProjectHandlers(): void {
       }
 
       await fs.unlink(filePath)
+
+      // Clean up the .lacon/documents/<docName>/ sidecar folder
+      // so old outlines, research, reviews, and sessions don't resurrect
+      // when a new file with the same name is created.
+      try {
+        getProjectWorkspaceService().deleteWorkspace(filePath, settings.activeProjectPath)
+      } catch (cleanupErr: any) {
+        console.warn('[IPC] project:deleteFile - workspace cleanup failed:', cleanupErr.message)
+      }
+
       return { success: true, data: { deleted: filePath } }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

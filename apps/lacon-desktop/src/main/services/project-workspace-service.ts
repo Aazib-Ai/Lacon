@@ -33,7 +33,7 @@ import type { ProjectWorkspace, WriterSession } from '../../shared/writer-types'
 function docNameFromFile(documentId: string): string {
   // If it looks like a path, use just the basename
   const base = basename(documentId)
-  return base.replace(/\.[^.]+$/, '')  // strip extension
+  return base.replace(/\.[^.]+$/, '') // strip extension
 }
 
 /**
@@ -64,11 +64,7 @@ export class ProjectWorkspaceService {
     const laconPath = join(projectPath, '.lacon', 'documents', docName)
 
     // Create directory structure
-    const dirs = [
-      laconPath,
-      join(laconPath, 'reviews'),
-      join(laconPath, 'snapshots'),
-    ]
+    const dirs = [laconPath, join(laconPath, 'reviews'), join(laconPath, 'snapshots')]
 
     for (const dir of dirs) {
       if (!existsSync(dir)) {
@@ -86,11 +82,7 @@ export class ProjectWorkspaceService {
     // Initialize research.json if missing
     const researchPath = join(laconPath, 'research.json')
     if (!existsSync(researchPath)) {
-      writeFileSync(
-        researchPath,
-        JSON.stringify({ entries: [], summary: '' }, null, 2),
-        'utf-8',
-      )
+      writeFileSync(researchPath, JSON.stringify({ entries: [], summary: '' }, null, 2), 'utf-8')
     }
 
     return {
@@ -115,6 +107,28 @@ export class ProjectWorkspaceService {
     const docName = docNameFromFile(documentId)
     const laconPath = join(projectPath, '.lacon', 'documents', docName)
     return existsSync(laconPath)
+  }
+
+  /**
+   * Delete the workspace for a document (outline, research, reviews, snapshots, session).
+   * Called when a file is deleted to prevent stale data from reappearing if
+   * a new file with the same name is created later.
+   */
+  deleteWorkspace(documentId: string, projectPath: string): void {
+    const docName = docNameFromFile(documentId)
+    const laconPath = join(projectPath, '.lacon', 'documents', docName)
+
+    if (!existsSync(laconPath)) {
+      return
+    }
+
+    try {
+      const { rmSync } = require('fs')
+      rmSync(laconPath, { recursive: true, force: true })
+      console.log(`[Workspace] Deleted workspace for "${docName}"`)
+    } catch (err: any) {
+      console.warn(`[Workspace] Failed to delete workspace for "${docName}":`, err.message)
+    }
   }
 
   /**
